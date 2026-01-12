@@ -1,0 +1,12 @@
+
+serverType: http-json
+serverConfig:
+  socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
+  # socket: ./iscsi.sock
+
+mounter:
+  id: iscsi
+  type: builtin
+  subtype: iscsiadm
+  config:
+    iscsiadmCommand: chroot /host iscsiadm

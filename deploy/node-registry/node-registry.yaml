@@ -1,0 +1,37 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: pv-poly
+  name: poly-csi-node-registry
+spec:
+  selector:
+    matchLabels:
+      app: poly-csi-node-registry
+  serviceName: poly-csi-node-registry
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: poly-csi-node-registry
+    spec:
+      containers:
+      - name: registry
+        image: harbor.k8s.lan/local-test/poly-csi-node-registry:v0.0.3
+        ports:
+        - name: http
+          containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: pv-poly
+  name: poly-csi-node-registry
+spec:
+  clusterIP: None
+  selector:
+    app: poly-csi-node-registry
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080

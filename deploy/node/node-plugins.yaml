@@ -1,0 +1,166 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  namespace: pv-poly
+  name: poly-csi-plugins
+  labels:
+    app.kubernetes.io/name: poly-csi
+    app.kubernetes.io/csi-role: node-plugins
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: poly-csi
+      app.kubernetes.io/csi-role: node-plugins
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: poly-csi
+        app.kubernetes.io/csi-role: node-plugins
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-node-critical
+      # Required by iSCSI
+      hostNetwork: true
+      # dnsPolicy: ClusterFirstWithHostNet
+      # Required by multipath detach
+      # hostIPC: true
+      # hostPID: false
+      containers:
+      - name: iscsi-mounter
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.13
+        args:
+        - --plugin-type=mounter
+        - --node-config=/poly-csi/iscsi-config/config.yaml
+        resources:
+          limits:
+            memory: 150Mi
+          requests:
+            cpu: 10m
+            memory: 15Mi
+        securityContext:
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
+        env:
+        - name: CSI_NODE_ID
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        # prevent crazy error messages due to the /dev host mount
+        terminationMessagePath: /tmp/termination-log
+        terminationMessagePolicy: File
+        # livenessProbe:
+        #   failureThreshold: 3
+        #   exec:
+        #     command:
+        #     - bin/liveness-probe
+        #     - --csi-address=/csi-data/csi.sock
+        #   initialDelaySeconds: 10
+        #   timeoutSeconds: 15
+        #   periodSeconds: 60
+        volumeMounts:
+        - mountPath: /var/lib/kubelet
+          name: kubelet-dir
+          mountPropagation: Bidirectional
+        # - mountPath: /lib/modules
+        #   name: modules-dir
+        #   readOnly: true
+        # - mountPath: /etc/localtime
+        #   name: localtime
+        #   readOnly: true
+        # - mountPath: /run/udev
+        #   name: udev-data
+        - mountPath: /host
+          name: host-dir
+          mountPropagation: Bidirectional
+        - mountPath: /sys
+          name: sys-dir
+        - mountPath: /dev
+          name: dev-dir
+        - mountPath: /poly-csi/iscsi-config
+          name: iscsi-config
+        - mountPath: /run/io.meoe.poly-csi/plugins/iscsi-container
+          name: poly-csi-plugins
+          mountPropagation: Bidirectional
+          subPath: iscsi-container
+        - mountPath: /etc/iscsi/
+          name: host-dir
+          readOnly: true
+          subPath: etc/iscsi/
+
+      - name: multipath
+        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.13
+        args:
+        - --plugin-type=multipath
+        - --node-config=/poly-csi/multipath-config/config.yaml
+        securityContext:
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
+        volumeMounts:
+        # - mountPath: /run/udev
+        #   name: udev-data
+        # - mountPath: /sys
+        #   name: sys-dir
+        - mountPath: /dev
+          name: dev-dir
+        - mountPath: /etc/multipath/
+          name: multipath-conf
+        - mountPath: /run/io.meoe.poly-csi/plugins/multipath-container
+          name: poly-csi-plugins
+          mountPropagation: Bidirectional
+          subPath: multipath-container
+        - mountPath: /poly-csi/multipath-config
+          name: multipath-config
+      volumes:
+      - name: kubelet-dir
+        hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+      - name: dev-dir
+        hostPath:
+          path: /dev
+          type: Directory
+      # - name: modules-dir
+      #   hostPath:
+      #     path: /lib/modules
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+      # - name: udev-data
+      #   hostPath:
+      #     path: /run/udev
+      - name: sys-dir
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: host-dir
+        hostPath:
+          path: /
+          type: Directory
+      # - hostPath:
+      #     path: /etc/iscsi/
+      #     type: ""
+      #   name: etc-iscsi
+      - name: poly-csi-plugins
+        hostPath:
+          path: /run/io.meoe.poly-csi/plugins
+          type: DirectoryOrCreate
+      - name: multipath-conf
+        hostPath:
+          path: /etc/multipath/
+          type: ""
+      - name: iscsi-config
+        configMap:
+          name: node-plugin-iscsi-config
+      - name: multipath-config
+        configMap:
+          name: node-plugin-multipath-config
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists

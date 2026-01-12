@@ -1,0 +1,11 @@
+
+*.log
+*.sock
+
+/bin/
+
+.env/
+/config.yaml
+/config-controller.yaml
+/config-node.yaml
+/config-iscsi.yaml

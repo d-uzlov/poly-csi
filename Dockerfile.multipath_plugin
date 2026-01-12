@@ -1,0 +1,26 @@
+FROM golang:1.25.3-alpine3.22 AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum .
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY ./cmd/builtinplugin/ /app/cmd/builtinplugin/
+COPY ./pkg/ /app/pkg/
+
+ARG APP_VERSION
+# prevent building with empty version
+RUN test -n "${APP_VERSION}"
+
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+  CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/builtinplugin/config.externalVersion=${APP_VERSION}" ./cmd/builtinplugin/
+
+FROM alpine:3.22.2 AS runtime
+WORKDIR /
+
+RUN apk add \
+  multipath-tools=0.11.1-r2 \
+  --no-cache
+
+COPY --from=builder /app/builtinplugin /builtinplugin
+ENTRYPOINT ["/builtinplugin"]

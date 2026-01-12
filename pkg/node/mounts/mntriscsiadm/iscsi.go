@@ -1,0 +1,156 @@
+package mntriscsiadm
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/transport"
+)
+
+type iscsiadmMounter struct {
+	id     string
+	config Config
+}
+
+func NewIscsiadmMounter(id string, config Config) mounts.NodeMounter {
+	return &iscsiadmMounter{
+		id:     id,
+		config: config,
+	}
+}
+
+func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.MounterContext, error) {
+	pc, err := ParsePublishContext(req.PublishContext)
+	if err != nil {
+		return nil, fmt.Errorf("ParsePublishContext: %w", err)
+	}
+
+	attributes := map[string]string{}
+
+	switch pc.Chap {
+	case ChapNone:
+		attributes["node.session.auth.authmethod"] = "None"
+	case ChapFromPublishSecret:
+		clientChap, err := ParseChap(req.PublishContextSecret, "chap.client")
+		if err != nil {
+			return nil, fmt.Errorf("parse chap.client from publish secret: %w", err)
+		}
+		targetChap, err := ParseChap(req.PublishContextSecret, "chap.target")
+		if err != nil {
+			return nil, fmt.Errorf("parse chap.target from publish secret: %w", err)
+		}
+
+		attributes["node.session.auth.authmethod"] = "CHAP"
+		attributes["node.session.auth.username"] = clientChap.User
+		attributes["node.session.auth.password"] = clientChap.Pass
+		attributes["node.session.auth.username_in"] = targetChap.User
+		attributes["node.session.auth.password_in"] = targetChap.Pass
+	default:
+		return nil, fmt.Errorf("unknown chap type: '%s'", pc.Chap)
+	}
+
+	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
+
+	tr := transport.FromContext(ctx)
+
+	successCount := 0
+	for _, v := range req.AddressOptions {
+		addr := fmt.Sprintf("%s:%s", v.Address, pc.Port)
+		err = snip.configureTarget(pc.Iqn, addr, attributes)
+		if err != nil {
+			if len(req.AddressOptions) <= 1 {
+				return nil, fmt.Errorf("iscsi: configureTarget: %w", err)
+			}
+
+			slogctx.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err)
+			continue
+		}
+		err = snip.connect(pc.Iqn, addr)
+		if err != nil {
+			if len(req.AddressOptions) <= 1 {
+				return nil, fmt.Errorf("iscsi: connect: %w", err)
+			}
+
+			slogctx.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err)
+			continue
+		}
+		successCount++
+	}
+	if successCount == 0 {
+		return nil, fmt.Errorf("all %d iscsi multipath connections failed, see logs for details", len(req.AddressOptions))
+	}
+	is, err := snip.findSessions(pc.Iqn)
+	if err != nil {
+		return nil, fmt.Errorf("find iscsi sessions: %w", err)
+	}
+	var devices []string
+	for _, v := range is {
+		deviceLink := fmt.Sprintf("/dev/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
+		// iscsi creates links in background, need to wait for it to appear
+		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
+			stat, err := tr.Cmds().Stat(ctx, deviceLink)
+			if err != nil {
+				return fmt.Errorf("stat %s (check if link exists): %w", deviceLink, err)
+			}
+			if stat == nil {
+				return fmt.Errorf("link does not exist: %s", deviceLink)
+			}
+			return nil
+		})
+	}
+	if len(devices) == 0 {
+		return nil, fmt.Errorf("iscsi device is not found")
+	}
+	return &mounts.MounterContext{
+		FolderPath: "",
+		Devices:    devices,
+		ManagedOps: mounts.ManagedOperations{
+			MountFs:   true,
+			UnmountFs: true,
+			ExpandFs:  true,
+		},
+		Extra: map[string]string{
+			"iscsi.iqn": pc.Iqn,
+		},
+	}, nil
+}
+
+func (m *iscsiadmMounter) Disconnect(ctx context.Context, info mounts.MounterContext) error {
+	iqn := info.Extra["iscsi.iqn"]
+	if iqn == "" {
+		return fmt.Errorf("mounter_info.extra: missing 'iscsi.iqn' field")
+	}
+	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
+
+	is, err := snip.findSessions(iqn)
+	if err != nil {
+		return fmt.Errorf("find iscsi sessions: %w", err)
+	}
+	for _, v := range is {
+		err = snip.disconnect(iqn, v.address)
+		if err != nil {
+			return fmt.Errorf("nvmeDisconnect: %w", err)
+		}
+	}
+	return nil
+}
+
+func (m *iscsiadmMounter) Expand(ctx context.Context, info mounts.MounterContext) error {
+	iqn := info.Extra["iscsi.iqn"]
+	if iqn == "" {
+		return fmt.Errorf("mounter_info.extra: missing 'iscsi.iqn' field")
+	}
+	_ = iqn
+
+	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
+	// TODO rescan only target devices?
+	err := snip.rescanAll()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Restore NVMe kernel target configuration
+Requires=sys-kernel-config.mount
+After=sys-kernel-config.mount network-online.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=no
+RemainAfterExit=yes
+ExecStart=/opt/nvmet_keeper config restore-merge
+# optionally save current configuration on exit
+# ExecStop=/opt/nvmet_keeper config save-merge
+SyslogIdentifier=nvmet_keeper
+
+[Install]
+WantedBy=multi-user.target

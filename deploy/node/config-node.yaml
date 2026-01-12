@@ -1,0 +1,39 @@
+nodeInfoDb:
+  address: http://poly-csi-node-registry:8080
+  interval: 15s
+
+encrypt:
+  nodeKey:
+    path: /poly-csi/node/node_key.pem
+  controllerPublicKey:
+    path: /poly-csi/controller/controller_key.pub.pem
+
+multipath:
+  id: multipath
+  type: plugin
+  subtype: http.json.dev
+  config:
+    socket: /run/io.meoe.poly-csi/plugins/multipath-container/multipath.sock
+
+mounters:
+- id: nfs
+  type: builtin
+  subtype: nfs
+- id: nvme
+  type: builtin
+  subtype: nvme
+- id: iscsi
+  type: plugin
+  subtype: http.json.dev
+  config:
+    socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
+
+networks:
+- includeCidr:
+  - 0.0.0.0/0
+  - ::/0
+  excludeCidr:
+  - 127.0.0.0/8
+  - 169.254.0.0/16
+  - ::1/128
+  - fe80::/10

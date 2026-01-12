@@ -1,0 +1,20 @@
+
+[Unit]
+Description=iSCSI plugin for poly-csi
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+User=root
+ExecStartPre=mkdir -p /run/io.meoe.poly-csi/plugins/iscsi/
+ExecStart=/opt/uni_csi_plugins/builtin -node-config /opt/uni_csi_plugins/iscsi.yaml
+
+# CPUQuota=200%
+# MemoryMin=15M
+# MemoryMax=30M
+# OOMPolicy=kill
+
+[Install]
+WantedBy=default.target

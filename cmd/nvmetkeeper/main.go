@@ -1,0 +1,49 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	configFolder string
+	useSudo      bool
+)
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+var rootCmd = &cobra.Command{
+	Use:           "nvmet_keeper",
+	Short:         "nvmet_keeper CLI",
+	Long:          "",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if configFolder == "" {
+			configFolder = "/etc/nvmet_keeper"
+			fmt.Fprintln(os.Stderr, "config-folder is set to default value:", configFolder)
+		}
+		return nil
+	},
+}
+
+func init() {
+	// persistent flag available to all subcommands
+	rootCmd.PersistentFlags().StringVar(&configFolder, "config-folder", "", "path to config folder")
+	rootCmd.PersistentFlags().BoolVar(&useSudo, "use-sudo", false, "run commands with sudo")
+
+	// register subcommands
+	rootCmd.AddCommand(portCmd)
+	rootCmd.AddCommand(subsysCmd)
+	rootCmd.AddCommand(namespaceCmd)
+	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(hostCmd)
+	rootCmd.AddCommand(stateCmd)
+}
