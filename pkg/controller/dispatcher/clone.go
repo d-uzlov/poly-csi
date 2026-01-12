@@ -13,86 +13,10 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-func (d *Dispatcher) optimizedClone(ctx context.Context, sourceId string, targetSrv *parsedServer, req storage.CreateRequest, dispatchParams DispatchParams) (storage.Volume, error) {
-	logger := slogctx.FromCtx(ctx)
+type sendFuncType func(ctx context.Context, targetFile string, timeout time.Duration) error
+type receiveFuncType func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error)
 
-	sh, err := d.getVolumeInfo(ctx, sourceId)
-	if err != nil {
-		return nil, fmt.Errorf("get volume info: %w", err)
-	}
-	defer sh.release()
-	if sh.vi == nil {
-		return nil, fmt.Errorf("source volume is not found")
-	}
-
-	targetStr, err := storagefactory.StorageFromType(dispatchParams.storageType, targetSrv.conf.Commands, targetSrv.conf.GlobalParams)
-	if err != nil {
-		return nil, fmt.Errorf("get target storage: %w", err)
-	}
-
-	sourceCtx := transport.MakeContext(ctx, sh.srv.trInstance)
-	targetCtx := transport.MakeContext(ctx, targetSrv.trInstance)
-
-	// TODO better timeout
-	timeout := time.Minute
-
-	sendFunc, receiveFunc, err := makeSendReceive(sourceCtx, targetCtx, sh.srv, *sh.vi, targetStr, req)
-	if err != nil {
-		return nil, fmt.Errorf("makeSendReceive: %w", err)
-	}
-
-	sendPipe, receivePipe, release, err := createClonePipes(ctx, req.Id, sh.srv, targetSrv, timeout)
-	if release != nil {
-		defer release()
-	}
-	if err != nil {
-		return nil, fmt.Errorf("createClonePipes: %w", err)
-	}
-
-	sendCtx, sendCancel := context.WithTimeout(sourceCtx, timeout)
-	defer sendCancel()
-	sendCh := make(chan error, 1)
-	go func() {
-		defer close(sendCh)
-		sendCh <- sendFunc(sendCtx, req.Id, sendPipe, timeout)
-	}()
-
-	receiveCtx, receiveCancel := context.WithTimeout(targetCtx, timeout)
-	defer receiveCancel()
-
-	var vol storage.Volume
-	receiveCh := make(chan error, 1)
-	go func() {
-		defer close(receiveCh)
-		sc, err := receiveFunc(receiveCtx, receivePipe, timeout)
-		vol = sc
-		receiveCh <- err
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("wait send: %w", ctx.Err())
-	case err = <-sendCh:
-		if err != nil {
-			return nil, fmt.Errorf("send: %w", err)
-		}
-		logger.Info("storage.Send: success")
-		// send OK, now let's check receive
-	}
-
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("wait receive: %w", ctx.Err())
-	case err = <-receiveCh:
-		if err != nil {
-			return nil, fmt.Errorf("receive: %w", err)
-		}
-		logger.Info("storage.Receive: success")
-		return vol, nil
-	}
-}
-
-func makeSendReceive(sourceCtx context.Context, targetCtx context.Context, sourceSrv *parsedServer, sourceVi voldbwrapper.VolumeInfo, targetStr storage.StorageManager, req storage.CreateRequest) (sendFunc func(ctx context.Context, id string, targetFile string, timeout time.Duration) error, receiveFunc func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error), err error) {
+func makeSendReceive(sourceCtx context.Context, targetCtx context.Context, sourceSrv *parsedServer, sourceVi voldbwrapper.VolumeInfo, targetStr storage.StorageManager, req storage.CreateRequest) (sendFuncType, receiveFuncType, error) {
 	sourceStr, err := storagefactory.StorageFromType(sourceVi.StorageType, sourceSrv.conf.Commands, sourceSrv.conf.GlobalParams)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get source storage: %w", err)
@@ -110,7 +34,7 @@ func makeSendReceive(sourceCtx context.Context, targetCtx context.Context, sourc
 	if sourceCaps.NativeSnapshot &&
 		sourceCaps.LocalSend != "" && targetCaps.LocalSend != "" &&
 		sourceCaps.LocalSend == targetCaps.LocalSend {
-		sendFunc = func(ctx context.Context, id string, targetFile string, timeout time.Duration) error {
+		sendFunc := func(ctx context.Context, targetFile string, timeout time.Duration) error {
 			snap, err := sourceVol.MakeNativeSnapshot(ctx, req.Id)
 			if err != nil {
 				return fmt.Errorf("create snapshot for send: %w", err)
@@ -119,10 +43,10 @@ func makeSendReceive(sourceCtx context.Context, targetCtx context.Context, sourc
 			defer snap.Delete(ctx)
 			return snap.Send(ctx, targetFile, timeout)
 		}
-		receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
+		receiveFunc := func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
 			return targetStr.Receive(ctx, sourceFile, req, timeout)
 		}
-		return
+		return sendFunc, receiveFunc, nil
 	}
 
 	// if storage does not support specialized send-receive,
@@ -152,20 +76,21 @@ func makeSendReceive(sourceCtx context.Context, targetCtx context.Context, sourc
 			return nil, nil, fmt.Errorf("generic copy is not available without local path")
 		}
 
-		sendFunc = func(ctx context.Context, id string, targetFile string, timeout time.Duration) error {
+		sendFunc := func(ctx context.Context, targetFile string, timeout time.Duration) error {
 			err := sendTar(ctx, sourceLocalPath, targetFile, timeout)
 			if err != nil {
 				return fmt.Errorf("send tar: %w", err)
 			}
 			return nil
 		}
-		receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
+		receiveFunc := func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
 			err := receiveTar(ctx, sourceFile, targetLocalPath, timeout)
 			if err != nil {
 				return nil, fmt.Errorf("receive tar: %w", err)
 			}
 			return targetVol, nil
 		}
+		return sendFunc, receiveFunc, nil
 	}
 
 	return nil, nil, fmt.Errorf("generic copy is not available for volumes of type '%s'", sourceCaps.LocalVolume)

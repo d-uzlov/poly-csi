@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/google/uuid"
@@ -158,18 +159,144 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 	var vol storage.Volume
 	if req.VolumeContentSource != nil {
-		if snap := req.VolumeContentSource.GetSnapshot(); snap != nil {
-			return nil, fmt.Errorf("snapshot source is not implemented")
-		} else if src := req.VolumeContentSource.GetVolume(); src != nil {
-			vol, err = d.optimizedClone(ctx, src.VolumeId, srv, storageCreateRequest, dispatchParams)
+		var sourceSnapshot storage.Snapshot
+		var sourceServer *parsedServer
+		var sourceCtx context.Context
+
+		tmpSnapshotId := "snap-for-" + req.Name
+
+		if src := req.VolumeContentSource.GetSnapshot(); src != nil {
+			sh, err := d.getSnapshotHandle(ctx, src.SnapshotId)
 			if err != nil {
-				return nil, fmt.Errorf("optimizedClone volume_id=%s: %w", src.VolumeId, err)
+				return nil, fmt.Errorf("getSnapshotHandle: %w", err)
 			}
-			if vol == nil {
-				return nil, fmt.Errorf("clone did not return storage context")
+			defer sh.release()
+			if sh.si == nil {
+				return nil, fmt.Errorf("source snapshot is not found")
+			}
+
+			sourceCtx = transport.MakeContext(ctx, sh.srv.trInstance)
+			sourceServer = sh.srv
+
+			sourceStr, err := storagefactory.StorageFromType(sh.si.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
+			if err != nil {
+				return nil, fmt.Errorf("get source storage: %w", err)
+			}
+
+			snap, err := sourceStr.ParseNativeSnapshot(sh.si.SerializedData)
+			if err != nil {
+				return nil, fmt.Errorf("parse source snapshot data: %w", err)
+			}
+			sourceSnapshot = snap
+		} else if src := req.VolumeContentSource.GetVolume(); src != nil {
+			sh, err := d.getVolumeInfo(ctx, src.VolumeId)
+			if err != nil {
+				return nil, fmt.Errorf("get volume info: %w", err)
+			}
+			defer sh.release()
+			if sh.vi == nil {
+				return nil, fmt.Errorf("source volume is not found")
+			}
+
+			sourceCtx = transport.MakeContext(ctx, sh.srv.trInstance)
+			sourceServer = sh.srv
+
+			sourceStr, err := storagefactory.StorageFromType(sh.vi.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
+			if err != nil {
+				return nil, fmt.Errorf("get source storage: %w", err)
+			}
+
+			sourceVol, err := sourceStr.ParseVolume(sh.vi.StorageData)
+			if err != nil {
+				return nil, fmt.Errorf("parse source storage data: %w", err)
+			}
+
+			sourceCaps := sourceStr.GetCapabilities()
+			if sourceCaps.NativeSnapshot {
+				sourceSnapshot, err = sourceVol.MakeNativeSnapshot(ctx, tmpSnapshotId)
+				if err != nil {
+					return nil, fmt.Errorf("create source snapshot: %w", err)
+				}
+				// TODO cleanup should use a different context, with extended timeout
+				defer sourceSnapshot.Delete(ctx)
+			} else {
+				return nil, fmt.Errorf("folder snapshots are not implemented")
 			}
 		} else {
 			return nil, fmt.Errorf("unknown volume content source type: %#v", req.VolumeContentSource.Type)
+		}
+
+		if sourceSnapshot == nil {
+			return nil, fmt.Errorf("unexpectedly missing source snapshot data")
+		}
+		if sourceCtx == nil {
+			return nil, fmt.Errorf("unexpectedly missing source context")
+		}
+
+		var sendFunc sendFuncType
+		var receiveFunc receiveFuncType
+
+		sourceCaps := sourceSnapshot.GetCapabilities()
+		targetCaps := str.GetCapabilities()
+		if sourceCaps.LocalSend != "" && targetCaps.LocalSend != "" &&
+			sourceCaps.LocalSend == targetCaps.LocalSend {
+			sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
+				return sourceSnapshot.Send(ctx, targetFile, timeout)
+			}
+			receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
+				return str.Receive(ctx, sourceFile, storageCreateRequest, timeout)
+			}
+		}
+
+		// TODO better timeout
+		timeout := time.Minute
+
+		sendPipe, receivePipe, release, err := createClonePipes(ctx, tmpSnapshotId, sourceServer, srv, timeout)
+		if release != nil {
+			defer release()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("createClonePipes: %w", err)
+		}
+
+		sendCtx, sendCancel := context.WithTimeout(sourceCtx, timeout)
+		defer sendCancel()
+		sendCh := make(chan error, 1)
+		go func() {
+			defer close(sendCh)
+			sendCh <- sendFunc(sendCtx, sendPipe, timeout)
+		}()
+
+		receiveCtx, receiveCancel := context.WithTimeout(ctx, timeout)
+		defer receiveCancel()
+
+		receiveCh := make(chan error, 1)
+		go func() {
+			defer close(receiveCh)
+			sc, err := receiveFunc(receiveCtx, receivePipe, timeout)
+			vol = sc
+			receiveCh <- err
+		}()
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("wait send: %w", ctx.Err())
+		case err = <-sendCh:
+			if err != nil {
+				return nil, fmt.Errorf("send: %w", err)
+			}
+			logger.Info("storage.Send: success")
+			// send OK, now let's check receive
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("wait receive: %w", ctx.Err())
+		case err = <-receiveCh:
+			if err != nil {
+				return nil, fmt.Errorf("receive: %w", err)
+			}
+			logger.Info("storage.Receive: success")
 		}
 	} else {
 		vol, err = str.CreateVolume(ctx, storageCreateRequest)

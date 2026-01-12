@@ -36,6 +36,7 @@ type Volume interface {
 }
 
 type Snapshot interface {
+	GetCapabilities() Capabilities
 	Send(ctx context.Context, targetFile string, timeout time.Duration) error
 	Delete(ctx context.Context) error
 	Serialize() (string, error)

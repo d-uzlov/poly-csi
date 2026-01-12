@@ -24,6 +24,15 @@ func newSnapshot(fullName string, snip zfs.Snippets) *Snapshot {
 	}
 }
 
+func (s *Snapshot) GetCapabilities() storage.Capabilities {
+	return storage.Capabilities{
+		LocalVolume:    storage.VolFolder,
+		OpaqueVolume:   "zfs-dataset",
+		NativeSnapshot: true,
+		LocalSend:      "zfs-dataset",
+	}
+}
+
 func (s *Snapshot) Send(ctx context.Context, targetFile string, timeout time.Duration) error {
 	err := s.snip.Send(ctx, s.FullName, targetFile, timeout)
 	if err != nil {
