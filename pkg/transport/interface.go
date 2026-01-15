@@ -25,6 +25,7 @@ type Commands interface {
 	Ls(ctx context.Context, path string) ([]string, error)
 	// Create directory. Idempotent, returns nil is directory already exists
 	Mkdir(ctx context.Context, path string, parents bool) error
+	Move(ctx context.Context, source string, dest string) error
 	RmDirRecursive(ctx context.Context, path string) error
 	// Delete directory. Can fail on files
 	RmDir(ctx context.Context, path string) error
@@ -32,6 +33,7 @@ type Commands interface {
 	RmFile(ctx context.Context, path string) error
 	// Stat returns StatResult for existing directory, or null if directory is not found
 	Stat(ctx context.Context, path string) (*StatResult, error)
+	Df(ctx context.Context, path string) (*FsSizeInfo, error)
 	CreateSymlink(ctx context.Context, link string, target string) error
 	MkFifo(ctx context.Context, path string) error
 
@@ -52,6 +54,12 @@ const (
 type StatResult struct {
 	Type int
 	Path string
+}
+
+type FsSizeInfo struct {
+	Size      int64
+	Used      int64
+	Available int64
 }
 
 func (r StatResult) IsDirectory() bool { return r.Type == FtDirectory }

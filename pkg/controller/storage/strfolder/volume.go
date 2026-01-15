@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type Volume struct {
@@ -18,9 +19,9 @@ func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
 }
 
 func (v *Volume) Delete(ctx context.Context) error {
-	err := deleteFolder(ctx, v.path)
+	err := transport.FromContext(ctx).SudoCmds().RmDirRecursive(ctx, v.path)
 	if err != nil {
-		return err
+		return fmt.Errorf("remove %s: %w", v.path, err)
 	}
 	return nil
 }

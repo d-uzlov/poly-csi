@@ -13,7 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/transport/executils"
 )
 
-type nativeCommands struct{
+type nativeCommands struct {
 	tr transport.Transport
 }
 
@@ -57,6 +57,20 @@ func (s *nativeCommands) Ls(ctx context.Context, path string) ([]string, error) 
 		result = append(result, v.Name())
 	}
 	return result, nil
+}
+
+func (s *nativeCommands) Move(ctx context.Context, source string, dest string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	if source == dest {
+		return nil
+	}
+
+	err := os.Rename(source, dest)
+	// todo handle moves between filesystems
+	return err
 }
 
 func (s *nativeCommands) Mkdir(ctx context.Context, path string, parents bool) error {
@@ -116,10 +130,14 @@ func (s *nativeCommands) Stat(ctx context.Context, path string) (*transport.Stat
 	}
 	// TODO use os.Stat instead of cmds fallback
 	return executils.New(s.tr, false).Stat(ctx, path)
-	// if !sudo || s.isRoot {
-	// 	res, err := os.Stat(path)
-	// 	return &transport.StatResult{}, nil
-	// }
+}
+
+func (s *nativeCommands) Df(ctx context.Context, path string) (*transport.FsSizeInfo, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	// TODO implement
+	return executils.New(s.tr, false).Df(ctx, path)
 }
 
 func (s *nativeCommands) CreateSymlink(ctx context.Context, link string, target string) error {

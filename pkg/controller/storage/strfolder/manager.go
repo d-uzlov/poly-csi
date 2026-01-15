@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type manager struct{}
@@ -28,12 +29,12 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	capacity, err := getAvailableCapacity(ctx, p.parentFolder)
+	fsInfo, err := transport.FromContext(ctx).Cmds().Df(ctx, p.parentFolder)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("get filesystem info: %w", err)
 	}
 
-	return capacity, nil
+	return fsInfo.Available, nil
 }
 
 func (m *manager) ParseVolume(serialized string) (storage.Volume, error) {
@@ -57,9 +58,9 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 
 	folderPath := fmt.Sprintf("%s/%s", p.parentFolder, req.Id)
 
-	err = createFolder(ctx, folderPath)
+	err = transport.FromContext(ctx).SudoCmds().Mkdir(ctx, folderPath, true)
 	if err != nil {
-		return nil, fmt.Errorf("create dataset: %w", err)
+		return nil, fmt.Errorf("create volume folder: %w", err)
 	}
 
 	return &Volume{

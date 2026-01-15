@@ -55,7 +55,7 @@ func (d *Dispatcher) getVolumeInfo(ctx context.Context, volumeId string) (*volum
 		return nil, fmt.Errorf("server[id=%s].db: get entry %w", srvId, err)
 	}
 	if dbEntry == nil {
-		return nil, nil
+		return &volumeManagementHandle{}, nil
 	}
 	wrapper := voldbwrapper.New(dbEntry)
 	vi, err := wrapper.GetVolumeInfo(ctx)

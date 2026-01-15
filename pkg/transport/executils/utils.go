@@ -3,6 +3,7 @@ package executils
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"meoe.io/poly-csi/pkg/transport"
@@ -84,6 +85,28 @@ func (ec *ExecCommands) Ls(ctx context.Context, path string) ([]string, error) {
 		return nil, transport.FormatRunError(runResult)
 	}
 	return strings.Fields(string(runResult.Stdout)), nil
+}
+
+func (ec *ExecCommands) Move(ctx context.Context, source string, dest string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	cmd := []string{"mv", source, dest}
+	if ec.sudo {
+		cmd = append([]string{"sudo"}, cmd...)
+	}
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	if err != nil {
+		return err
+	}
+	if runResult.ExitCode != 0 {
+		if strings.Contains(string(runResult.Stderr), "are the same file") {
+			return nil
+		}
+		return transport.FormatRunError(runResult)
+	}
+	return nil
 }
 
 func (ec *ExecCommands) Mkdir(ctx context.Context, path string, parents bool) error {
@@ -246,6 +269,43 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (*transport.StatR
 		result.Type = transport.FtFile
 	}
 	return result, nil
+}
+
+func (ec *ExecCommands) Df(ctx context.Context, path string) (*transport.FsSizeInfo, error) {
+	cmd := []string{"df", "--output=size,used,avail", "--block-size=1", path}
+	// cmd := fmt.Sprintf("df --output=avail --block-size=1 '%s' | tail -n +2", path)
+	stdout, err := transport.CheckedRunStdout(ctx, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", cmd, err)
+	}
+	lines := strings.Split(stdout, "\n")
+	if len(lines) != 2 {
+		return nil, fmt.Errorf("expected only 2 lines in df stdout: %s", stdout)
+	}
+
+	fields := strings.Fields(lines[1])
+	if len(fields) != 3 {
+		return nil, fmt.Errorf("expected 3 fields in df stdout: %s", stdout)
+	}
+
+	size, err := strconv.ParseInt(lines[1], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parse size from df stdout")
+	}
+	used, err := strconv.ParseInt(lines[1], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parse used from df stdout")
+	}
+	avail, err := strconv.ParseInt(lines[1], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parse avail from df stdout")
+	}
+
+	return &transport.FsSizeInfo{
+		Size:      size,
+		Used:      used,
+		Available: avail,
+	}, nil
 }
 
 func (ec *ExecCommands) CreateSymlink(ctx context.Context, link string, target string) error {
