@@ -37,12 +37,12 @@ func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
 	return v.getMainVolume(), nil
 }
 
-func (v *Volume) getMainVolume() (string) {
+func (v *Volume) getMainVolume() string {
 	return v.containerPath + "/volume"
 }
 
 func (v *Volume) Create(ctx context.Context) error {
-	_, err := v.snip.CreateSubvolume(ctx, v.getMainVolume())
+	_, err := v.snip.SubvolumeCreate(ctx, v.getMainVolume())
 	if err != nil {
 		return fmt.Errorf("create subvol: %w", err)
 	}
@@ -58,7 +58,7 @@ func (v *Volume) setQuota(ctx context.Context, size int64) error {
 }
 
 func (v *Volume) Delete(ctx context.Context) error {
-	_, err := v.snip.DestroySubvolume(ctx, v.getMainVolume())
+	_, err := v.snip.SubvolumeDelete(ctx, v.getMainVolume())
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,12 @@ func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
 
 func (v *Volume) MakeNativeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
 	snapshotPath := v.containerPath + "/snap-" + name
-	err := v.snip.SnapshotSubvolume(ctx, v.getMainVolume(), snapshotPath)
+	exists, err := v.snip.SubvolumeTest(ctx, snapshotPath)
+	if exists {
+		return newSnapshot(snapshotPath, v.snip), nil
+	}
+
+	err = v.snip.SubvolumeSnapshot(ctx, v.getMainVolume(), snapshotPath)
 	if err != nil {
 		return nil, fmt.Errorf("create btrfs snapshot '%s': %w", snapshotPath, err)
 	}

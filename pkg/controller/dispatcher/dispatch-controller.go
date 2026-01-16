@@ -117,6 +117,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		}
 	}
 
+	if strings.Contains(req.Name, "/") {
+		return nil, fmt.Errorf("volume name must not contain '/' symbol")
+	}
 	volumeId := createVolumeId(srv.conf.StableId, req.Name)
 
 	existingDbEntry, err := srv.dbInstance.GetEntry(ctx, req.Name)

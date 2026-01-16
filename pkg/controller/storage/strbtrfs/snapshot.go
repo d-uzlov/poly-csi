@@ -65,6 +65,6 @@ func (s *Snapshot) Send(ctx context.Context, targetFile string, timeout time.Dur
 }
 
 func (s *Snapshot) Delete(ctx context.Context) error {
-	_, err := s.snip.DestroySubvolume(ctx, s.Path)
+	_, err := s.snip.SubvolumeDelete(ctx, s.Path)
 	return err
 }
