@@ -41,7 +41,7 @@ func (v *Volume) getMainVolume() string {
 	return v.containerPath + "/volume"
 }
 
-func (v *Volume) Create(ctx context.Context) error {
+func (v *Volume) createMainVolume(ctx context.Context) error {
 	_, err := v.snip.SubvolumeCreate(ctx, v.getMainVolume())
 	if err != nil {
 		return fmt.Errorf("create subvol: %w", err)

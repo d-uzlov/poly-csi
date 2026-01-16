@@ -21,9 +21,9 @@ type BtrfsJsonResult struct {
 	FilesystemDf []QuotaEntry `json:"filesystem-df"`
 }
 
-func NewSnippets(zfsCmd []string) Snippets {
+func NewSnippets(btrfsCmd []string) Snippets {
 	return Snippets{
-		btrfsCmd: zfsCmd,
+		btrfsCmd: btrfsCmd,
 	}
 }
 

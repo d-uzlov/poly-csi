@@ -70,6 +70,7 @@ func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateReque
 		return nil, nil
 	}
 
+	// TODO
 	// if info.GetSize() != req.Size {
 	// 	return nil, fmt.Errorf("size mismatch: %d != %d", info.GetSize(), req.Size)
 	// }
@@ -91,7 +92,7 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 	}
 
 	vol := newVolume(containerPath, m.snip)
-	err = vol.Create(ctx)
+	err = vol.createMainVolume(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create subvol: %w", err)
 	}

@@ -249,6 +249,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
 				return str.Receive(ctx, sourceFile, storageCreateRequest, timeout)
 			}
+		} else {
+			return nil, fmt.Errorf("source and target use incompatible send-receive mechanism")
 		}
 
 		// TODO better timeout
