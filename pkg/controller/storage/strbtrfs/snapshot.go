@@ -11,16 +11,16 @@ import (
 )
 
 type Snapshot struct {
-	Path string `json:"full_name"`
-	snip btrfs.Snippets
+	SubvolPath string `json:"full_name"`
+	snip       btrfs.Snippets
 }
 
 var _ storage.Snapshot = &Snapshot{}
 
 func newSnapshot(path string, snip btrfs.Snippets) *Snapshot {
 	return &Snapshot{
-		Path: path,
-		snip: snip,
+		SubvolPath: path,
+		snip:       snip,
 	}
 }
 
@@ -30,7 +30,7 @@ func parseSnapshot(serialized string, snip btrfs.Snippets) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal json: %w", err)
 	}
-	if result.Path == "" {
+	if result.SubvolPath == "" {
 		return nil, fmt.Errorf("path is empty")
 	}
 	result.snip = snip
@@ -55,8 +55,12 @@ func (s *Snapshot) GetCapabilities() storage.Capabilities {
 	}
 }
 
+func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {
+	return s.SubvolPath, func() {}, nil
+}
+
 func (s *Snapshot) Send(ctx context.Context, targetFile string, timeout time.Duration) error {
-	err := s.snip.Send(ctx, s.Path, targetFile, timeout)
+	err := s.snip.Send(ctx, s.SubvolPath, targetFile, timeout)
 	if err != nil {
 		return fmt.Errorf("btrfs send: %w", err)
 	}
@@ -65,6 +69,6 @@ func (s *Snapshot) Send(ctx context.Context, targetFile string, timeout time.Dur
 }
 
 func (s *Snapshot) Delete(ctx context.Context) error {
-	_, err := s.snip.SubvolumeDelete(ctx, s.Path)
+	_, err := s.snip.SubvolumeDelete(ctx, s.SubvolPath)
 	return err
 }

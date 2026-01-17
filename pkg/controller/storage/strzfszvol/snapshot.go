@@ -4,24 +4,43 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
 type Snapshot struct {
-	FullName string
-	snip     zfs.Snippets
+	FullName   string
+	parentName string
+	snip       zfs.Snippets
 }
 
 var _ storage.Snapshot = &Snapshot{}
 
 func newSnapshot(fullName string, snip zfs.Snippets) *Snapshot {
-	return &Snapshot{
-		FullName: fullName,
-		snip:     snip,
+	c := strings.Split(fullName, "@")
+	if len(c) != 2 {
+		panic("snapshot name is not in the format dataset@snap-name: " + fullName)
 	}
+	if c[0] == "" || c[1] == "" {
+		panic("snapshot name is not in the format dataset@snap-name: " + fullName)
+	}
+	return &Snapshot{
+		FullName:   fullName,
+		parentName: c[0],
+		snip:       snip,
+	}
+}
+
+func (s *Snapshot) Serialize() (string, error) {
+	bytes, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 func (s *Snapshot) GetCapabilities() storage.Capabilities {
@@ -31,6 +50,21 @@ func (s *Snapshot) GetCapabilities() storage.Capabilities {
 		NativeSnapshot: true,
 		LocalSend:      "zfs-zvol",
 	}
+}
+
+func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {
+	err = s.snip.PropSet(ctx, s.parentName, "snapdev", "visible")
+	if err != nil {
+		return "", nil, fmt.Errorf("set snapdev=visible: %w", err)
+	}
+	path = fmt.Sprintf("/dev/zvol/%s", s.FullName)
+	release = func() {
+		err = s.snip.PropInherit(ctx, s.parentName, "snapdev")
+		if err != nil {
+			slogctx.FromCtx(ctx).Error("failed to configure 'inherit snapdev' on cleanup")
+		}
+	}
+	return path, release, nil
 }
 
 func (s *Snapshot) Send(ctx context.Context, targetFile string, timeout time.Duration) error {
@@ -45,12 +79,4 @@ func (s *Snapshot) Send(ctx context.Context, targetFile string, timeout time.Dur
 func (s *Snapshot) Delete(ctx context.Context) error {
 	_, err := s.snip.DestroySnapshot(ctx, s.FullName)
 	return err
-}
-
-func (s *Snapshot) Serialize() (string, error) {
-	bytes, err := json.Marshal(s)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
 }

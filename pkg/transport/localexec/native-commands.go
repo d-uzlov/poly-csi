@@ -152,16 +152,19 @@ func (s *nativeCommands) CreateSymlink(ctx context.Context, link string, target 
 	return nil
 }
 
-func (s *nativeCommands) MkFifo(ctx context.Context, path string) error {
+func (s *nativeCommands) MkFifo(ctx context.Context, path string) (alreadyExists bool, err error) {
 	if ctx.Err() != nil {
-		return ctx.Err()
+		return false, ctx.Err()
 	}
-	err := syscall.Mkfifo(path, 0666)
+	err = syscall.Mkfifo(path, 0666)
 	if err != nil {
-		return err
+		if errors.Is(err, os.ErrExist) {
+			return true, nil
+		}
+		return false, err
 	}
 
-	return nil
+	return false, nil
 }
 
 func (s *nativeCommands) CreateLock(ctx context.Context, lockFile string, maxDuration time.Duration) (func(ctx context.Context) error, error) {

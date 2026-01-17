@@ -161,6 +161,22 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}
 
 	var vol storage.Volume
+	defer func() {
+		if vol == nil {
+			return
+		}
+		if success {
+			return
+		}
+		logger.Info("deleting storage volume on failure")
+		slogctx.FromCtx(ctx).Debug("running storage cleanup")
+		err = vol.Delete(ctx)
+		if err != nil {
+			slogctx.FromCtx(ctx).Error("failed to run storage cleanup", "error", err)
+			return
+		}
+	}()
+
 	if req.VolumeContentSource != nil {
 		var sourceSnapshot storage.Snapshot
 		var sourceServer *parsedServer
@@ -223,7 +239,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				// TODO cleanup should use a different context, with extended timeout
 				defer sourceSnapshot.Delete(ctx)
 			} else {
-				return nil, fmt.Errorf("folder snapshots are not implemented")
+				return nil, fmt.Errorf("source volume does not support snapshots")
 			}
 		} else {
 			return nil, fmt.Errorf("unknown volume content source type: %#v", req.VolumeContentSource.Type)
@@ -243,11 +259,57 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		targetCaps := str.GetCapabilities()
 		if sourceCaps.LocalSend != "" && targetCaps.LocalSend != "" &&
 			sourceCaps.LocalSend == targetCaps.LocalSend {
+			// Both source and target has send-receive support, and use the same format
 			sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
 				return sourceSnapshot.Send(ctx, targetFile, timeout)
 			}
 			receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
 				return str.Receive(ctx, sourceFile, storageCreateRequest, timeout)
+			}
+		} else if sourceCaps.LocalVolume != "" && targetCaps.LocalVolume != "" &&
+			sourceCaps.LocalVolume == targetCaps.LocalVolume {
+			// File-based volumes, can copy contents
+			sourcePath, releaseSnapshot, err := sourceSnapshot.GetLocalPath(sourceCtx)
+			if err != nil {
+				return nil, fmt.Errorf("get snapshot local path: %w", err)
+			}
+			defer releaseSnapshot()
+
+			recvVol, err := str.CreateVolume(ctx, storageCreateRequest)
+			if err != nil {
+				return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.storageType, err)
+			}
+			targetPath, err := recvVol.GetLocalPath(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("storage[%s]:CreateVolume:GetLocalPath %w", dispatchParams.storageType, err)
+			}
+			logger.Info("storage.CreateVolume: success")
+
+			switch sourceCaps.LocalVolume {
+			case storage.VolFolder:
+				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
+					return sendTar(ctx, sourcePath, targetFile, timeout)
+				}
+				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
+					err := receiveTar(ctx, sourceFile, targetPath, timeout)
+					if err != nil {
+						return nil, fmt.Errorf("receive tar: %w", err)
+					}
+					return recvVol, nil
+				}
+			case storage.VolDevice:
+				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
+					return sendFile(ctx, sourcePath, targetFile, timeout)
+				}
+				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
+					err := receiveFile(ctx, sourceFile, targetPath, timeout)
+					if err != nil {
+						return nil, fmt.Errorf("receive device file: %w", err)
+					}
+					return recvVol, nil
+				}
+			default:
+				return nil, fmt.Errorf("unknown local volume type: sourceCaps.LocalVolume")
 			}
 		} else {
 			return nil, fmt.Errorf("source and target use incompatible send-receive mechanism")
@@ -314,19 +376,6 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	if vol == nil {
 		return nil, fmt.Errorf("volume create did not set storage context")
 	}
-
-	defer func() {
-		if success {
-			return
-		}
-		logger.Info("deleting storage volume on failure")
-		slogctx.FromCtx(ctx).Debug("running storage cleanup")
-		err = vol.Delete(ctx)
-		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to run storage cleanup", "error", err)
-			return
-		}
-	}()
 
 	// when using local volumes, we can check common stuff here, to avoid repeating it in each share
 	if strCaps.LocalVolume != "" {

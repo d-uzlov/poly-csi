@@ -25,3 +25,21 @@ func (s *Snippets) DestroyDataset(ctx context.Context, path string) (recovered b
 	}
 	return recovered, nil
 }
+
+func (s *Snippets) PropSet(ctx context.Context, path string, prop string, value string) error {
+	cmd := append(s.zfsCmd, "set", fmt.Sprintf("%s=%s", prop, value), path)
+	err := transport.CheckedRun(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("%s: %w", cmd, err)
+	}
+	return nil
+}
+
+func (s *Snippets) PropInherit(ctx context.Context, path string, prop string) error {
+	cmd := append(s.zfsCmd, "inherit", prop, path)
+	err := transport.CheckedRun(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("%s: %w", cmd, err)
+	}
+	return nil
+}

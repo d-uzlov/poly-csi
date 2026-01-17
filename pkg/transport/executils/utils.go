@@ -327,9 +327,9 @@ func (ec *ExecCommands) CreateSymlink(ctx context.Context, link string, target s
 	return nil
 }
 
-func (ec *ExecCommands) MkFifo(ctx context.Context, path string) error {
+func (ec *ExecCommands) MkFifo(ctx context.Context, path string) (alreadyExists bool, err error) {
 	if ctx.Err() != nil {
-		return ctx.Err()
+		return false, ctx.Err()
 	}
 
 	cmd := []string{"mkfifo", path}
@@ -338,10 +338,13 @@ func (ec *ExecCommands) MkFifo(ctx context.Context, path string) error {
 	}
 	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
 	if err != nil {
-		return err
+		return false, err
 	}
 	if runResult.ExitCode != 0 {
-		return transport.FormatRunError(runResult)
+		if strings.Contains(string(runResult.Stderr), "File exists") {
+			return true, nil
+		}
+		return false, transport.FormatRunError(runResult)
 	}
-	return nil
+	return false, nil
 }

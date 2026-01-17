@@ -102,5 +102,6 @@ func (v *Volume) MakeNativeSnapshot(ctx context.Context, name string) (storage.S
 		return nil, fmt.Errorf("create zfs snapshot '%s': %w", snapshotName, err)
 	}
 
-	return newSnapshot(snapshotName, v.snip), nil
+	// it's ok if mountPath is not filled
+	return newSnapshot(snapshotName, v.snip, v.mountPath), nil
 }

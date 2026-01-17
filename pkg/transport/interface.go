@@ -35,7 +35,7 @@ type Commands interface {
 	Stat(ctx context.Context, path string) (*StatResult, error)
 	Df(ctx context.Context, path string) (*FsSizeInfo, error)
 	CreateSymlink(ctx context.Context, link string, target string) error
-	MkFifo(ctx context.Context, path string) error
+	MkFifo(ctx context.Context, path string) (alreadyExists bool, err error)
 
 	// Creates and/or capture a lock file in specified location.
 	// When it returns, lock file will contain lease info, which must be released via a provided callback.

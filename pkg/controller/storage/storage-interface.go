@@ -36,10 +36,17 @@ type Volume interface {
 }
 
 type Snapshot interface {
+	Serialize() (string, error)
 	GetCapabilities() Capabilities
+	// GetLocalPath returns path in local filesystem containing snapshot content
+	// The path should be read-only if possible.
+	// Some implementations may need to take additional actions to make snapshot accessible in the filesystem,
+	// which requires caller to invoke "release" function when they are done.
+	// Release function must be safe to run several times.
+	// If release is not needed, implementation must return empty function, but never nil.
+	GetLocalPath(ctx context.Context) (path string, release func(), err error)
 	Send(ctx context.Context, targetFile string, timeout time.Duration) error
 	Delete(ctx context.Context) error
-	Serialize() (string, error)
 }
 
 type CreateRequest struct {
