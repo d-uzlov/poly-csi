@@ -12,8 +12,10 @@ import (
 type Dispatcher struct {
 	csi.UnimplementedControllerServer
 
-	// main mutex locks these fields: config, nameMap, idMap
-	mainMutex sync.RWMutex
+	// confMutex locks conf as a whole but does not lock its contents.
+	// When managing the content, you should lock confMutex, find what you need,
+	// and then lock mutex on the object you have found.
+	confMutex sync.RWMutex
 	conf      *DispatcherConf
 }
 
@@ -27,8 +29,8 @@ func NewDispatcher(ctx context.Context) *Dispatcher {
 func (d *Dispatcher) Cleanup(ctx context.Context) {
 	var servers []*parsedServer
 	func() {
-		d.mainMutex.Lock()
-		defer d.mainMutex.Unlock()
+		d.confMutex.Lock()
+		defer d.confMutex.Unlock()
 
 		servers = d.conf.servers
 		d.conf.servers = nil
@@ -60,15 +62,15 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 	var oldConf *DispatcherConf
 
 	func() {
-		d.mainMutex.Lock()
-		defer d.mainMutex.Unlock()
+		d.confMutex.Lock()
+		defer d.confMutex.Unlock()
 
 		oldConf = d.conf
 		d.conf = newConf
 	}()
 
-	d.mainMutex.RLock()
-	defer d.mainMutex.RUnlock()
+	d.confMutex.RLock()
+	defer d.confMutex.RUnlock()
 
 	for _, v := range d.conf.servers {
 		func() {
@@ -112,8 +114,8 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 }
 
 func (d *Dispatcher) FindServerByName(name string) (result *parsedServer, err error) {
-	d.mainMutex.RLock()
-	defer d.mainMutex.RUnlock()
+	d.confMutex.RLock()
+	defer d.confMutex.RUnlock()
 
 	result = d.conf.FindServerByName(name)
 	if result == nil {
@@ -124,8 +126,8 @@ func (d *Dispatcher) FindServerByName(name string) (result *parsedServer, err er
 }
 
 func (d *Dispatcher) FindServerById(id string) (result *parsedServer, err error) {
-	d.mainMutex.RLock()
-	defer d.mainMutex.RUnlock()
+	d.confMutex.RLock()
+	defer d.confMutex.RUnlock()
 
 	result = d.conf.FindServerById(id)
 	if result == nil {

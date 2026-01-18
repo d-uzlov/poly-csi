@@ -239,7 +239,7 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 
 		sl = append(sl, &srv)
 
-		// TODO
+		// TODO remove
 		// el, wl := srv.Validate()
 		// for _, iss := range el {
 		// 	logger.Error(fmt.Sprintf("servers[i=%d/name=%s].%s", i, srv.conf.Name, iss))

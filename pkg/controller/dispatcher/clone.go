@@ -14,22 +14,22 @@ import (
 type sendFuncType func(ctx context.Context, targetFile string, timeout time.Duration) error
 type receiveFuncType func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error)
 
-func createClonePipes(ctx context.Context, id string, source *parsedServer, target *parsedServer, timeout time.Duration) (send string, receive string, release func(), err error) {
-	if source.conf.StableId == target.conf.StableId {
+func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, targetSrv *parsedServer, timeout time.Duration) (send string, receive string, release func(), err error) {
+	if sourceSrv.conf.StableId == targetSrv.conf.StableId {
 		fifo := fmt.Sprintf("/tmp/clone-local-%s", id)
-		_, err = source.trInstance.Cmds().MkFifo(ctx, fifo)
+		_, err = sourceSrv.trInstance.Cmds().MkFifo(ctx, fifo)
 		if err != nil {
 			return "", "", nil, fmt.Errorf("create pipe '%s': %w", fifo, err)
 		}
-		return fifo, fifo, func() { source.trInstance.Cmds().RmFile(ctx, fifo) }, nil
+		return fifo, fifo, func() { sourceSrv.trInstance.Cmds().RmFile(ctx, fifo) }, nil
 	}
 
 	send = fmt.Sprintf("/tmp/clone-send-%s", id)
 	receive = fmt.Sprintf("/tmp/clone-receive-%s", id)
 	success := false
 	deletePipes := func() {
-		_ = source.trInstance.Cmds().RmFile(ctx, send)
-		_ = target.trInstance.Cmds().RmFile(ctx, receive)
+		_ = sourceSrv.trInstance.Cmds().RmFile(ctx, send)
+		_ = targetSrv.trInstance.Cmds().RmFile(ctx, receive)
 	}
 	defer func() {
 		if success {
@@ -38,17 +38,17 @@ func createClonePipes(ctx context.Context, id string, source *parsedServer, targ
 		deletePipes()
 	}()
 
-	_, err = source.trInstance.Cmds().MkFifo(ctx, send)
+	_, err = sourceSrv.trInstance.Cmds().MkFifo(ctx, send)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("create send pipe '%s': %w", send, err)
 	}
-	_, err = target.trInstance.Cmds().MkFifo(ctx, receive)
+	_, err = targetSrv.trInstance.Cmds().MkFifo(ctx, receive)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("create receive pipe '%s': %w", receive, err)
 	}
 
 	// TODO better address selection
-	targetAddress := target.conf.AddressList[0].Address
+	targetAddress := targetSrv.conf.AddressList[0].Address
 	// select random port between 40k and 50k
 	port := rand.Intn(10000) + 40000
 	portString := fmt.Sprintf("%d", port)
@@ -61,7 +61,7 @@ func createClonePipes(ctx context.Context, id string, source *parsedServer, targ
 
 	// we need to be careful to avoid leaked goroutines if an error happens and release was never called
 	go func() {
-		runResult, err := source.trInstance.RunCommand(sendCtx, sendCmd, transport.WithStdinFile(send), transport.WithoutStdout(), transport.WithTimeout(timeout))
+		runResult, err := sourceSrv.trInstance.RunCommand(sendCtx, sendCmd, transport.WithStdinFile(send), transport.WithoutStdout(), transport.WithTimeout(timeout))
 		if err != nil {
 			slogctx.FromCtx(ctx).Error("ncat send failed", "error", err)
 		} else if runResult.ExitCode != 0 {
@@ -69,7 +69,7 @@ func createClonePipes(ctx context.Context, id string, source *parsedServer, targ
 		}
 	}()
 	go func() {
-		runResult, err := target.trInstance.RunCommand(receiveCtx, receiveCmd, transport.WithStdoutFile(receive), transport.WithTimeout(timeout))
+		runResult, err := targetSrv.trInstance.RunCommand(receiveCtx, receiveCmd, transport.WithStdoutFile(receive), transport.WithTimeout(timeout))
 		if err != nil {
 			slogctx.FromCtx(ctx).Error("ncat receive failed", "error", err)
 		} else if runResult.ExitCode != 0 {
