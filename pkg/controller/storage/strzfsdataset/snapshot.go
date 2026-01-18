@@ -46,30 +46,21 @@ func (s *Snapshot) Serialize() (string, error) {
 	return string(bytes), nil
 }
 
-func (s *Snapshot) GetCapabilities() storage.Capabilities {
-	return storage.Capabilities{
-		LocalVolume:    storage.VolFolder,
-		OpaqueVolume:   "zfs-dataset",
-		NativeSnapshot: true,
-		LocalSend:      "zfs-dataset",
-	}
-}
-
 func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {
 	if s.mountPath != "" {
 		return s.mountPath, nil, nil
 	}
-	datasetInfo, err := s.snip.GetDataset(ctx, s.parentName)
+	info, err := s.snip.GetProperties(ctx, s.parentName)
 	if err != nil {
 		return "", nil, fmt.Errorf("checking dataset: %w", err)
 	}
-	if datasetInfo == nil {
+	if info == nil {
 		return "", nil, fmt.Errorf("dataset is not present in underlying storage")
 	}
-	if datasetInfo.IsZvol() {
+	if info.IsZvol() {
 		return "", nil, fmt.Errorf("expected dataset but found zvol at path %s", s.parentName)
 	}
-	s.mountPath = fmt.Sprintf("%s/.zfs/snapshot/%s", datasetInfo.Properties.MountPoint.Value, s.snapName)
+	s.mountPath = fmt.Sprintf("%s/.zfs/snapshot/%s", info.Properties.MountPoint.Value, s.snapName)
 	return s.mountPath, func() {}, nil
 }
 

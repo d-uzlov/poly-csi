@@ -59,7 +59,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	err = snip.setupTarget(tnIscsiRequest{
 		extentName: uuid.New().String(),
 		iqn:        iqn,
-		zvol:       zfsVol.Data.Path,
+		zvol:       zfsVol.Path,
 	})
 	if err != nil {
 		return "", err
@@ -67,7 +67,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	c := shareContext{
 		Iqn:  iqn,
-		Zvol: zfsVol.Data.Path,
+		Zvol: zfsVol.Path,
 	}
 	err = c.validate()
 	if err != nil {

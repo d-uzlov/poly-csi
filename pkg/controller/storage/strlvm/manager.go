@@ -50,7 +50,7 @@ func (m *manager) ParseVolume(serialized string) (storage.Volume, error) {
 	return parseVolume(serialized, m.snip)
 }
 
-func (m *manager) ParseNativeSnapshot(serialized string) (storage.Snapshot, error) {
+func (m *manager) ParseSnapshot(serialized string) (storage.Snapshot, error) {
 	return parseSnapshot(serialized, m.snip)
 }
 

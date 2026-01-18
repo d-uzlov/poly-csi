@@ -38,10 +38,10 @@ func (ds DatasetState) IsZvol() bool {
 }
 
 func (ds DatasetState) GetSize() int64 {
+	// TODO use better error handling?
 	if ds.IsZvol() {
 		i, err := ds.Properties.VolSize.GetInt()
 		if err != nil {
-			// TODO
 			panic(err)
 		}
 		return i
@@ -49,14 +49,12 @@ func (ds DatasetState) GetSize() int64 {
 	if !ds.Properties.RefQuota.IsEmpty() {
 		i, err := ds.Properties.RefQuota.GetInt()
 		if err != nil {
-			// TODO
 			panic(err)
 		}
 		return i
 	}
 	i, err := ds.Properties.Quota.GetInt()
 	if err != nil {
-		// TODO
 		panic(err)
 	}
 	return i
@@ -71,7 +69,7 @@ type ZfsProperty struct {
 }
 
 func (p ZfsProperty) GetInt() (int64, error) {
-	if p.Value == "" || p.Value == "-" || p.Value == "none" {
+	if p.IsEmpty() {
 		return 0, fmt.Errorf("value is empty")
 	}
 	i, err := strconv.ParseInt(p.Value, 10, 64)
@@ -82,10 +80,10 @@ func (p ZfsProperty) GetInt() (int64, error) {
 }
 
 func (p ZfsProperty) IsEmpty() bool {
-	return p.Value == "" || p.Value == "-"
+	return p.Value == "" || p.Value == "-" || p.Value == "none"
 }
 
-func (s *Snippets) GetDataset(ctx context.Context, path string) (*DatasetState, error) {
+func (s *Snippets) GetProperties(ctx context.Context, path string) (*DatasetState, error) {
 	properties := []string{
 		"used",
 		"volsize",

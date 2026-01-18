@@ -2,6 +2,7 @@ package strbtrfs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
@@ -9,7 +10,7 @@ import (
 )
 
 type Volume struct {
-	containerPath string
+	ContainerPath string `json:"container_path"`
 	snip          btrfs.Snippets
 }
 
@@ -17,20 +18,30 @@ var _ storage.Volume = &Volume{}
 
 func newVolume(path string, snip btrfs.Snippets) *Volume {
 	return &Volume{
-		containerPath: path,
+		ContainerPath: path,
 		snip:          snip,
 	}
 }
 
-func parseVolume(serialized string, snip btrfs.Snippets) (*Volume, error) {
-	return &Volume{
-		containerPath: serialized,
-		snip:          snip,
-	}, nil
+func parseVolume(encoded string, snip btrfs.Snippets) (*Volume, error) {
+	var result Volume
+	err := json.Unmarshal([]byte(encoded), &result)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json: %w", err)
+	}
+	if result.ContainerPath == "" {
+		return nil, fmt.Errorf("path is empty")
+	}
+	result.snip = snip
+	return &result, nil
 }
 
 func (v *Volume) Serialize() (string, error) {
-	return v.containerPath, nil
+	encoded, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
 }
 
 func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
@@ -38,7 +49,7 @@ func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
 }
 
 func (v *Volume) getMainVolume() string {
-	return v.containerPath + "/volume"
+	return v.ContainerPath + "/volume"
 }
 
 func (v *Volume) createMainVolume(ctx context.Context) error {
@@ -66,7 +77,7 @@ func (v *Volume) Delete(ctx context.Context) error {
 }
 
 func (v *Volume) GetSize(ctx context.Context) (int64, error) {
-	// TODO uncomment proper returns  after updating to a newer btrfs version
+	// TODO uncomment proper returns after updating to a newer btrfs version
 	info, err := v.snip.GetQuotaInfo(ctx, v.getMainVolume())
 	if err != nil {
 		return 0, nil
@@ -98,8 +109,8 @@ func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
 	return newSize, nil
 }
 
-func (v *Volume) MakeNativeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
-	snapshotPath := v.containerPath + "/snap-" + name
+func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
+	snapshotPath := v.ContainerPath + "/snap-" + name
 	exists, err := v.snip.SubvolumeTest(ctx, snapshotPath)
 	if exists {
 		return newSnapshot(snapshotPath, v.snip), nil

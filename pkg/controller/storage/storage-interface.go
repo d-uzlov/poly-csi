@@ -19,31 +19,30 @@ type StorageManager interface {
 	Receive(ctx context.Context, sourceFile string, req CreateRequest, timeout time.Duration) (Volume, error)
 	// ParseVolume recreates volume handle from result of Volume.Serialize
 	ParseVolume(serialized string) (Volume, error)
-	// ParseNativeSnapshot recreates snapshot handle from result of Volume.MakeNativeSnapshot.Serialize
-	ParseNativeSnapshot(serialized string) (Snapshot, error)
+	// ParseSnapshot recreates snapshot handle from result of Snapshot.Serialize
+	ParseSnapshot(serialized string) (Snapshot, error)
 }
 
 type Volume interface {
+	// Serialize returns a string that can be used in StorageManager.ParseVolume to recreate this volume handle
+	Serialize() (string, error)
 	GetLocalPath(ctx context.Context) (string, error)
 	Delete(ctx context.Context) error
 	GetSize(ctx context.Context) (int64, error)
 	// Modify(ctx context.Context, req *csi.ControllerModifyVolumeRequest) error
 	Expand(ctx context.Context, newSize int64) (int64, error)
-	// MakeNativeSnapshot must create an instantaneous consistent snapshot or return an error
-	MakeNativeSnapshot(ctx context.Context, name string) (Snapshot, error)
-	// Serialize returns a string that can be used in StorageManager.ParseVolume to recreate this volume handle
-	Serialize() (string, error)
+	// MakeSnapshot must create an instantaneous consistent snapshot or return an error
+	MakeSnapshot(ctx context.Context, name string) (Snapshot, error)
 }
 
 type Snapshot interface {
 	Serialize() (string, error)
-	GetCapabilities() Capabilities
 	// GetLocalPath returns path in local filesystem containing snapshot content
 	// The path should be read-only if possible.
 	// Some implementations may need to take additional actions to make snapshot accessible in the filesystem,
 	// which requires caller to invoke "release" function when they are done.
 	// Release function must be safe to run several times.
-	// If release is not needed, implementation must return empty function, but never nil.
+	// If path is not empty, release must not be nil.
 	GetLocalPath(ctx context.Context) (path string, release func(), err error)
 	Send(ctx context.Context, targetFile string, timeout time.Duration) error
 	Delete(ctx context.Context) error
@@ -65,7 +64,7 @@ type Capabilities struct {
 	LocalVolume string
 
 	// OpaqueVolume holds storage-specific volume type.
-	// Unlike LocalVolume, OpaqueVolume does not have to be well-known.
+	// Unlike LocalVolume, OpaqueVolume does not use well-known values.
 	// Storage-specific share methods can use this to expose volume to network.
 	OpaqueVolume string
 

@@ -39,22 +39,22 @@ func (s *Snippets) SubvolumeTest(ctx context.Context, path string) (exists bool,
 	return true, nil
 }
 
-func (s *Snippets) SubvolumeCreate(ctx context.Context, path string) (recovered bool, err error) {
+func (s *Snippets) SubvolumeCreate(ctx context.Context, path string) (alreadyExists bool, err error) {
 	cmd := append(s.btrfsCmd, "subvolume", "create", path)
-	recovered, err = transport.RelaxedRun(ctx, cmd, "target path already exists")
+	alreadyExists, err = transport.RelaxedRun(ctx, cmd, "target path already exists")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
-	return recovered, nil
+	return alreadyExists, nil
 }
 
-func (s *Snippets) SubvolumeDelete(ctx context.Context, path string) (recovered bool, err error) {
+func (s *Snippets) SubvolumeDelete(ctx context.Context, path string) (doesNotExist bool, err error) {
 	cmd := append(s.btrfsCmd, "subvolume", "delete", path)
-	recovered, err = transport.RelaxedRun(ctx, cmd, "No such file or directory")
+	doesNotExist, err = transport.RelaxedRun(ctx, cmd, "No such file or directory")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
-	return recovered, nil
+	return doesNotExist, nil
 }
 
 func (s *Snippets) SubvolumeSnapshot(ctx context.Context, source string, dest string) error {

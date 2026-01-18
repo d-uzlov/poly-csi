@@ -41,7 +41,7 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 		return nil, fmt.Errorf("get volume size: %w", err)
 	}
 
-	snap, err := vol.MakeNativeSnapshot(ctx, req.Name)
+	snap, err := vol.MakeSnapshot(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("create snapshot in storage: %w", err)
 	}
@@ -93,7 +93,7 @@ func (d *Dispatcher) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 	// 	return nil, fmt.Errorf("parse storage data: %w", err)
 	// }
 
-	snap, err := strInstance.ParseNativeSnapshot(mh.si.SerializedData)
+	snap, err := strInstance.ParseSnapshot(mh.si.SerializedData)
 	if err != nil {
 		return nil, fmt.Errorf("parse snapshot data: %w", err)
 	}

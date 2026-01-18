@@ -501,7 +501,7 @@ func (k *NvmetKeeper) CreateHost(ctx context.Context, n nvmet.Host) error {
 	}
 	if existingHost != nil {
 		if !existingHost.IsEqual(n) {
-			// TODO secret keys ??
+			// TODO remove secret keys from logs ??
 			return fmt.Errorf("existing config does not match requested: existing %#v != requested %#v", *existingHost, n)
 		}
 	} else {

@@ -94,7 +94,7 @@ func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
 	return newSize, nil
 }
 
-func (v *Volume) MakeNativeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
+func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
 	snapshotName := v.LvName + "." + name
 
 	size, err := v.GetSize(ctx)

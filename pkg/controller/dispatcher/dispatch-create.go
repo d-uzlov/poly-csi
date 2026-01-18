@@ -175,6 +175,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		var sourceSnapshot storage.Snapshot
 		var sourceServer *parsedServer
 		var sourceCtx context.Context
+		var sourceCaps *storage.Capabilities
 
 		tmpSnapshotId := "snap-for-" + req.Name
 
@@ -196,7 +197,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
 
-			snap, err := sourceStr.ParseNativeSnapshot(sh.si.SerializedData)
+			caps := sourceStr.GetCapabilities()
+			sourceCaps = &caps
+
+			snap, err := sourceStr.ParseSnapshot(sh.si.SerializedData)
 			if err != nil {
 				return nil, fmt.Errorf("parse source snapshot data: %w", err)
 			}
@@ -219,6 +223,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
 
+			caps := sourceStr.GetCapabilities()
+			sourceCaps = &caps
+
 			sourceVol, err := sourceStr.ParseVolume(sh.vi.StorageData)
 			if err != nil {
 				return nil, fmt.Errorf("parse source storage data: %w", err)
@@ -226,7 +233,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 			sourceCaps := sourceStr.GetCapabilities()
 			if sourceCaps.NativeSnapshot {
-				sourceSnapshot, err = sourceVol.MakeNativeSnapshot(ctx, tmpSnapshotId)
+				sourceSnapshot, err = sourceVol.MakeSnapshot(ctx, tmpSnapshotId)
 				if err != nil {
 					return nil, fmt.Errorf("create source snapshot: %w", err)
 				}
@@ -239,6 +246,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("unknown volume content source type: %#v", req.VolumeContentSource.Type)
 		}
 
+		if sourceCaps == nil {
+			return nil, fmt.Errorf("unexpectedly missing source capabilities")
+		}
 		if sourceSnapshot == nil {
 			return nil, fmt.Errorf("unexpectedly missing source snapshot data")
 		}
@@ -249,7 +259,6 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		var sendFunc sendFuncType
 		var receiveFunc receiveFuncType
 
-		sourceCaps := sourceSnapshot.GetCapabilities()
 		targetCaps := str.GetCapabilities()
 		if sourceCaps.LocalSend != "" && targetCaps.LocalSend != "" &&
 			sourceCaps.LocalSend == targetCaps.LocalSend {

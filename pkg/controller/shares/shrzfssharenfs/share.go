@@ -41,7 +41,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	zfsVol, ok := req.Volume.(*strzfsdataset.Volume)
 	if !ok {
-		return "", fmt.Errorf("storage volume is not zfs dataset: %T", req.Volume)
+		return "", fmt.Errorf("storage volume is not a zfs dataset: %T", req.Volume)
 	}
 
 	mountPath, err := req.Volume.GetLocalPath(ctx)
@@ -51,13 +51,13 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	snip := zfs.NewSnippets(sh.cmds.zfsCmd)
 
-	err = snip.SetShareNfs(ctx, zfsVol.Data.Path, p.shareOptions)
+	err = snip.SetShareNfs(ctx, zfsVol.Path, p.shareOptions)
 	if err != nil {
 		return "", err
 	}
 
 	c := shareContext{
-		Dataset: zfsVol.Data.Path,
+		Dataset: zfsVol.Path,
 		Folder:  mountPath,
 	}
 	err = c.validate()

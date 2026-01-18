@@ -38,7 +38,7 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 }
 
 func (m *manager) ParseVolume(serialized string) (storage.Volume, error) {
-	return &Volume{path: serialized}, nil
+	return parseVolume(serialized)
 }
 
 func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateRequest) (storage.Volume, error) {
@@ -46,7 +46,7 @@ func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateReque
 	return nil, nil
 }
 
-func (m *manager) ParseNativeSnapshot(serialized string) (storage.Snapshot, error) {
+func (m *manager) ParseSnapshot(serialized string) (storage.Snapshot, error) {
 	return nil, fmt.Errorf("native snapshots are not supported for folder storage")
 }
 
@@ -63,9 +63,7 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 		return nil, fmt.Errorf("create volume folder: %w", err)
 	}
 
-	return &Volume{
-		path: folderPath,
-	}, nil
+	return newVolume(folderPath), nil
 }
 
 func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.CreateRequest, timeout time.Duration) (storage.Volume, error) {

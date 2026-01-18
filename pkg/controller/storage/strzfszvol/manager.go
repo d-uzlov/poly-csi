@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/controller/storage/zfsdata"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
@@ -39,27 +39,22 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	datasetInfo, err := m.snip.GetDataset(ctx, p.parentDataset)
+	info, err := m.snip.GetProperties(ctx, p.parentDataset)
 	if err != nil {
 		return 0, err
 	}
-	if datasetInfo == nil {
+	if info == nil {
 		return 0, fmt.Errorf("parent dataset is not found")
 	}
 
-	return datasetInfo.Properties.Available.GetInt()
+	return info.Properties.Available.GetInt()
 }
 
 func (m *manager) ParseVolume(serialized string) (storage.Volume, error) {
-	zd, err := zfsdata.Parse(serialized)
-	if err != nil {
-		return nil, fmt.Errorf("parse zfs data: %w", err)
-	}
-
-	return newVolume(zd, m.snip), nil
+	return parseVolume(serialized, m.snip)
 }
 
-func (m *manager) ParseNativeSnapshot(serialized string) (storage.Snapshot, error) {
+func (m *manager) ParseSnapshot(serialized string) (storage.Snapshot, error) {
 	var result Snapshot
 	err := json.Unmarshal([]byte(serialized), &result)
 	if err != nil {
@@ -81,19 +76,19 @@ func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateReque
 
 	datasetPath := fmt.Sprintf("%s/%s", p.parentDataset, req.Id)
 
-	datasetInfo, err := m.snip.GetDataset(ctx, datasetPath)
+	info, err := m.snip.GetProperties(ctx, datasetPath)
 	if err != nil {
 		return nil, fmt.Errorf("checking existing dataset: %w", err)
 	}
-	if datasetInfo == nil {
+	if info == nil {
 		return nil, nil
 	}
 
-	if datasetInfo.GetSize() != req.Size {
-		return nil, fmt.Errorf("size mismatch: %d != %d", datasetInfo.GetSize(), req.Size)
+	if info.GetSize() != req.Size {
+		return nil, fmt.Errorf("size mismatch: %d != %d", info.GetSize(), req.Size)
 	}
 
-	return newVolume(zfsdata.ZfsData{Path: datasetPath}, m.snip), nil
+	return newVolume(datasetPath, m.snip), nil
 }
 
 func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (storage.Volume, error) {
@@ -110,23 +105,66 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("create zvol: %w", err)
 	}
-	datasetInfo, err := m.snip.GetDataset(ctx, datasetPath)
+	info, err := m.snip.GetProperties(ctx, datasetPath)
 	if err != nil {
 		return nil, fmt.Errorf("checking created dataset: %w", err)
 	}
-	if datasetInfo == nil {
+	if info == nil {
 		return nil, fmt.Errorf("checking created dataset: not found")
 	}
-	if !datasetInfo.IsZvol() {
+	if !info.IsZvol() {
 		return nil, fmt.Errorf("created zvol %s, but it's a dataset when checked", datasetPath)
 	}
-	if datasetInfo.GetSize() != req.Size {
-		return nil, fmt.Errorf("size mismatch: %d != %d", datasetInfo.GetSize(), req.Size)
+	if info.GetSize() != req.Size {
+		return nil, fmt.Errorf("size mismatch: %d != %d", info.GetSize(), req.Size)
 	}
 
-	return newVolume(zfsdata.ZfsData{Path: datasetPath}, m.snip), nil
+	return newVolume(datasetPath, m.snip), nil
 }
 
 func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.CreateRequest, timeout time.Duration) (storage.Volume, error) {
-	return nil, fmt.Errorf("unimplemented")
+	p, err := parseParams(req.StaticParams, req.MutableParams)
+	if err != nil {
+		return nil, fmt.Errorf("parse params: %w", err)
+	}
+
+	datasetPath := fmt.Sprintf("%s/%s", p.parentDataset, req.Id)
+	targetSnapshot := fmt.Sprintf("%s@init", datasetPath)
+
+	err = m.snip.Receive(ctx, targetSnapshot, sourceFile, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("zfs receive: %w", err)
+	}
+	defer m.snip.DestroySnapshot(ctx, targetSnapshot)
+	success := false
+	defer func() {
+		if success {
+			return
+		}
+		_, err := m.snip.DestroyDataset(ctx, datasetPath)
+		if err != nil {
+			slogctx.FromCtx(ctx).Error("failed to delete received dataset", "error", err)
+		} else {
+			slogctx.FromCtx(ctx).Info("deleted received dataset")
+		}
+	}()
+
+	info, err := m.snip.GetProperties(ctx, datasetPath)
+	if err != nil {
+		return nil, fmt.Errorf("checking received volume: %w", err)
+	}
+	if !info.IsZvol() {
+		return nil, fmt.Errorf("received volume is not a zvol")
+	}
+	if info.GetSize() < req.Size {
+		err = m.snip.ConfigureZvol(ctx, datasetPath, zfs.ZvolConfig{
+			Size: req.Size,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set zvol size: %w", err)
+		}
+	}
+
+	success = true
+	return newVolume(datasetPath, m.snip), nil
 }

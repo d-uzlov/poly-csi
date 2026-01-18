@@ -51,15 +51,6 @@ func (s *Snapshot) Serialize() (string, error) {
 	return string(bytes), nil
 }
 
-func (s *Snapshot) GetCapabilities() storage.Capabilities {
-	return storage.Capabilities{
-		LocalVolume:    storage.VolDevice,
-		OpaqueVolume:   "lvm",
-		NativeSnapshot: true,
-		LocalSend:      "",
-	}
-}
-
 func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {
 	return s.snip.MakeLvPath(s.VgName, s.LvName), func() {}, nil
 }

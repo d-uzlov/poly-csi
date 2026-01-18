@@ -118,6 +118,7 @@ func findMount(mountedPath string) (*mount.MountInfo, error) {
 
 func FormatFs(ctx context.Context, devicePath string, fsType string, formatOptions []string) error {
 	switch fsType {
+	// TODO more filesystem options
 	case "ext4":
 		// TODO use format options
 		cmd := []string{"mkfs.ext4", devicePath}

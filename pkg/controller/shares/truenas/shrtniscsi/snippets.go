@@ -46,7 +46,7 @@ func (s snippets) setupTarget(target tnIscsiRequest) error {
 			return fmt.Errorf("getIscsiExtents: %w", err)
 		}
 		if tnExtents == nil {
-			return fmt.Errorf("creates extend but could not find it in extent list")
+			return fmt.Errorf("created extent but could not find it in the extent list")
 		}
 		tnExtent = tnExtents[0]
 	case 1:

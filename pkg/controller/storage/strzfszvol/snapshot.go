@@ -43,15 +43,6 @@ func (s *Snapshot) Serialize() (string, error) {
 	return string(bytes), nil
 }
 
-func (s *Snapshot) GetCapabilities() storage.Capabilities {
-	return storage.Capabilities{
-		LocalVolume:    storage.VolDevice,
-		OpaqueVolume:   "zfs-zvol",
-		NativeSnapshot: true,
-		LocalSend:      "zfs-zvol",
-	}
-}
-
 func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {
 	err = s.snip.PropSet(ctx, s.parentName, "snapdev", "visible")
 	if err != nil {
