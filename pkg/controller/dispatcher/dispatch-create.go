@@ -47,8 +47,6 @@ func generateId(tmplName string, tmpl string, requestName string, id string, sta
 	return buf.String(), nil
 }
 
-// ==== create-delete ====
-
 func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, finalErr error) {
 	logger := slogctx.FromCtx(ctx)
 
@@ -116,7 +114,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}
 	volumeId := createVolumeId(srv.conf.StableId, req.Name)
 
-	existingDbEntry, err := srv.dbInstance.GetEntry(ctx, req.Name)
+	existingDbEntry, err := srv.dbInstance.FindEntry(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("check existing volume: %w", err)
 	}
@@ -440,7 +438,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("serialize storage volume: %w", err)
 	}
 
-	dbEntry, err := srv.dbInstance.CreateEntry(ctx, req.Name)
+	dbEntry, err := srv.dbInstance.CreateEntry(ctx, req.Name, uuidString)
 	if err != nil {
 		return nil, fmt.Errorf("create db entry: %w", err)
 	}

@@ -23,7 +23,7 @@ const (
 	shareTnIscsi     = "truenas-iscsi"
 )
 
-func ShareFromType(vmType string, commands map[string][]string, globalParams map[string]string) (shares.ShareHelper, error) {
+func ShareFromType(vmType string, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	switch vmType {
 	case shareZfsSharenfs:
 		return shrzfssharenfs.New(commands, globalParams)

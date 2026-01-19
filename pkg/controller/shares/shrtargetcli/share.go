@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/thanhpk/randstr"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/mounts/mntriscsiadm"
 )
 
 type share struct {
@@ -16,7 +13,7 @@ type share struct {
 	cmds commands
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareHelper, error) {
+func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
@@ -104,135 +101,6 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	}
 
 	return c.serialize(), nil
-}
-
-func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*shares.PublishContext, error) {
-	if !sh.cmds.ready(ctx) {
-		return nil, fmt.Errorf("targetcli is not ready")
-	}
-
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
-	}
-
-	iscsiInfo, err := mntriscsiadm.ParseIscsiInfo(mi)
-	if err != nil {
-		return nil, fmt.Errorf("parse mounter info as iscsi: %w", err)
-	}
-
-	chap := mntriscsiadm.ChapNone
-	if c.AuthType == authTypeChapProvision {
-		chap = mntriscsiadm.ChapFromPublishSecret
-	}
-	pc := map[string]string{}
-	err = mntriscsiadm.InjectPublishContext(pc, mntriscsiadm.IscsiPublishContext{
-		Iqn:       c.Iqn,
-		Port:      c.Port,
-		Transport: c.Transport,
-		Chap:      chap,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create publish context: %w", err)
-	}
-
-	if c.AuthType == authTypeNone {
-		return &shares.PublishContext{
-			Public: pc,
-			Local: map[string]string{
-				"host_iqn": iscsiInfo.HostIqn,
-			},
-		}, nil
-	}
-
-	snip := newTargetcliSnippets(ctx, sh.cmds.targetcliCmd)
-
-	err = snip.createClient(c.Iqn, iscsiInfo.HostIqn)
-	if err != nil {
-		return nil, fmt.Errorf("create client: %w", err)
-	}
-
-	if c.AuthType == authTypeIqn {
-		err = snip.save()
-		if err != nil {
-			return nil, fmt.Errorf("save config: %w", err)
-		}
-
-		return &shares.PublishContext{
-			Public: pc,
-			Local: map[string]string{
-				"host_iqn": iscsiInfo.HostIqn,
-			},
-		}, nil
-	}
-
-	secret := map[string]string{}
-
-	acl, err := snip.readClientAcl(c.Iqn, iscsiInfo.HostIqn)
-	if err != nil {
-		return nil, fmt.Errorf("read client auth: %w", err)
-	}
-	if acl == nil {
-		acl = &chapAcl{
-			client:     mntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
-			controller: mntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
-		}
-
-		err = snip.setupClientAcl(c.Iqn, iscsiInfo.HostIqn, *acl)
-		if err != nil {
-			return nil, fmt.Errorf("setup client acl: %w", err)
-		}
-	}
-
-	acl.client.Inject(secret, "chap.client")
-	acl.controller.Inject(secret, "chap.target")
-
-	err = snip.save()
-	if err != nil {
-		return nil, fmt.Errorf("save config: %w", err)
-	}
-
-	return &shares.PublishContext{
-		Public: pc,
-		Local: map[string]string{
-			"host_iqn": iscsiInfo.HostIqn,
-		},
-		Secret: secret,
-	}, nil
-}
-
-func (sh *share) Unpublish(ctx context.Context, shareData string, localCtx map[string]string) error {
-	if !sh.cmds.ready(ctx) {
-		return fmt.Errorf("targetcli is not ready")
-	}
-
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
-	}
-
-	hostIqn := localCtx["host_iqn"]
-	if hostIqn == "" {
-		return fmt.Errorf("publish_context: public: field missing: host_iqn")
-	}
-
-	snip := newTargetcliSnippets(ctx, sh.cmds.targetcliCmd)
-
-	err = snip.deleteClientAcl(c.Iqn, hostIqn)
-	if err != nil {
-		return fmt.Errorf("delete client acl: %w", err)
-	}
-
-	err = snip.save()
-	if err != nil {
-		return fmt.Errorf("save config: %w", err)
-	}
-
-	return nil
-}
-
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
-	return fmt.Errorf("UnpublishAll is not implemented")
 }
 
 func (sh *share) DeleteShare(ctx context.Context, shareData string) error {

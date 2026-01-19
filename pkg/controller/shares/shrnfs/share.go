@@ -6,8 +6,6 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/mounts/mntrnfs"
 )
 
 type share struct {
@@ -15,7 +13,7 @@ type share struct {
 	gp   globalParams
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareHelper, error) {
+func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
@@ -67,32 +65,6 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		ExportsFile: token,
 		Folder:      mountPath,
 	}.serialize(), nil
-}
-
-func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*shares.PublishContext, error) {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
-	}
-
-	pc := map[string]string{}
-	err = mntrnfs.InjectPublishContext(pc, mntrnfs.NfsMountContext{
-		Path: c.Folder,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("inject nfs publish context: %w", err)
-	}
-	return &shares.PublishContext{
-		Public: pc,
-	}, nil
-}
-
-func (sh *share) Unpublish(ctx context.Context, shareData string, localCtx map[string]string) error {
-	return nil
-}
-
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
-	return nil
 }
 
 func (sh *share) DeleteShare(ctx context.Context, shareData string) error {

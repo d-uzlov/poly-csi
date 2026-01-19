@@ -21,6 +21,7 @@ func NewJsonFileVolumeDatabase(config JsonFileInfoManagerConfig) voldb.VolumeDat
 
 func validateId(id string) bool {
 	const charset = ":/"
+	// TODO make it more strict?
 	return !strings.ContainsAny(id, charset)
 }
 
@@ -28,7 +29,7 @@ func (m *JsonFileDatabase) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string) (voldb.Entry, error) {
+func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string, uuid string) (voldb.Entry, error) {
 	if !validateId(name) {
 		return nil, fmt.Errorf("entry name '%s' is invalid", name)
 	}
@@ -41,7 +42,7 @@ func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string) (voldb.
 	if err != nil {
 		return nil, fmt.Errorf("createLock: %w", err)
 	}
-	// TODO use different context for this
+	// TODO use different context for cleanup
 	defer func() {
 		releaseErr := release(ctx)
 		if releaseErr != nil {
@@ -50,25 +51,29 @@ func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string) (voldb.
 	}()
 
 	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
-	entry := Entry{Directory: folder}
-	err = entry.CreateUnsafe(ctx)
+	entry := newEntry(folder, uuid)
+	err = entry.unsafeCreate(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create entry in filesystem: %w", err)
 	}
 
-	return &entry, nil
+	return entry, nil
 }
 
-func (m *JsonFileDatabase) GetEntry(ctx context.Context, name string) (voldb.Entry, error) {
+func (m *JsonFileDatabase) FindEntry(ctx context.Context, name string) (voldb.Entry, error) {
 	if !validateId(name) {
 		return nil, fmt.Errorf("entry name '%s' is invalid", name)
 	}
 
 	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
-	entry := Entry{Directory: folder}
-	err := entry.CheckExists(ctx)
+	entry := Entry{directory: folder}
+	err := entry.CheckValid(ctx)
 	if err != nil {
 		return nil, nil
+	}
+	err = entry.fillUuid(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read entry uuid: %w", err)
 	}
 
 	return &entry, nil

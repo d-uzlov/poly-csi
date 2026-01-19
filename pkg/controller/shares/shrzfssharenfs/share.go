@@ -16,7 +16,7 @@ type share struct {
 	cmds commands
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareHelper, error) {
+func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
@@ -87,7 +87,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, shareData string, localCtx map[string]string) error {
+func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
 	return nil
 }
 

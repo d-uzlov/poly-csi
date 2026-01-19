@@ -10,8 +10,6 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-// ==== snapshots ====
-
 func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	mh, err := d.getVolumeInfo(ctx, req.SourceVolumeId)
 	if err != nil {

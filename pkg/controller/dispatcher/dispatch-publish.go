@@ -17,8 +17,6 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-// ==== publish ====
-
 func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	logger := slogctx.FromCtx(ctx)
 
@@ -119,8 +117,12 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		pc.Public["_secret"] = base64.StdEncoding.EncodeToString(secretJsonEnc)
 	}
 
-	if pc.Local != nil {
-		err = mh.wrapper.CreatePublishCtx(ctx, req.NodeId, pc.Local)
+	if pc.Data != nil {
+		serialized, err := pc.Data.Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("serialize publish data: %w", err)
+		}
+		err = mh.wrapper.SetPublishCtx(ctx, req.NodeId, serialized)
 		if err != nil {
 			return nil, fmt.Errorf("publish_context: save to db: %w", err)
 		}
@@ -150,38 +152,64 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
 
-	if req.NodeId == "" {
-		caps := shrInstance.GetCapabilities()
-		if caps.UnpublishAll {
-			err = shrInstance.UnpublishAll(ctx, mh.vi.ShareData)
+	if req.NodeId != "" {
+		pds, err := mh.wrapper.GetPublishData(ctx, req.NodeId)
+		if err != nil {
+			return nil, fmt.Errorf("publish data: get from db: %w", err)
+		}
+
+		// nothing to do if publish data is empty
+		if pds != "" {
+			err = shrInstance.Unpublish(ctx, mh.vi.ShareData, pds)
 			if err != nil {
-				return nil, fmt.Errorf("shrInstance.UnpublishAll: %w", err)
+				return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
 			}
-			logger.Info("share.UnpublishAll: success")
-		} else {
-			return nil, fmt.Errorf("unpublish all is not supported for %s", mh.vi.ShareType)
+			logger.Info("share.Unpublish: success")
+
+			err = mh.wrapper.DeletePublishData(ctx, req.NodeId)
+			if err != nil {
+				return nil, fmt.Errorf("db: delete publish context: %w", err)
+			}
 		}
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
-	pcLocal, err := mh.wrapper.GetPublishCtx(ctx, req.NodeId)
-	if err != nil {
-		return nil, fmt.Errorf("publish_context: get from db: %w", err)
-	}
-	if pcLocal == nil {
-		// nothing to do if publish context is not found
+	caps := shrInstance.GetCapabilities()
+	if caps.UnpublishAll {
+		err = shrInstance.UnpublishAll(ctx, mh.vi.ShareData)
+		if err != nil {
+			return nil, fmt.Errorf("shrInstance.UnpublishAll: %w", err)
+		}
+		logger.Info("share.UnpublishAll: success")
+		err = mh.wrapper.ClearPublishData(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("ClearPublishData: %w", err)
+		}
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
-	err = shrInstance.Unpublish(ctx, mh.vi.ShareData, pcLocal)
+	fullPublishData, err := mh.wrapper.GetFullPublishData(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
+		return nil, fmt.Errorf("GetFullPublishCtxList: %w", err)
 	}
-	logger.Info("share.Unpublish: success")
 
-	err = mh.wrapper.DeletePublishCtx(ctx, req.NodeId)
+	for _, v := range fullPublishData {
+		if v == "" {
+			// nothing to do if publish data is empty
+			continue
+		}
+
+		err = shrInstance.Unpublish(ctx, mh.vi.ShareData, v)
+		if err != nil {
+			return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
+		}
+	}
+
+	logger.Info("share.Unpublish: success for all entries")
+
+	err = mh.wrapper.ClearPublishData(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("db: delete publish context: %w", err)
+		return nil, fmt.Errorf("ClearPublishData: %w", err)
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
