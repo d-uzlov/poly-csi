@@ -151,11 +151,16 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 	}
 
 	if req.NodeId == "" {
-		err = shrInstance.UnpublishAll(ctx, mh.vi.ShareData)
-		if err != nil {
-			return nil, fmt.Errorf("shrInstance.UnpublishAll: %w", err)
+		caps := shrInstance.GetCapabilities()
+		if caps.UnpublishAll {
+			err = shrInstance.UnpublishAll(ctx, mh.vi.ShareData)
+			if err != nil {
+				return nil, fmt.Errorf("shrInstance.UnpublishAll: %w", err)
+			}
+			logger.Info("share.UnpublishAll: success")
+		} else {
+			return nil, fmt.Errorf("unpublish all is not supported for %s", mh.vi.ShareType)
 		}
-		logger.Info("share.UnpublishAll: success")
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 

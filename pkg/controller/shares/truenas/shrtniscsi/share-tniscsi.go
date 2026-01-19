@@ -35,6 +35,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 
 func (sh *share) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
+		UnpublishAll: false,
 		LocalVolume:  []string{storage.VolDevice},
 		OpaqueVolume: []string{"zfs-zvol"},
 	}
@@ -133,7 +134,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, localCtx map[s
 }
 
 func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
-	return nil
+	return fmt.Errorf("unimplemented")
 }
 
 func (sh *share) DeleteShare(ctx context.Context, shareData string) error {

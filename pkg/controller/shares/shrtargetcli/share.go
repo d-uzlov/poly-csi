@@ -33,6 +33,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 
 func (sh *share) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
+		UnpublishAll: false,
 		LocalVolume:  []string{storage.VolDevice},
 		OpaqueVolume: nil,
 	}

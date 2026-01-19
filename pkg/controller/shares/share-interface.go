@@ -32,6 +32,7 @@ type PublishContext struct {
 }
 
 type Capabilities struct {
+	UnpublishAll bool
 	LocalVolume  []string
 	OpaqueVolume []string
 }
