@@ -229,3 +229,70 @@ roleRef:
   kind: Role
   name: csi-resizer
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: poly-csi:snapshotter
+rules:
+- apiGroups: [ "" ]
+  resources: [ "events" ]
+  verbs: [ "list", "watch", "create", "update", "patch" ]
+- apiGroups: [ "" ]
+  resources: [ "secrets" ]
+  verbs: [ "get", "list" ]
+- apiGroups: [ "snapshot.storage.k8s.io" ]
+  resources: [ "volumesnapshotclasses" ]
+  verbs: [ "get", "list", "watch" ]
+- apiGroups: [ "snapshot.storage.k8s.io" ]
+  resources: [ "volumesnapshotcontents" ]
+  verbs: [ "get", "list", "watch", "update", "patch" ]
+- apiGroups: [ "snapshot.storage.k8s.io" ]
+  resources: [ "volumesnapshotcontents/status" ]
+  verbs: [ "update", "patch" ]
+- apiGroups: [ "groupsnapshot.storage.k8s.io" ]
+  resources: [ "volumegroupsnapshotclasses" ]
+  verbs: [ "get", "list", "watch" ]
+- apiGroups: [ "groupsnapshot.storage.k8s.io" ]
+  resources: [ "volumegroupsnapshotcontents" ]
+  verbs: [ "get", "list", "watch", "update", "patch" ]
+- apiGroups: [ "groupsnapshot.storage.k8s.io" ]
+  resources: [ "volumegroupsnapshotcontents/status" ]
+  verbs: [ "update", "patch" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: poly-csi:snapshotter
+subjects:
+- kind: ServiceAccount
+  namespace: pv-poly
+  name: poly-csi-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: poly-csi:snapshotter
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: pv-poly
+  name: csi-snapshotter
+rules:
+- apiGroups: [ "coordination.k8s.io" ]
+  resources: [ "leases" ]
+  verbs: [ "get", "watch", "list", "delete", "update", "create" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: pv-poly
+  name: csi-snapshotter
+subjects:
+- kind: ServiceAccount
+  namespace: pv-poly
+  name: csi-snapshotter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: csi-snapshotter

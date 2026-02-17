@@ -26,7 +26,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.2.19
+        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.2.27
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -38,16 +38,6 @@ spec:
           requests:
             memory: 15Mi
         # env: []
-        # livenessProbe:
-        #   failureThreshold: 3
-        #   exec:
-        #     command:
-        #     - bin/liveness-probe
-        #     - --csi-version=1.5.0
-        #     - --csi-address=/csi-data/csi.sock
-        #   initialDelaySeconds: 10
-        #   timeoutSeconds: 15
-        #   periodSeconds: 60
         volumeMounts:
         - mountPath: /csi-data
           name: socket-dir
@@ -113,6 +103,7 @@ spec:
               apiVersion: v1
               fieldPath: metadata.namespace
         - name: POD_NAME
+          # external-provisioner uses POD_NAME env to determine CSIStorageCapacity owner
           valueFrom:
             fieldRef:
               apiVersion: v1
@@ -142,43 +133,31 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
-        - name: POD_NAME
+      # https://github.com/kubernetes-csi/external-snapshotter
+      - name: external-snapshotter
+        image: registry.k8s.io/sig-storage/csi-snapshotter:v8.5.0
+        args:
+        - --v=5
+        - --leader-election
+        - --leader-election-namespace=$(NAMESPACE)
+        - --timeout=90s
+        - --worker-threads=10
+        - --csi-address=/csi-data/csi.sock
+        - --automaxprocs=true
+        resources:
+          limits:
+            memory: 50Mi
+          requests:
+            memory: 25Mi
+        volumeMounts:
+        - mountPath: /csi-data
+          name: socket-dir
+        env:
+        - name: NAMESPACE
           valueFrom:
             fieldRef:
               apiVersion: v1
-              fieldPath: metadata.name
-      # https://github.com/kubernetes-csi/external-snapshotter
-      # beware upgrading version:
-      #  - https://github.com/rook/rook/issues/4178
-      #  - https://github.com/kubernetes-csi/external-snapshotter/issues/147#issuecomment-513664310
-      # - name: external-snapshotter
-      #   image: "registry.k8s.io/sig-storage/csi-snapshotter:v8.2.1"
-      #   args:
-      #   - --v=5
-      #   - --leader-election
-      #   - --leader-election-namespace=pv-dem
-      #   - --timeout=90s
-      #   - --worker-threads=10
-      #   - --csi-address=/csi-data/csi.sock
-      #   resources:
-      #     limits:
-      #       memory: 25Mi
-      #     requests:
-      #       memory: 25Mi
-      #   volumeMounts:
-      #   - mountPath: /csi-data
-      #     name: socket-dir
-      #   env:
-      #   - name: NAMESPACE
-      #     valueFrom:
-      #       fieldRef:
-      #         apiVersion: v1
-      #         fieldPath: metadata.namespace
-      #   - name: POD_NAME
-      #     valueFrom:
-      #       fieldRef:
-      #         apiVersion: v1
-      #         fieldPath: metadata.name
+              fieldPath: metadata.namespace
 
       volumes:
       - name: socket-dir

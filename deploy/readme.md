@@ -32,8 +32,8 @@ kl -n pv-poly get ds
 kl -n pv-poly get deploy
 
 kl -n pv-poly logs deployments/poly-csi-controller --tail 10
-kl -n pv-poly logs deployments/poly-csi-controller > ./controller.log
-kl -n pv-poly logs deployments/poly-csi-controller > ./controller.log --follow
+kl -n pv-poly logs deployments/poly-csi-controller csi-driver > ./controller.log
+kl -n pv-poly logs deployments/poly-csi-controller csi-driver > ./controller.log --follow
 
 ```
 
