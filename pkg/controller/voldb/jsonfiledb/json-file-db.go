@@ -67,9 +67,20 @@ func (m *JsonFileDatabase) FindEntry(ctx context.Context, name string) (voldb.En
 
 	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
 	entry := Entry{directory: folder}
-	err := entry.CheckValid(ctx)
-	if err != nil {
+	// CheckValid below expects valid UUID
+	fillUuidErr := entry.fillUuid(ctx)
+	empty, err := entry.CheckValid(ctx)
+	// first check if we think volume does not exist in db
+	// then check fillUuidErr
+	// then check error from CheckValid
+	if empty {
 		return nil, nil
+	}
+	if fillUuidErr != nil {
+		return nil, fmt.Errorf("read uuid: %w", err)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("check db entry: %w", err)
 	}
 	err = entry.fillUuid(ctx)
 	if err != nil {

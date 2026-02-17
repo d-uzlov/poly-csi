@@ -63,7 +63,7 @@ func (e Entry) readUuid(ctx context.Context) (string, error) {
 	return string(uuid), nil
 }
 
-func (e Entry) fillUuid(ctx context.Context) error {
+func (e *Entry) fillUuid(ctx context.Context) error {
 	if e.uuid != "" {
 		return nil
 	}
@@ -83,33 +83,35 @@ func (e Entry) Lock(ctx context.Context) (release func(ctx context.Context) erro
 	return release, err
 }
 
-func (e Entry) CheckValid(ctx context.Context) error {
-	if e.uuid == "" {
-		return fmt.Errorf("entry is not initialized with uuid")
-	}
-
+func (e Entry) CheckValid(ctx context.Context) (empty bool, err error) {
 	cmds := transport.FromContext(ctx).Cmds()
 
 	sr, err := cmds.Stat(ctx, e.directory)
 	if err != nil {
-		return fmt.Errorf("stat %s: %w", e.directory, err)
+		return false, fmt.Errorf("stat %s: %w", e.directory, err)
 	}
 	if sr == nil {
-		return fmt.Errorf("stat %s: directory is not found", e.directory)
+		// return true, fmt.Errorf("stat %s: directory is not found", e.directory)
+		return true, nil
 	}
 	if !sr.IsDirectory() {
-		return fmt.Errorf("path '%s' is not a directory", e.directory)
+		return false, fmt.Errorf("path '%s' is not a directory", e.directory)
+	}
+
+	// does not make sense to check uuid until we are sure entry exists in db
+	if e.uuid == "" {
+		return false, fmt.Errorf("entry is not initialized with uuid")
 	}
 
 	currentUuid, err := e.readUuid(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if e.uuid != currentUuid {
-		return fmt.Errorf("uuid on disk has changed: expected %s != current %s", e.uuid, currentUuid)
+		return false, fmt.Errorf("uuid on disk has changed: expected %s != current %s", e.uuid, currentUuid)
 	}
 
-	return nil
+	return false, nil
 }
 
 func (e Entry) ListModules(ctx context.Context) ([]string, error) {

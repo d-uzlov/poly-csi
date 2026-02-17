@@ -63,6 +63,10 @@ func (w Wrapper) SetSnapshotData(ctx context.Context, name string, snap *Snapsho
 		return err
 	}
 
+	if pc.Entries == nil {
+		pc.Entries = map[string]string{}
+	}
+
 	if snap != nil {
 		serialized, err := snap.serialize()
 		if err != nil {
@@ -93,6 +97,10 @@ func (w Wrapper) GetSnapshot(ctx context.Context, name string) (*SnapshotInfo, e
 	pc, err := w.unsafeGetSnapshotsContainer(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if pc.Entries == nil {
+		return nil, nil
 	}
 
 	serialized := pc.Entries[name]

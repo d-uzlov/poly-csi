@@ -40,6 +40,10 @@ func (w Wrapper) SetPublishCtx(ctx context.Context, name string, data string) er
 		return err
 	}
 
+	if pc.Entries == nil {
+		pc.Entries = map[string]string{}
+	}
+
 	if pc.Entries[name] == data {
 		return nil
 	}
@@ -67,6 +71,10 @@ func (w Wrapper) GetPublishData(ctx context.Context, name string) (string, error
 	pc, err := w.unsafeGetPublishContainer(ctx)
 	if err != nil {
 		return "", err
+	}
+
+	if pc.Entries == nil {
+		return "", nil
 	}
 
 	return pc.Entries[name], nil

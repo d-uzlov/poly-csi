@@ -17,7 +17,7 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 	}
 	defer mh.release()
 	if mh.vi == nil {
-		return nil, fmt.Errorf("volume not found")
+		return nil, fmt.Errorf("source volume not found")
 	}
 
 	snapshotId := createSnapshotId(mh.srv.conf.StableId, mh.volumeName, req.Name)

@@ -52,7 +52,7 @@ func (d *Dispatcher) getVolumeInfo(ctx context.Context, volumeId string) (*volum
 	ctx = transport.MakeContext(ctx, srv.trInstance)
 	dbEntry, err := srv.dbInstance.FindEntry(ctx, volumeName)
 	if err != nil {
-		return nil, fmt.Errorf("server[id=%s].db: get entry %w", srvId, err)
+		return nil, fmt.Errorf("server[id=%s].db: get entry: %w", srvId, err)
 	}
 	if dbEntry == nil {
 		return &volumeManagementHandle{}, nil
@@ -115,7 +115,7 @@ func (d *Dispatcher) getSnapshotHandle(ctx context.Context, snapshotId string) (
 	ctx = transport.MakeContext(ctx, srv.trInstance)
 	dbEntry, err := srv.dbInstance.FindEntry(ctx, volumeName)
 	if err != nil {
-		return nil, fmt.Errorf("server[id=%s].db: get entry %w", srvId, err)
+		return nil, fmt.Errorf("server[id=%s].db: get entry: %w", srvId, err)
 	}
 	if dbEntry == nil {
 		return nil, nil
