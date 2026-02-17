@@ -187,6 +187,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				return nil, fmt.Errorf("source snapshot is not found")
 			}
 
+			if sh.si.SnapshotType != "native" {
+				return nil, fmt.Errorf("clone from non-native snapshot is not supported")
+			}
+
 			sourceCtx = transport.MakeContext(ctx, sh.srv.trInstance)
 			sourceServer = sh.srv
 
@@ -238,7 +242,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				// TODO cleanup should use a different context, with extended timeout
 				defer sourceSnapshot.Delete(ctx)
 			} else {
-				return nil, fmt.Errorf("source volume does not support snapshots")
+				return nil, fmt.Errorf("source volume does not support native snapshots")
 			}
 		} else {
 			return nil, fmt.Errorf("unknown volume content source type: %#v", req.VolumeContentSource.Type)

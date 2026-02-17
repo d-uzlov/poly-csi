@@ -49,7 +49,7 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 		return nil, fmt.Errorf("serialize snapshot: %w", err)
 	}
 
-	err = mh.wrapper.CreateSnapshot(ctx, req.Name, voldbwrapper.SnapshotInfo{
+	err = mh.wrapper.SetSnapshotData(ctx, req.Name, &voldbwrapper.SnapshotInfo{
 		SnapshotType:   "native",
 		StorageType:    mh.vi.StorageType,
 		SerializedData: snapData,
@@ -86,11 +86,6 @@ func (d *Dispatcher) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 		return nil, err
 	}
 
-	// vol, err := strInstance.ParseVolume(mh.vi.StorageData)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("parse storage data: %w", err)
-	// }
-
 	snap, err := strInstance.ParseSnapshot(mh.si.SerializedData)
 	if err != nil {
 		return nil, fmt.Errorf("parse snapshot data: %w", err)
@@ -101,7 +96,7 @@ func (d *Dispatcher) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 		return nil, fmt.Errorf("delete underlying snapshot: %w", err)
 	}
 
-	err = mh.wrapper.DeleteSnapshot(ctx, mh.snapshotName)
+	err = mh.wrapper.DeleteSnapshotData(ctx, mh.snapshotName)
 	if err != nil {
 		return nil, fmt.Errorf("delete snapshot data from database: %w", err)
 	}
