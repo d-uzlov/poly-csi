@@ -1,0 +1,11 @@
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: test-sc-poly-csi-nfs-snapshot
+  labels:
+    test: pvc
+spec:
+  volumeSnapshotClassName: poly-csi-snaps
+  source:
+    persistentVolumeClaimName: test-sc-poly-csi-nfs
