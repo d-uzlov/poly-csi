@@ -71,7 +71,7 @@ func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateReque
 		return nil, nil
 	}
 
-	// TODO
+	// TODO btrfs crashes when trying to get quota info in json format
 	// if info.GetSize() != req.Size {
 	// 	return nil, fmt.Errorf("size mismatch: %d != %d", info.GetSize(), req.Size)
 	// }

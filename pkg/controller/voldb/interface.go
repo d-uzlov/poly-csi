@@ -7,7 +7,7 @@ import (
 type VolumeDatabase interface {
 	// Cleanup disposes of this VolumeDatabase instance.
 	// It does not affect any entries.
-	Cleanup(ctx context.Context) error
+	Cleanup() error
 	// CreateEntry fetches existing entry, or creates a new entry if necessary.
 	CreateEntry(ctx context.Context, name string, uuid string) (Entry, error)
 	// FindEntry fetches existing entry, or returns an error if entry does not exist.

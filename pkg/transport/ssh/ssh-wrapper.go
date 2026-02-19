@@ -84,7 +84,7 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		User:    config.Username,
 		Auth:    authMethods,
 		Timeout: config.DialTimeout,
-		// TODO ?
+		// TODO add ability to check host key
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
@@ -110,7 +110,7 @@ func (s *sshWrapper) watchClient(ctx context.Context) {
 		err := s.UpdateClient(client)
 		if err != nil {
 			s.logger.Error("SshWrapper.watchClient: UpdateClient failed", "error", err)
-			// TODO add backoff?
+			// TODO add backoff? or remove repeated attempts from logs?
 			time.Sleep(time.Second)
 			continue
 		}
@@ -119,7 +119,7 @@ func (s *sshWrapper) watchClient(ctx context.Context) {
 	s.logger.Debug("context cancelled, stopping ssh watcher")
 }
 
-func (s *sshWrapper) Cleanup(ctx context.Context) {
+func (s *sshWrapper) Cleanup() {
 	s.clientMutex.Lock()
 	defer s.clientMutex.Unlock()
 

@@ -47,8 +47,7 @@ func main() {
 
 	d := dispatcher.NewDispatcher(ctx)
 	d.ReloadConfig(ctx, dispatcherConfig)
-	// TODO it's bad to use program context in cleanup, it can be expired by the time cleanup is called
-	defer d.Cleanup(ctx)
+	defer d.Cleanup()
 
 	go configwatcher.WatchConfigChanges(ctx, appConfig.ConfigPath, func() {
 		logger.Info("reading new config file")

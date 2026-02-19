@@ -47,7 +47,7 @@ func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityReques
 	}, nil
 }
 
-// TODO
+// TODO implement ListVolumes?
 // func (d *Dispatcher) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 // 	connectionName, ok := req.Parameters["dispatch.name"]
 // 	if !ok {
@@ -94,6 +94,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 			VolumeId:      req.VolumeId,
 			CapacityBytes: volumeSize,
 			VolumeContext: mh.vi.VolumeContext,
+			// ContentSource: , // TODO restore matching content source
 		},
 		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
 			VolumeCondition: &csi.VolumeCondition{
@@ -104,7 +105,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 	}, nil
 }
 
-// TODO
+// TODO implement ControllerModifyVolume
 // func (d *Dispatcher) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 // 	d.mainMutex.RLock()
 // 	defer d.mainMutex.RUnlock()

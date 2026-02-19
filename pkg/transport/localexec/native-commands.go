@@ -136,7 +136,7 @@ func (s *nativeCommands) Df(ctx context.Context, path string) (*transport.FsSize
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	// TODO implement
+	// TODO implement df natively
 	return executils.New(s.tr, false).Df(ctx, path)
 }
 
@@ -171,6 +171,6 @@ func (s *nativeCommands) CreateLock(ctx context.Context, lockFile string, maxDur
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	// TODO add optimized implementation
+	// TODO add optimized implementation for CreateLock
 	return executils.New(s.tr, false).CreateLock(ctx, lockFile, maxDuration)
 }

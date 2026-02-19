@@ -26,7 +26,7 @@ func NewDispatcher(ctx context.Context) *Dispatcher {
 	return result
 }
 
-func (d *Dispatcher) Cleanup(ctx context.Context) {
+func (d *Dispatcher) Cleanup() {
 	var servers []*parsedServer
 	func() {
 		d.confMutex.Lock()
@@ -42,12 +42,12 @@ func (d *Dispatcher) Cleanup(ctx context.Context) {
 			defer v.mutex.Unlock()
 
 			if v.trInstance != nil {
-				v.trInstance.Cleanup(ctx)
+				v.trInstance.Cleanup()
 			}
 			v.trInstance = nil
 
 			if v.dbInstance != nil {
-				v.dbInstance.Cleanup(ctx)
+				v.dbInstance.Cleanup()
 			}
 			v.dbInstance = nil
 		}()
@@ -108,7 +108,7 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 			v.mutex.Lock()
 			defer v.mutex.Unlock()
 
-			v.Cleanup(ctx)
+			v.Cleanup()
 		}()
 	}
 }

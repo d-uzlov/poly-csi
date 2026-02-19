@@ -77,7 +77,7 @@ func (v *Volume) Delete(ctx context.Context) error {
 }
 
 func (v *Volume) GetSize(ctx context.Context) (int64, error) {
-	// TODO uncomment proper returns after updating to a newer btrfs version
+	// TODO btrfs crashes when trying to get quota info in json format
 	info, err := v.snip.GetQuotaInfo(ctx, v.getMainVolume())
 	if err != nil {
 		return 0, nil

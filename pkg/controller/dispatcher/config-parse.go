@@ -117,13 +117,13 @@ func (c *parsedServer) Reuse(old *parsedServer) {
 	}
 }
 
-func (c *parsedServer) Cleanup(ctx context.Context) {
+func (c *parsedServer) Cleanup() {
 	if c.trInstance != nil {
-		c.trInstance.Cleanup(ctx)
+		c.trInstance.Cleanup()
 		c.trInstance = nil
 	}
 	if c.dbInstance != nil {
-		c.dbInstance.Cleanup(ctx)
+		c.dbInstance.Cleanup()
 		c.dbInstance = nil
 	}
 }

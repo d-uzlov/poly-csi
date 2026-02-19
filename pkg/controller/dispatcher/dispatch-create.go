@@ -447,6 +447,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("create db entry: %w", err)
 	}
 	wrapped := voldbwrapper.New(dbEntry)
+	// TODO save req.VolumeContentSource
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
 		MounterId:     dispatchParams.mounterId,
 		TransportId:   srv.conf.StableId,

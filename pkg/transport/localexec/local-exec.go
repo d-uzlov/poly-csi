@@ -30,7 +30,7 @@ func New(ctx context.Context) (transport.Transport, error) {
 	return result, nil
 }
 
-func (s *localExecWrapper) Cleanup(ctx context.Context) {}
+func (s *localExecWrapper) Cleanup() {}
 
 func (s *localExecWrapper) Cmds() transport.Commands {
 	return &nativeCommands{tr: s}

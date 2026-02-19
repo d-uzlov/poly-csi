@@ -25,7 +25,7 @@ func validateId(id string) bool {
 	return !strings.ContainsAny(id, charset)
 }
 
-func (m *JsonFileDatabase) Cleanup(ctx context.Context) error {
+func (m *JsonFileDatabase) Cleanup() error {
 	return nil
 }
 

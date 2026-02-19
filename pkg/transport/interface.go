@@ -6,7 +6,7 @@ import (
 )
 
 type Transport interface {
-	Cleanup(ctx context.Context)
+	Cleanup()
 	RunCommand(ctx context.Context, cmd []string, opts ...ExecOption) (CommandResult, error)
 	Cmds() Commands
 	SudoCmds() Commands
