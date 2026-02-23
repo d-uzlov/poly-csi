@@ -14,7 +14,7 @@ import (
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "manage nvmet subsystems",
+	Short: "bulk-manage config files",
 }
 
 func init() {

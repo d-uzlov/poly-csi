@@ -31,6 +31,10 @@ func init() {
 var subsysCreateCmd = &cobra.Command{
 	Use:   "create <subsys_json>",
 	Short: "Create nvmet subsys with given configuration. If requested subsys already exists, check that existing config matches requested one",
+	Example: `
+nvmet_keeper subsys create '{"nqn":"nqn.2014-08.org.com.example:subsys","model":"","serial":"","allow_any_host":false}'
+model and serial can be arbitrary strings. When left empty, Linux kernel will set model=Linux and generate a unique value for serial
+`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -65,6 +69,7 @@ var subsysCreateCmd = &cobra.Command{
 var subsysDeleteCmd = &cobra.Command{
 	Use:   "delete <nqn>",
 	Short: "delete nvmet subsys by nqn",
+	Example: `nvmet_keeper subsys delete nqn.2014-08.org.com.example:subsys`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -89,8 +94,9 @@ var subsysDeleteCmd = &cobra.Command{
 }
 
 var subsysAttachCmd = &cobra.Command{
-	Use:   "attach nqn port",
+	Use:   "attach nqn port_name",
 	Short: "Attach subsys to given port",
+	Example: `nvmet_keeper subsys attach nqn.2014-08.org.com.example:subsys 2020`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -118,8 +124,9 @@ var subsysAttachCmd = &cobra.Command{
 }
 
 var subsysDetachCmd = &cobra.Command{
-	Use:   "detach nqn port",
+	Use:   "detach nqn port_name",
 	Short: "Detach subsys from given port",
+	Example: `nvmet_keeper subsys detach nqn.2014-08.org.com.example:subsys 2020`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -149,6 +156,7 @@ var subsysDetachCmd = &cobra.Command{
 var subsysAllowHostCmd = &cobra.Command{
 	Use:   "allow nqn host_nqn",
 	Short: "Allow a host to access subsystem",
+	Example: `nvmet_keeper subsys allow nqn.2014-08.org.com.example:subsys nqn.2014-08.org.com.example:machine`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -178,6 +186,7 @@ var subsysAllowHostCmd = &cobra.Command{
 var subsysDisallowHostCmd = &cobra.Command{
 	Use:   "disallow nqn host_nqn",
 	Short: "Disallow a host to access subsystem",
+	Example: `nvmet_keeper subsys disallow nqn.2014-08.org.com.example:subsys nqn.2014-08.org.com.example:machine`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

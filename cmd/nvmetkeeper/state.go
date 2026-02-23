@@ -15,7 +15,7 @@ import (
 
 var stateCmd = &cobra.Command{
 	Use:   "state",
-	Short: "manage nvmet state",
+	Short: "bulk-manage in-memory state of nvmet",
 }
 
 func init() {
