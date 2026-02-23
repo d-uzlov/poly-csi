@@ -37,6 +37,25 @@ func (c Ns) Validate() error {
 	return nil
 }
 
+func CheckNamespaceEquivalent(requested Ns, existing Ns) bool {
+	if requested.Nqn != existing.Nqn {
+		return false
+	}
+	if requested.Nsid != existing.Nsid {
+		return false
+	}
+	if requested.DevicePath != existing.DevicePath {
+		return false
+	}
+	if requested.DeviceUuid != "" && requested.DeviceUuid != existing.DeviceUuid {
+		return false
+	}
+	if requested.DeviceGuid != "" && requested.DeviceGuid != existing.DeviceGuid {
+		return false
+	}
+	return true
+}
+
 func (s Snippets) ListNamespaces(nqn string) ([]string, error) {
 	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces", nqn)
@@ -97,6 +116,26 @@ func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
 		DeviceGuid: string(deviceGuid),
 		Enabled:    enabled,
 	}, nil
+}
+
+// SetNamespaceEnabled takes full namespace description, but ignores parameters, except for Enabled
+func (s Snippets) SetNamespaceEnabled(c Ns) (err error) {
+	tr := transport.FromContext(s.ctx)
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s", c.Nqn, c.Nsid)
+
+	enable := "0"
+	if c.Enabled {
+		enable = "1"
+	}
+
+	attrPath := fmt.Sprintf("%s/enable", path)
+	// we are in defer, we can just set err
+	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
+	if err != nil {
+		err = fmt.Errorf("write %s to '%s/enable': %w", enable, path, err)
+	}
+
+	return nil
 }
 
 func (s Snippets) ConfigureNamespace(c Ns) (err error) {
@@ -166,14 +205,14 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 		return fmt.Errorf("write '%s' to '%s': %w", c.DevicePath, attrPath, err)
 	}
 	if c.DeviceUuid != "" {
-		attrPath = fmt.Sprintf("%s/device_path", path)
+		attrPath = fmt.Sprintf("%s/device_uuid", path)
 		err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceUuid))
 		if err != nil {
 			return fmt.Errorf("write '%s' to '%s': %w", c.DeviceUuid, attrPath, err)
 		}
 	}
 	if c.DeviceGuid != "" {
-		attrPath = fmt.Sprintf("%s/device_path", path)
+		attrPath = fmt.Sprintf("%s/device_nguid", path)
 		err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceGuid))
 		if err != nil {
 			return fmt.Errorf("write '%s' to '%s': %w", c.DeviceGuid, attrPath, err)

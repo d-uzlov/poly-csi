@@ -211,11 +211,13 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (*transport.StatR
 	}
 	runResult, err := ec.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("readlink: %w", err)
 	}
 	if runResult.ExitCode != 0 {
-		if strings.Contains(string(runResult.Stderr), "No such file or directory") {
-			return nil, nil
+		if runResult.ExitCode == 1 && len(runResult.Stdout) == 0 {
+			// it's arguable if we should return nil value or an error here
+			// TODO change interface?
+			return nil, fmt.Errorf("parent folder does not exist")
 		}
 		return nil, transport.FormatRunError(runResult)
 	}
@@ -231,7 +233,7 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (*transport.StatR
 	}
 	runResult, err = ec.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stat: %w", err)
 	}
 	if runResult.ExitCode != 0 {
 		if strings.Contains(string(runResult.Stderr), "No such file or directory") {

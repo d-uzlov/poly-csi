@@ -29,6 +29,24 @@ func (c Subsys) Json() string {
 	return string(encoded)
 }
 
+// Returns true when subsystems are equivalent.
+// Ignores Model and Serial if they are empty in requested.
+func CheckSubsystemsEquivalent(requested Subsys, existing Subsys) bool {
+	if requested.Nqn != existing.Nqn {
+		return false
+	}
+	if requested.AllowAnyHost != existing.AllowAnyHost {
+		return false
+	}
+	if requested.Model != "" && requested.Model != existing.Model {
+		return false
+	}
+	if requested.Serial != "" && requested.Serial != existing.Serial {
+		return false
+	}
+	return true
+}
+
 func (s Snippets) ListSubsys() ([]string, error) {
 	tr := transport.FromContext(s.ctx)
 	path := "/sys/kernel/config/nvmet/subsystems/"

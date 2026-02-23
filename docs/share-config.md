@@ -107,6 +107,14 @@ Set `nvmet_keeper` global command to `[ sudo, /opt/nvmet_keeper, --config-folder
 
 ```bash
 
+# copy nvmet_keeper files from local filesystem to target machine (you need to compile the binary manually)
+# TODO replace with download links
+target=
+scp ./deploy/nvmet_keeper.service $target:./nvmet_keeper.service
+scp ./bin/nvmet_keeper $target:./nvmet_keeper
+
+# below actions should be run on the target server
+
 # nvmet kernel module must be loaded
  sudo tee /etc/modules-load.d/nvmeof.conf << EOF
 nvmet
@@ -117,18 +125,16 @@ sudo systemctl restart systemd-modules-load.service
 # check that modules are loaded
 lsmod | grep -e nvmet
 
-# TODO replace with download links
-scp ./deploy/nvmet_keeper.service nas-rose.storage.lan:./nvmet_keeper.service
-sudo mv ./nvmet_keeper.service /opt/nvmet_keeper
-
+sudo mv ./nvmet_keeper /opt/nvmet_keeper
 sudo mv ./nvmet_keeper.service /etc/systemd/system/nvmet_keeper.service
+
 sudo systemctl daemon-reload
 sudo systemctl enable nvmet_keeper.service
 sudo systemctl restart nvmet_keeper.service
-sudo systemctl status nvmet_keeper.service
+sudo systemctl status nvmet_keeper.service --no-pager
 
 # configure port
-sudo nvmet_keeper port create '{"name":"4420","address_family":"ipv4","listen_addr":"0.0.0.0","listen_port":4420,"type":"tcp"}'
+sudo /opt/nvmet_keeper port create '{"name":"4420","address_family":"ipv4","listen_addr":"0.0.0.0","listen_port":4420,"type":"tcp"}'
 
 ```
 

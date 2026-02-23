@@ -8,8 +8,6 @@ import (
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
-// sudo nvme gen-dhchap-key --secret 0d85ec64f3a73bb60180a1c9bace8caa9b7ce7fbf65046e21c06a092a3d2b584 --key-length 32 --nqn nqn.test --hmac 1
-
 type NvmetKeeper struct {
 	useSudo    bool
 	sudoPrefix string
@@ -156,7 +154,7 @@ func (k *NvmetKeeper) ShowState(ctx context.Context, w io.Writer) error {
 			return fmt.Errorf("read subsys %s: not found", v)
 		}
 		fmt.Fprintf(w, "  subsys %s: \n", s.Nqn)
-		fmt.Fprintf(w, "    properties: allow_any_host=%v, serial=%s\n", s.AllowAnyHost, s.Serial)
+		fmt.Fprintf(w, "    properties: allow_any_host=%v, serial=%s, model=%s\n", s.AllowAnyHost, s.Serial, s.Model)
 
 		namespaces, err := snip.ListNamespaces(s.Nqn)
 		if err != nil {
@@ -418,7 +416,7 @@ func (k *NvmetKeeper) CreateSubsystem(ctx context.Context, s nvmet.Subsys) error
 		return fmt.Errorf("read existing subsys info: %w", err)
 	}
 	if existingSubsys != nil {
-		if *existingSubsys != s {
+		if !nvmet.CheckSubsystemsEquivalent(s, *existingSubsys) {
 			return fmt.Errorf("existing config does not match requested: existing %#v != requested %#v", *existingSubsys, s)
 		}
 	} else {
@@ -444,11 +442,16 @@ func (k *NvmetKeeper) CreateNamespace(ctx context.Context, n nvmet.Ns) error {
 		return fmt.Errorf("read existing subsys info: %w", err)
 	}
 	if existingNs != nil {
-		if *existingNs != n {
+		if !nvmet.CheckNamespaceEquivalent(n, *existingNs) {
 			return fmt.Errorf("existing config does not match requested: existing %#v != requested %#v", *existingNs, n)
 		}
+		if n.Enabled != existingNs.Enabled {
+			err = snip.SetNamespaceEnabled(n)
+			if err != nil {
+				return fmt.Errorf("enable namespace '%s/%s': %w", n.Nqn, n.Nsid, err)
+			}
+		}
 	} else {
-		// namespace does not exist yet, need to create it
 		err = snip.ConfigureNamespace(n)
 		if err != nil {
 			return fmt.Errorf("configure namespace '%s/%s': %w", n.Nqn, n.Nsid, err)
