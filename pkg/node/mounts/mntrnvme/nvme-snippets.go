@@ -11,6 +11,19 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
+type NvmeSnippets struct {
+	cmd            []string
+	parseKernelLog bool
+}
+
+func newNvmeSnippets() NvmeSnippets {
+	// TODO make it configurable
+	return NvmeSnippets{
+		cmd:            []string{"nvme"},
+		parseKernelLog: true,
+	}
+}
+
 type nvmeNodeInfo struct {
 	hostNqn string
 	hostId  string
@@ -32,50 +45,65 @@ func nvmeGetNodeInfo(ctx context.Context) (*nvmeNodeInfo, error) {
 	}, nil
 }
 
-func nvmeConnect(ctx context.Context, nqn string, port string, nvmeTransport string, address string, ioQueues string) error {
-	hostInfo, err := nvmeGetNodeInfo(ctx)
-	if err != nil {
-		return err
-	}
+func initKernelMessageParser(prefix string) (getMessages func() []string, err error) {
 	kMsgReader, err := kmsgparser.NewParser()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer kMsgReader.Close()
 	err = kMsgReader.SeekEnd()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	messages := kMsgReader.Parse()
-	defer func() {
-		logger := slogctx.FromCtx(ctx)
+	return func() []string {
+		defer kMsgReader.Close()
+		var result []string
 		for {
 			select {
 			case msg := <-messages:
-				if strings.HasPrefix(msg.Message, "nvme") {
-					logger.Info("new kernel message", "msg", msg.Message)
+				if strings.HasPrefix(msg.Message, prefix) {
+					result = append(result, msg.Message)
 				}
 			default:
-				return
+				return result
 			}
 		}
-	}()
-	// setting hostnqn explicitly, because by default linux uses hostnqn detected on boot
-	// if you change it, `nvme show-hostnqn` and /etc/nvme/hostnqn show new value,
-	// but nvme connect will still use old value until reboot
-	cmd := []string{"nvme", "connect", "--hostnqn", hostInfo.hostNqn, "--hostid", hostInfo.hostId, "--transport", nvmeTransport, "--traddr", address, "--nqn", nqn}
+	}, nil
+}
+
+func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn string, hostId string, port string, nvmeTransport string, address string, ioQueues string, hostKey string, controllerKey string) error {
+	if snip.parseKernelLog {
+		getMessages, err := initKernelMessageParser("nvme")
+		if err != nil {
+			return fmt.Errorf("failed to init kmsgparser: %w", err)
+		}
+		defer func() {
+			logger := slogctx.FromCtx(ctx)
+			for _, v := range getMessages() {
+				logger.Info("new kernel message", "msg", v)
+			}
+		}()
+	}
+
+	cmd := append(snip.cmd, "connect", "--hostnqn", hostNqn, "--hostid", hostId, "--transport", nvmeTransport, "--traddr", address, "--trsvcid", port, "--nqn", targetNqn)
 	if ioQueues != "" {
 		cmd = append(cmd, "--nr-io-queues", ioQueues)
 	}
-	_, err = transport.RelaxedRun(ctx, cmd, "already connected")
+	if hostKey != "" {
+		cmd = append(cmd, "--dhchap-secret", hostKey)
+	}
+	if controllerKey != "" {
+		cmd = append(cmd, "--dhchap-ctrl-secret", controllerKey)
+	}
+	_, err := transport.RelaxedRun(ctx, cmd, "already connected")
 	if err != nil {
-		return fmt.Errorf("nvme connect '%s': %w", nqn, err)
+		return fmt.Errorf("nvme connect '%s': %w", targetNqn, err)
 	}
 	return nil
 }
 
-func nvmeDisconnect(ctx context.Context, nqn string) error {
-	cmd := []string{"nvme", "disconnect", "--nqn", nqn}
+func (snip *NvmeSnippets) Disconnect(ctx context.Context, nqn string) error {
+	cmd := append(snip.cmd, "disconnect", "--nqn", nqn)
 	// nvme disconnect returns success when nqn is already disconnected
 	err := transport.CheckedRun(ctx, cmd)
 	if err != nil {
@@ -84,8 +112,8 @@ func nvmeDisconnect(ctx context.Context, nqn string) error {
 	return nil
 }
 
-func nvmeGetNqnInfo(ctx context.Context, nqn string) (*nvmeSubsystemInfo, error) {
-	devices, err := nvmeListSubsys(ctx)
+func (snip *NvmeSnippets) GetSubsysInfo(ctx context.Context, nqn string) (*nvmeSubsystemInfo, error) {
+	devices, err := snip.ListSubsys(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("nvmeListSubsys: %w", err)
 	}
@@ -122,8 +150,8 @@ func nvmeGetNqnInfo(ctx context.Context, nqn string) (*nvmeSubsystemInfo, error)
 // 	return "", fmt.Errorf("nqn=%s: controller not found", nqn)
 // }
 
-func nvmeFindNamespace(ctx context.Context, nqn string, nsid int) (string, error) {
-	subsys, err := nvmeGetNqnInfo(ctx, nqn)
+func (snip *NvmeSnippets) FindNamespaceDevice(ctx context.Context, nqn string, nsid int) (string, error) {
+	subsys, err := snip.GetSubsysInfo(ctx, nqn)
 	if err != nil {
 		return "", fmt.Errorf("nvmeGetNqnInfo: %w", err)
 	}
@@ -172,8 +200,8 @@ type nvmeInfo struct {
 	Subsystems []nvmeSubsystemInfo `json:"Subsystems"`
 }
 
-func nvmeListSubsys(ctx context.Context) ([]nvmeInfo, error) {
-	cmd := []string{"nvme", "list", "--verbose", "--output-format=json"}
+func (snip *NvmeSnippets) ListSubsys(ctx context.Context) ([]nvmeInfo, error) {
+	cmd := append(snip.cmd, "list", "--verbose", "--output-format=json")
 	stdout, err := transport.CheckedRunStdout(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("nvme list: %w", err)
@@ -189,8 +217,8 @@ func nvmeListSubsys(ctx context.Context) ([]nvmeInfo, error) {
 	return result.Devices, nil
 }
 
-func nvmeRescan(ctx context.Context, nqn string) error {
-	nqnInfo, err := nvmeGetNqnInfo(ctx, nqn)
+func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
+	nqnInfo, err := snip.GetSubsysInfo(ctx, nqn)
 	if err != nil {
 		return fmt.Errorf("nvmeGetNqnInfo: %w", err)
 	}
@@ -201,7 +229,7 @@ func nvmeRescan(ctx context.Context, nqn string) error {
 	err = nil
 	for _, c := range nqnInfo.Controllers {
 		devPath := "/dev/" + c.Controller
-		cmd := []string{"nvme", "ns-rescan", "--verbose", devPath}
+		cmd := append(snip.cmd, "ns-rescan", "--verbose", devPath)
 		err = transport.CheckedRun(ctx, cmd)
 		if err != nil {
 			err = fmt.Errorf("nvme ns-rescan '%s': %w", devPath, err)

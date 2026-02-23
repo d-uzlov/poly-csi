@@ -80,14 +80,17 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 	}
 
 	pc := map[string]string{}
-	err = mntrnvme.InjectPublishContext(pc, mntrnvme.NvmePublishContext{
-		Nqn:       c.Nqn,
-		Port:      c.Port,
-		Transport: c.Transport,
-		IoQueues:  c.IoQueues,
-	})
+	err = mntrnvme.NvmePublishContext{
+		TargetNqn:     c.Nqn,
+		HostNqn:       nvmeInfo.HostNqn,
+		HostId:        nvmeInfo.HostId,
+		AuthType:      mntrnvme.AuthTypeNqn,
+		ConnectPort:   c.Port,
+		TransportType: c.Transport,
+		IoQueues:      c.IoQueues,
+	}.Inject(pc)
 	if err != nil {
-		return nil, fmt.Errorf("CreateVolumeContext: %w", err)
+		return nil, fmt.Errorf("inject nvme publish context: %w", err)
 	}
 
 	pd := &publishData{

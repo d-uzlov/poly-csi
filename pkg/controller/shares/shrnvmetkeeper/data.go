@@ -10,6 +10,7 @@ type shareContext struct {
 	Port      string `json:"port"`
 	Transport string `json:"transport"`
 	IoQueues  string `json:"io_queues"`
+	AuthType  string `json:"auth_type"`
 }
 
 func (c shareContext) serialize() string {
@@ -29,6 +30,9 @@ func (c shareContext) validate() error {
 	}
 	if c.Transport == "" {
 		return fmt.Errorf("missing transport")
+	}
+	if c.AuthType == "" {
+		return fmt.Errorf("missing auth_type")
 	}
 	return nil
 }

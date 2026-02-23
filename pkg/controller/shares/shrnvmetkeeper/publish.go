@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/mounts"
 	"meoe.io/poly-csi/pkg/node/mounts/mntrnvme"
@@ -60,39 +61,98 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 		return nil, fmt.Errorf("parse mounter info as nvme: %w", err)
 	}
 
-	cmd := append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
-		Nqn:      nvmeInfo.HostNqn,
-		NeedAuth: false,
-	}.Json())
-	err = transport.CheckedRun(ctx, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("host create: %w", err)
+	// todo this will create ephemeral one-use hosts on every publish
+	// we need to try to limit this and run cleanup when possible
+	hostId := uuid.NewString()
+	hostNqn := nvmeInfo.HostNqn + ":" + hostId
+
+	secret := map[string]string{}
+	mounterAuthType := ""
+
+	switch c.AuthType {
+	case authTypeNone:
+		// no need to configure hosts
+	case authTypeNqn:
+		mounterAuthType = mntrnvme.AuthTypeNqn
+
+		cmd := append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
+			Nqn:      hostNqn,
+			NeedAuth: false,
+		}.Json())
+		err = transport.CheckedRun(ctx, cmd)
+		if err != nil {
+			return nil, fmt.Errorf("host create: %w", err)
+		}
+	case authTypeChapProvision:
+		mounterAuthType = mntrnvme.AuthTypeDhChap
+
+		cmd := []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
+		hostKey, err := transport.CheckedRunStdout(ctx, cmd)
+		if err != nil {
+			return nil, fmt.Errorf("host create: %w", err)
+		}
+		if hostKey == "" {
+			return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
+		}
+		cmd = []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
+		controllerKey, err := transport.CheckedRunStdout(ctx, cmd)
+		if err != nil {
+			return nil, fmt.Errorf("host create: %w", err)
+		}
+		if controllerKey == "" {
+			return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
+		}
+
+		err = mntrnvme.NvmeSecrets{
+			HostKey:       hostKey,
+			ControllerKey: controllerKey,
+		}.Inject(secret)
+		if err != nil {
+			return nil, fmt.Errorf("inject nvme secret publish context: %w", err)
+		}
+
+		cmd = append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
+			Nqn:           hostNqn,
+			NeedAuth:      true,
+			HostKey:       hostKey,
+			ControllerKey: controllerKey,
+			HashType:      nvmet.HashTypeHmacSha256,
+			DhGroup:       nvmet.DhGroup2048,
+		}.Json())
+		err = transport.CheckedRun(ctx, cmd)
+		if err != nil {
+			return nil, fmt.Errorf("host create: %w", err)
+		}
 	}
 
-	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "allow", c.Nqn, nvmeInfo.HostNqn)
+	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "allow", c.Nqn, hostNqn)
 	err = transport.CheckedRun(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("subsys allow: %w", err)
 	}
 
 	pc := map[string]string{}
-	err = mntrnvme.InjectPublishContext(pc, mntrnvme.NvmePublishContext{
-		Nqn:       c.Nqn,
-		Port:      c.Port,
-		Transport: c.Transport,
-		IoQueues:  c.IoQueues,
-	})
+	err = mntrnvme.NvmePublishContext{
+		TargetNqn:     c.Nqn,
+		HostNqn:       hostNqn,
+		HostId:        hostId,
+		AuthType:      mounterAuthType,
+		ConnectPort:   c.Port,
+		TransportType: c.Transport,
+		IoQueues:      c.IoQueues,
+	}.Inject(pc)
 	if err != nil {
-		return nil, fmt.Errorf("CreateVolumeContext: %w", err)
+		return nil, fmt.Errorf("inject nvme public publish context: %w", err)
 	}
 
 	pd := &publishData{
-		HostNqn: nvmeInfo.HostNqn,
+		HostNqn: hostNqn,
 	}
 
 	return &shares.PublishContext{
 		Public: pc,
 		Data:   pd,
+		Secret: secret,
 	}, nil
 }
 

@@ -13,12 +13,14 @@ import (
 )
 
 type nvmeMounter struct {
-	id string
+	id   string
+	snip NvmeSnippets
 }
 
 func NewNvmeMounter(id string) mounts.NodeMounter {
 	return &nvmeMounter{
-		id: id,
+		id:   id,
+		snip: newNvmeSnippets(),
 	}
 }
 
@@ -28,9 +30,25 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
 	}
 
+	hostKey := ""
+	controllerKey := ""
+	switch pc.AuthType {
+	case AuthTypeNqn:
+		// nothing to do
+	case AuthTypeDhChap:
+		secret, err := ParseSecretContext(req.PublishContextSecret)
+		if err != nil {
+			return nil, fmt.Errorf("ParseSecretContext: %w", err)
+		}
+		hostKey = secret.HostKey
+		controllerKey = secret.ControllerKey
+	default:
+		return nil, fmt.Errorf("unknown auth type: %s", pc.AuthType)
+	}
+
 	successCount := 0
 	for _, v := range req.AddressOptions {
-		err = nvmeConnect(ctx, pc.Nqn, pc.Port, pc.Transport, v.Address, pc.IoQueues)
+		err = m.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, pc.IoQueues, hostKey, controllerKey)
 		if err != nil {
 			if len(req.AddressOptions) <= 1 {
 				return nil, fmt.Errorf("nvmeConnect: %w", err)
@@ -45,7 +63,7 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 		return nil, fmt.Errorf("all %d nvme multipath connections failed, see logs for details", len(req.AddressOptions))
 	}
 
-	namespaceDevice, err := nvmeFindNamespace(ctx, pc.Nqn, 1)
+	namespaceDevice, err := m.snip.FindNamespaceDevice(ctx, pc.TargetNqn, 1)
 	if err != nil {
 		return nil, fmt.Errorf("nvmeFindNamespace: %w", err)
 	}
@@ -78,7 +96,7 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 			ExpandFs:  true,
 		},
 		Extra: map[string]string{
-			"nvme.nqn":              pc.Nqn,
+			"nvme.nqn":              pc.TargetNqn,
 			"nvme.namespace-device": namespaceDevicePath,
 		},
 	}, nil
@@ -89,7 +107,7 @@ func (m *nvmeMounter) Disconnect(ctx context.Context, nvi mounts.MounterContext)
 	if !ok {
 		return fmt.Errorf("local volume info: 'nvme.nqn' missing")
 	}
-	err := nvmeDisconnect(ctx, nqn)
+	err := m.snip.Disconnect(ctx, nqn)
 	if err != nil {
 		return fmt.Errorf("nvmeDisconnect: %w", err)
 	}
@@ -101,7 +119,7 @@ func (m *nvmeMounter) Expand(ctx context.Context, nvi mounts.MounterContext) err
 	if !ok {
 		return fmt.Errorf("local volume info: 'nvme.nqn' missing")
 	}
-	err := nvmeRescan(ctx, nqn)
+	err := m.snip.Rescan(ctx, nqn)
 	if err != nil {
 		return fmt.Errorf("nvmeRescan: %w", err)
 	}

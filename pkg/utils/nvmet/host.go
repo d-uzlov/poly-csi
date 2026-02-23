@@ -16,6 +16,19 @@ type Host struct {
 	DhGroup       string `json:"dh_group"`
 }
 
+const (
+	HashTypeHmacSha256 = "hmac(sha256)"
+	HashTypeHmacSha384 = "hmac(sha384)"
+	HashTypeHmacSha512 = "hmac(sha512)"
+
+	DhGroupEmpty = "0"
+	DhGroup2048  = "ffdhe2048"
+	DhGroup3072  = "ffdhe3072"
+	DhGroup4096  = "ffdhe4096"
+	DhGroup6144  = "ffdhe6144"
+	DhGroup8192  = "ffdhe8192"
+)
+
 func (c Host) Json() string {
 	encoded, err := json.Marshal(c)
 	if err != nil {

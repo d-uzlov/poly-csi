@@ -51,9 +51,14 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	nqn := fmt.Sprintf("%s:%s", sh.gp.nqnBase, req.ShareId)
 
+	allowAnyHost := false
+	if p.authType == authTypeNone {
+		allowAnyHost = true
+	}
+
 	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
 		Nqn:          nqn,
-		AllowAnyHost: false,
+		AllowAnyHost: allowAnyHost,
 	}.Json())
 	err = transport.CheckedRun(ctx, cmd)
 	if err != nil {
@@ -82,6 +87,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		Port:      p.listenPort,
 		Transport: p.transport,
 		IoQueues:  p.ioQueues,
+		AuthType:  p.authType,
 	}
 	err = c.validate()
 	if err != nil {
