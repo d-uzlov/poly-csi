@@ -85,7 +85,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	c := shareContext{
 		Nqn:       nqn,
 		Port:      p.listenPort,
-		Transport: p.transport,
+		Transport: p.transportType,
 		IoQueues:  p.ioQueues,
 		AuthType:  p.authType,
 	}

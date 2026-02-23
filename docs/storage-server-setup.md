@@ -5,8 +5,8 @@ This file discusses how to prepare a Linux server to serve as storage for poly-c
 
 You need a few things for a working storage server:
 - Access to server management (SSH with superuser rights)
-- Storage (ZFS pool, folder in filesystem, etc.)
-- Ability to expose storage to network as shares
+- Storage (existing ZFS pool, existing BTRFS volume, preconfigured LVM, folder in filesystem, etc.)
+- Ability to expose storage to network as shares (NFS server, iSCSI target, NVMEoF kernel module, etc.)
 
 ## SSH
 
@@ -22,3 +22,11 @@ The easiest way to do this is to allow `sudo` for all commands:
 ```bash
 echo "$USER ALL=(ALL:ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USER
 ```
+
+## Storage
+
+See [storage-config.md](./storage-config.md).
+
+## Shares
+
+See [share-config.md](./share-config.md).

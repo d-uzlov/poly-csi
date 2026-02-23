@@ -89,14 +89,19 @@ Global parameters:
 - [required] `nqnBase`: prefix for all NQNs. Share NQN will look like `<nqnBase>:<share_id>`
 
 Available options:
-- `nvmet.transport`: NVME transport to use. Default: `tcp`
-- `nvmet.nvmetPort`: pre-configured `nvmet` port. Default: `1`
-- `nvmet.listenPort`: port on which `nvmet` port is listening. Default: `4420`
+- `nvmet.transportType`: NVME transport to use. Default: `tcp`.
+- - `rdma` and fibre-channel are not tested because of lack of hardware.
+- [required] `nvmet.nvmetPortName`: pre-configured `nvmet` port.
+- [required] `nvmet.listenPort`: port on which `nvmet` port is listening.
 - `nvmet.ioQueues`: amount of parallel connections between NVME client and storage server. When not set, defaults to amount of cores on the client.
+- [required] `nvmet.authType`: describes how share is secured. See below for details.
 
-NVME target on generic Linux distro does not have a standard way to save state.
-This share manager expects to get a custom command that will capture `nvmet` state and make it persistent.
-See below for options.
+Saves state in `nvmet_keeper` config folder.
+
+**Auth**: there are several options for NVMEoF auth:
+- `none`: share is not protected, anyone can connect to it. Can be convenient for debugging.
+- `nqn`: client must provide registered NQN when connecting. Node NQNs are automatically registered in Controller Publish method.
+- `chap-provision`: client must provide matching secret when connecting. Secrets are automatically generated in Controller Publish method.
 
 Requirements:
 - `nvmet` kernel module
@@ -144,7 +149,7 @@ Type: `nvmet-kernel`
 
 Uses NVMEoF share type.
 
-`nvmet-kernel` share is provided for historical reasons. It's recommended that you use `nvmet-keeper` instead.
+[!] `nvmet-kernel` share is provided for historical reasons. It's recommended that you use `nvmet-keeper` instead.
 
 Global commands:
 - `nvmet_save`: no default, required to be set.
@@ -246,5 +251,5 @@ Set `nvmet_save` to `[ sudo, /path/to/nvmet_keeper, config, save-merge ]`.
 
 ---
 
-It's possible to use any other tools that can capture and save existing state of `nvmet` kernel config.
-But I'm not aware of any except `nvmetcli` and `nvmetcfg`.
+It's possible to use any other tools that can capture and save existing state of `nvmet` kernel config,
+you just need to set `nvmet_save` command accordingly.

@@ -25,8 +25,8 @@ type globalParams struct {
 }
 
 type params struct {
-	transport string
-	nvmetPort string
+	transportType string
+	nvmetPort     string
 	// TODO add fallback to reading listenPort from current nvmet state
 	listenPort string
 	ioQueues   string
@@ -85,7 +85,7 @@ func parseParams(static map[string]string, mutable map[string]string) (params, e
 		}
 		switch k {
 		case keyTransport:
-			result.transport = v
+			result.transportType = v
 		case keyNvmetPort:
 			result.nvmetPort = v
 		case keyConnectPort:
@@ -119,7 +119,9 @@ func parseParams(static map[string]string, mutable map[string]string) (params, e
 		}
 	}
 
-	// no defaults
+	if result.transportType == "" {
+		result.transportType = "tcp"
+	}
 
 	err := result.validate()
 	if err != nil {
@@ -130,7 +132,7 @@ func parseParams(static map[string]string, mutable map[string]string) (params, e
 }
 
 func (p params) validate() error {
-	if p.transport == "" {
+	if p.transportType == "" {
 		return fmt.Errorf("missing key %s", keyTransport)
 	}
 	if p.listenPort == "" {

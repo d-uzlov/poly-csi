@@ -314,7 +314,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 					return recvVol, nil
 				}
 			default:
-				return nil, fmt.Errorf("unknown local volume type: sourceCaps.LocalVolume")
+				return nil, fmt.Errorf("unknown local volume type: %s", sourceCaps.LocalVolume)
 			}
 		} else {
 			return nil, fmt.Errorf("source and target use incompatible send-receive mechanism")
