@@ -9,11 +9,11 @@ import (
 )
 
 type NodeInfo struct {
-	Id           string                   `json:"id"`
-	PublicKey    *encrypt.RsaPublicKey    `json:"public_key"`
-	HasMultipath bool                     `json:"has_multipath"`
-	Mounters     []mounts.MounterNodeInfo `json:"mounters"`
-	Ips          []string                 `json:"ips"`
+	Id           string                            `json:"id"`
+	PublicKey    *encrypt.RsaPublicKey             `json:"public_key"`
+	HasMultipath bool                              `json:"has_multipath"`
+	Mounters     map[string]mounts.MounterNodeInfo `json:"mounters"`
+	Ips          []string                          `json:"ips"`
 }
 
 func (ni *NodeInfo) Validate() error {
@@ -22,11 +22,6 @@ func (ni *NodeInfo) Validate() error {
 	}
 	if ni.PublicKey == nil {
 		return fmt.Errorf("public key is not set")
-	}
-	for i, v := range ni.Mounters {
-		if v.Id == "" {
-			return fmt.Errorf("mounter %d has empty id: %v", i, v)
-		}
 	}
 	return nil
 }
@@ -41,12 +36,12 @@ func (ni *NodeInfo) Serialize(remotePubKey encrypt.RsaPublicKey, aesSecret []byt
 	if ni.HasMultipath {
 		result["has_multipath"] = "1"
 	}
-	for _, m := range ni.Mounters {
-		serialized, err := m.Serialize(aesSecret)
+	for k, v := range ni.Mounters {
+		serialized, err := v.Serialize(aesSecret)
 		if err != nil {
-			return nil, fmt.Errorf("mounter %s: serialize failed: %w", m.Id, err)
+			return nil, fmt.Errorf("mounter %s: serialize failed: %w", k, err)
 		}
-		key := "mounter." + m.Id
+		key := "mounter." + k
 		result[key] = serialized
 	}
 
@@ -61,7 +56,9 @@ func ParseNodeInfo(src map[string]string, privateKey encrypt.RsaPrivateKey) (*No
 		return nil, fmt.Errorf("extract aes secret: %w", err)
 	}
 
-	result := NodeInfo{}
+	result := NodeInfo{
+		Mounters: map[string]mounts.MounterNodeInfo{},
+	}
 	for k, v := range src {
 		switch k {
 		case "id":
@@ -88,9 +85,10 @@ func ParseNodeInfo(src map[string]string, privateKey encrypt.RsaPrivateKey) (*No
 			if err != nil {
 				return nil, fmt.Errorf("deserialize mounter %s info: %w", mounterId, err)
 			}
-			result.Mounters = append(result.Mounters, mountInfo)
+			result.Mounters[mounterId] = mountInfo
 			continue
 		}
+		// TODO add logs for ignored fields?
 	}
 	return &result, nil
 }

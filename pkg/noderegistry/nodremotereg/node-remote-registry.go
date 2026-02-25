@@ -21,7 +21,7 @@ func NewNodeRemoteRegistry(address string) NodeRemoveRegistry {
 	}
 }
 
-func (r *NodeRemoveRegistry) Get(id string) (*regnodeinfo.NodeInfo, error) {
+func (r *NodeRemoveRegistry) Get(id string) (*regnodeinfo.RegNodeInfo, error) {
 	qp := make(url.Values)
 	qp.Set("id", id)
 
@@ -39,7 +39,7 @@ func (r *NodeRemoveRegistry) Get(id string) (*regnodeinfo.NodeInfo, error) {
 		return nil, fmt.Errorf("get node info: status code %d: %s", resp.StatusCode, body)
 	}
 
-	var ni regnodeinfo.NodeInfo
+	var ni regnodeinfo.RegNodeInfo
 	err = json.Unmarshal(body, &ni)
 	if err != nil {
 		return nil, fmt.Errorf("get node info: unmarshal body: %w", err)
@@ -47,7 +47,7 @@ func (r *NodeRemoveRegistry) Get(id string) (*regnodeinfo.NodeInfo, error) {
 	return &ni, nil
 }
 
-func (r *NodeRemoveRegistry) Set(ni regnodeinfo.NodeInfo) error {
+func (r *NodeRemoveRegistry) Set(ni regnodeinfo.RegNodeInfo) error {
 	b, err := json.Marshal(ni)
 	if err != nil {
 		return fmt.Errorf("set node info: marshal: %w", err)

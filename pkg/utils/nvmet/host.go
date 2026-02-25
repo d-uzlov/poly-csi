@@ -90,10 +90,13 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", name)
 	stat, err := tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("stat '%s/dhchap_key': %w", path, err)
+		return nil, fmt.Errorf("stat '%s': %w", path, err)
 	}
-	if stat == nil {
-		// this server does not support auth, skip reading it
+	if !stat.ParentExists {
+		return nil, fmt.Errorf("folder /sys/kernel/config/nvmet/hosts does not exist")
+	}
+	if !stat.FileExists {
+		// host does not exist in nvmet
 		return nil, nil
 	}
 
@@ -102,9 +105,10 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 	attrPath := fmt.Sprintf("%s/dhchap_key", path)
 	stat, err = tr.Cmds().Stat(s.ctx, attrPath)
 	if err != nil {
-		return nil, fmt.Errorf("stat '%s/dhchap_key': %w", path, err)
+		return nil, fmt.Errorf("stat '%s': %w", attrPath, err)
 	}
-	if stat == nil {
+	if !stat.FileExists {
+		// this server does not support auth
 		return &Host{
 			Nqn:      name,
 			NeedAuth: false,
@@ -164,31 +168,31 @@ func (s Snippets) ConfigureHost(c Host) error {
 	attrPath := fmt.Sprintf("%s/dhchap_key", path)
 	stat, err := tr.Cmds().Stat(s.ctx, attrPath)
 	if err != nil {
-		return fmt.Errorf("stat '%s/dhchap_key': %w", path, err)
+		return fmt.Errorf("stat '%s': %w", attrPath, err)
 	}
-	if stat == nil {
-		return fmt.Errorf("kernel does not support DH-CHAP: missing file %s/dhchap_key", path)
+	if !stat.FileExists {
+		return fmt.Errorf("kernel does not support DH-CHAP: missing file %s", attrPath)
 	}
 
 	attrPath = fmt.Sprintf("%s/dhchap_key", path)
 	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HostKey))
 	if err != nil {
-		return fmt.Errorf("write %s/dhchap_key: %w", path, err)
+		return fmt.Errorf("write %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_ctrl_key", path)
 	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ControllerKey))
 	if err != nil {
-		return fmt.Errorf("write %s/dhchap_ctrl_key: %w", path, err)
+		return fmt.Errorf("write %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_hash", path)
 	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HashType))
 	if err != nil {
-		return fmt.Errorf("write '%s' to %s/dhchap_hash: %w", c.HashType, path, err)
+		return fmt.Errorf("write '%s' to %s: %w", c.HashType, attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_dhgroup", path)
 	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DhGroup))
 	if err != nil {
-		return fmt.Errorf("write '%s' to %s/dhchap_dhgroup: %w", c.DhGroup, path, err)
+		return fmt.Errorf("write '%s' to %s: %w", c.DhGroup, attrPath, err)
 	}
 	return nil
 }
@@ -202,7 +206,7 @@ func (s Snippets) AllowHost(subsysNqn string, hostNqn string) error {
 	if err != nil {
 		return fmt.Errorf("stat '%s' (checking if host is already configured on nqn): %w", link, err)
 	}
-	if stat != nil {
+	if stat.FileExists {
 		if !stat.IsDirectory() {
 			return fmt.Errorf("link '%s' exists but does not point to a directory", link)
 		}

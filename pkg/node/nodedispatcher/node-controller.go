@@ -55,7 +55,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		panic(err.Error())
 	}
 
-	mounts := []mounts.NodeMounter{}
+	mounts := map[string]mounts.NodeMounter{}
 	for _, v := range newConf.Mounts {
 		if !v.Valid {
 			continue
@@ -64,7 +64,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		if m == nil {
 			continue
 		}
-		mounts = append(mounts, m)
+		mounts[v.Conf.Id] = m
 	}
 	var mp multipath.Multipath
 	if newConf.Multipath.Valid {
@@ -83,7 +83,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 	pushCtx = transport.MakeContext(pushCtx, tr)
 	pushCh := make(chan struct{})
 
-	nodeinfo.SetupPush(pushCtx, newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval, func() regnodeinfo.NodeInfo {
+	nodeinfo.SetupPush(pushCtx, newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval, func() (regnodeinfo.RegNodeInfo, error) {
 		return nodeinfo.GatherNodeInfo(pushCtx, n.nodeId, newConf.Encrypt.NodeKey, mounts, aesSecret, newConf.Encrypt.ControllerKey, mp, newConf.Networks)
 	}, func() {})
 

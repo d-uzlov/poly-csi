@@ -28,7 +28,7 @@ const responseStatusOk = "ok"
 type PluginResponse struct {
 	Status string `json:"status"`
 	Err    string `json:"error"`
-	Result any    `json:"result"`
+	Result string `json:"result"`
 }
 
 type handlerFunc func(ctx context.Context, body string) (result any, err error)
@@ -44,9 +44,9 @@ type ServerConfig struct {
 
 func NewServer(callCtx context.Context, config ServerConfig, mounter mounts.NodeMounter) mountplugins.MounterPlugin {
 	return &Server{
-		callCtx: callCtx,
-		config:  config,
-		mounter: mounter,
+		callCtx:  callCtx,
+		config:   config,
+		mounter:  mounter,
 		handlers: map[string]handler{},
 	}
 }
@@ -127,15 +127,22 @@ func (s *Server) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res, err := json.Marshal(PluginResponse{Status: responseStatusOk, Result: callRes})
+	serialized, err := json.Marshal(callRes)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "connect: json marshal failed: %s"}`, responseStatusError, err.Error()), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "json marshal call result: %s"}`, responseStatusError, err.Error()), http.StatusInternalServerError)
 		return
 	}
+
+	res, err := json.Marshal(&PluginResponse{Status: responseStatusOk, Result: string(serialized)})
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "json marshal plugin response: %s"}`, responseStatusError, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	slogctx.FromCtx(s.callCtx).Info("call success", "method", req.URL.Path, "data", callRes)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(res)
-	// TODO check errors
+	// TODO log write errors
 }
 
 func (s *Server) handleGetInfo(ctx context.Context, body string) (result any, err error) {

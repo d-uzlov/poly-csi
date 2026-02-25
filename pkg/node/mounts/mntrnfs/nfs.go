@@ -10,21 +10,16 @@ import (
 )
 
 type nfsMounter struct {
-	id string
 }
 
-func NewNfsMounter(id string) mounts.NodeMounter {
-	return &nfsMounter{
-		id: id,
-	}
+func NewNfsMounter() mounts.NodeMounter {
+	return &nfsMounter{}
 }
 
 const nfsMountSuffix = "/nfs_mount"
 
 func (m *nfsMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
-	return &mounts.MounterNodeInfo{
-		Id: m.id,
-	}, nil
+	return &mounts.MounterNodeInfo{}, nil
 }
 
 func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {

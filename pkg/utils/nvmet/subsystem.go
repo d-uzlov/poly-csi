@@ -61,7 +61,11 @@ func (s Snippets) ReadSubsys(nqn string) (*Subsys, error) {
 	if err != nil {
 		return nil, fmt.Errorf("check if folder '%s' exists: %w", path, err)
 	}
-	if stat == nil {
+	if !stat.ParentExists {
+		return nil, fmt.Errorf("folder /sys/kernel/config/nvmet/subsystems does not exist")
+	}
+	if !stat.FileExists {
+		// subsys does not exist in nvmet
 		return nil, nil
 	}
 

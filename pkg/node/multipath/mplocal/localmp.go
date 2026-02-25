@@ -40,7 +40,7 @@ func (l *localMp) Ready(ctx context.Context) bool {
 func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.MultipathContext, error) {
 	wwid := ""
 	for _, v := range devices {
-		cmd := []string{"multipath", "-a", "v"}
+		cmd := []string{"multipath", "-a", v}
 		stdout, err := transport.CheckedRunStdout(ctx, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("%s (add device to config): %w", cmd, err)
@@ -68,13 +68,17 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.Multi
 	err = transport.Retry(time.Millisecond*100, time.Second, func() error {
 		stat, err := tr.Cmds().Stat(ctx, deviceLink)
 		if err != nil {
-			return fmt.Errorf("stat %s (check if link exists): %w", deviceLink, err)
+			// runtime errors should be self-explanatory
+			return err
 		}
-		if stat == nil {
+		if !stat.FileExists {
 			return fmt.Errorf("link does not exist: %s", deviceLink)
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for device file: %w", err)
+	}
 
 	encoded, err := json.Marshal(Data{
 		Wwid: wwid,
@@ -111,13 +115,16 @@ func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
 func parseMpAdd(stdout string) (string, error) {
 	// example:
 	// wwid '360014054975efecf0dd41ae980917107' added
-	wwid, ok := strings.CutPrefix(stdout, "wwid '")
+	const prefix = "wwid '"
+	const suffix = "' added"
+	stdout = strings.TrimSpace(stdout)
+	wwid, ok := strings.CutPrefix(stdout, prefix)
 	if !ok {
-		return "", fmt.Errorf("invalid multipath stdout format: expected to find \"wwid '\" prefix: %s", stdout)
+		return "", fmt.Errorf("invalid multipath stdout format: expected to find \"%s\" prefix: %s", prefix, stdout)
 	}
-	wwid, ok = strings.CutSuffix(wwid, "' added")
+	wwid, ok = strings.CutSuffix(wwid, suffix)
 	if !ok {
-		return "", fmt.Errorf("invalid multipath stdout format: expected to find \"' added\" suffix: %s", stdout)
+		return "", fmt.Errorf("invalid multipath stdout format: expected to find \"%s\" suffix: %s", suffix, stdout)
 	}
 	return wwid, nil
 }

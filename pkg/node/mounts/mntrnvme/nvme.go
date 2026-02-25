@@ -13,14 +13,12 @@ import (
 )
 
 type nvmeMounter struct {
-	id     string
 	snip   NvmeSnippets
 	config Config
 }
 
-func NewNvmeMounter(id string, config Config) mounts.NodeMounter {
+func NewNvmeMounter(config Config) mounts.NodeMounter {
 	return &nvmeMounter{
-		id:     id,
 		snip:   newNvmeSnippets(config.NvmeCmd, config.DevFolder, config.ParseKernelLog),
 		config: config,
 	}

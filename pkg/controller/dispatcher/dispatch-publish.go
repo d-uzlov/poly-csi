@@ -10,7 +10,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
-	"meoe.io/poly-csi/pkg/node/mounts"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
 	"meoe.io/poly-csi/pkg/transport"
@@ -69,18 +68,13 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: validation failed: %w", err)
 	}
 
-	var mountInfo *mounts.MounterNodeInfo
-	for _, v := range ni.Mounters {
-		if v.Id == mh.vi.MounterId {
-			mountInfo = &v
-			break
-		}
-	}
-	if mountInfo == nil {
+	logger.Warn("printing mounters", "value", ni.Mounters)
+	mountInfo, ok := ni.Mounters[mh.vi.MounterId]
+	if !ok {
 		return nil, fmt.Errorf("node info does not list mounter %s", mh.vi.MounterId)
 	}
 
-	pc, err := shrInstance.Publish(ctx, mh.vi.ShareData, *mountInfo)
+	pc, err := shrInstance.Publish(ctx, mh.vi.ShareData, mountInfo)
 	if err != nil {
 		return nil, fmt.Errorf("shareInstance.Publish to %s/%s: %w", req.NodeId, mh.vi.MounterId, err)
 	}

@@ -139,7 +139,7 @@ func (d *Dispatcher) getSnapshotHandle(ctx context.Context, snapshotId string) (
 func checkFile(ctx context.Context, expectedType string, path string) error {
 
 	tr := transport.FromContext(ctx)
-	var stat *transport.StatResult
+	var stat transport.StatResult
 	var err error
 
 	switch expectedType {
@@ -151,16 +151,13 @@ func checkFile(ctx context.Context, expectedType string, path string) error {
 				// error description is appended below
 				return err
 			}
-			if stat == nil {
+			if !stat.FileExists {
 				return fmt.Errorf("file does not exist: %s", path)
 			}
 			return nil
 		})
 		if err != nil {
 			return fmt.Errorf("stat '%s': %w", path, err)
-		}
-		if stat == nil {
-			return fmt.Errorf("file '%s' does not exist", path)
 		}
 		if !stat.IsBlock() {
 			return fmt.Errorf("file '%s' is not a block device", path)
@@ -170,7 +167,7 @@ func checkFile(ctx context.Context, expectedType string, path string) error {
 		if err != nil {
 			return fmt.Errorf("stat '%s': %w", path, err)
 		}
-		if stat == nil {
+		if !stat.FileExists {
 			return fmt.Errorf("file '%s' does not exist", path)
 		}
 		if !stat.IsDirectory() {

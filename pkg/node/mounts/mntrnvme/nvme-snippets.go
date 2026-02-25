@@ -13,13 +13,14 @@ import (
 
 type NvmeSnippets struct {
 	cmd            []string
-	devFolder        string
+	devFolder      string
 	parseKernelLog bool
 }
 
 func newNvmeSnippets(cmd []string, devFolder string, parseKernelLog bool) NvmeSnippets {
 	return NvmeSnippets{
 		cmd:            cmd,
+		devFolder:      devFolder,
 		parseKernelLog: parseKernelLog,
 	}
 }

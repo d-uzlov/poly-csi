@@ -27,7 +27,6 @@ func (m *nvmeMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, err
 	}
 
 	return &mounts.MounterNodeInfo{
-		Id:     m.id,
 		Public: string(public),
 		Secret: "",
 	}, nil

@@ -49,7 +49,11 @@ func (s Snippets) ReadPort(name string) (*Port, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stat '%s': %w", path, err)
 	}
-	if stat == nil {
+	if !stat.ParentExists {
+		return nil, fmt.Errorf("folder /sys/kernel/config/nvmet/ports does not exist")
+	}
+	if !stat.FileExists {
+		// port does not exist in nvmet
 		return nil, nil
 	}
 
@@ -141,7 +145,7 @@ func (s Snippets) AttachNqnToPort(nqn string, nvmePort string) error {
 	if err != nil {
 		return fmt.Errorf("stat '%s' (checking if nqn is already configured on port): %w", link, err)
 	}
-	if stat != nil {
+	if stat.FileExists {
 		if !stat.IsDirectory() {
 			return fmt.Errorf("link '%s' exists but does not point to a directory", link)
 		}

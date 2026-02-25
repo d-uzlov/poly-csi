@@ -90,7 +90,7 @@ func (e Entry) CheckValid(ctx context.Context) (empty bool, err error) {
 	if err != nil {
 		return false, fmt.Errorf("stat %s: %w", e.directory, err)
 	}
-	if sr == nil {
+	if !sr.FileExists {
 		// return true, fmt.Errorf("stat %s: directory is not found", e.directory)
 		return true, nil
 	}

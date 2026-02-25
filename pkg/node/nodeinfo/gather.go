@@ -2,6 +2,7 @@ package nodeinfo
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -12,53 +13,51 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, mounters []mounts.NodeMounter, aesSecret []byte, remotePubKey encrypt.RsaPublicKey, mp multipath.Multipath, networks []nodeconfig.NodeNetworkConfig) regnodeinfo.NodeInfo {
+func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, mounters map[string]mounts.NodeMounter, aesSecret []byte, remotePubKey encrypt.RsaPublicKey, mp multipath.Multipath, networks []nodeconfig.NodeNetworkConfig) (regnodeinfo.RegNodeInfo, error) {
 	nodePublicKey := pk.GetPublicKey()
 	info := NodeInfo{
 		Id:        nodeId,
 		PublicKey: &nodePublicKey,
+		Mounters:  map[string]mounts.MounterNodeInfo{},
 	}
 
 	if mp != nil {
 		info.HasMultipath = mp.Ready(ctx)
 	}
 
-	for _, v := range mounters {
+	for k, v := range mounters {
 		mi, err := v.GetInfo(ctx)
 		if err != nil {
 			slogctx.FromCtx(ctx).Error("mounter.GetInfo failed", "error", err)
 			continue
 		}
-		info.Mounters = append(info.Mounters, *mi)
+		info.Mounters[k] = *mi
 	}
 
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		slogctx.FromCtx(ctx).Error("failed to list network interfaces", "error", err)
-		return regnodeinfo.NodeInfo{}
+		return regnodeinfo.RegNodeInfo{}, fmt.Errorf("list network interfaces: %w", err)
 	}
 
 	var addresses []string
 	for _, iface := range interfaces {
 		al, err := iface.Addrs()
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to list unicast addresses for interface", "error", err, "interface", iface.Name)
-			return regnodeinfo.NodeInfo{}
+			return regnodeinfo.RegNodeInfo{}, fmt.Errorf("list unicast addresses for interface %s: %w", iface.Name, err)
 		}
 		for _, a := range al {
 			addr, ok := a.(*net.IPNet)
 			if !ok {
-				slogctx.FromCtx(ctx).Error("failed to cast addresses to net.IPNet", "error", err, "addr", a)
-				return regnodeinfo.NodeInfo{}
+				return regnodeinfo.RegNodeInfo{}, fmt.Errorf("cast addresses %v to net.IPNet: %w", a, err)
 			}
 			for _, n := range networks {
 				matchesInclude := false
 				matchesExclude := false
 				for _, v := range n.Include {
+					// TODO move CIDR parsing to config reloading
 					_, cidr, err := net.ParseCIDR(v)
 					if err != nil {
-						slogctx.FromCtx(ctx).Error("failed to parse cidr", "error", err, "cidr", v)
-						return regnodeinfo.NodeInfo{}
+						return regnodeinfo.RegNodeInfo{}, fmt.Errorf("parse cidr %s from include: %w", v, err)
 					}
 					if cidr.Contains(addr.IP) {
 						matchesInclude = true
@@ -68,8 +67,7 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 				for _, v := range n.Exclude {
 					_, cidr, err := net.ParseCIDR(v)
 					if err != nil {
-						slogctx.FromCtx(ctx).Error("failed to parse cidr", "error", err, "cidr", v)
-						return regnodeinfo.NodeInfo{}
+						return regnodeinfo.RegNodeInfo{}, fmt.Errorf("parse cidr %s from exclude: %w", v, err)
 					}
 					if cidr.Contains(addr.IP) {
 						matchesExclude = true
@@ -84,19 +82,18 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 	}
 	info.Ips = addresses
 
-	if info.Validate() != nil {
-		slogctx.FromCtx(ctx).Error("failed to validate node info", "error", err)
-		return regnodeinfo.NodeInfo{}
+	err = info.Validate()
+	if err != nil {
+		return regnodeinfo.RegNodeInfo{}, fmt.Errorf("validate: %w", err)
 	}
 
 	serialized, err := info.Serialize(remotePubKey, aesSecret)
 	if err != nil {
-		slogctx.FromCtx(ctx).Error("failed to serialize node info", "error", err)
-		return regnodeinfo.NodeInfo{}
+		return regnodeinfo.RegNodeInfo{}, fmt.Errorf("serialize: %w", err)
 	}
 
-	return regnodeinfo.NodeInfo{
+	return regnodeinfo.RegNodeInfo{
 		Id:   nodeId,
 		Data: serialized,
-	}
+	}, nil
 }

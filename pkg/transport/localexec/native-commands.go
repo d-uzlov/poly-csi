@@ -124,9 +124,9 @@ func (s *nativeCommands) RmFile(ctx context.Context, path string) error {
 	return nil
 }
 
-func (s *nativeCommands) Stat(ctx context.Context, path string) (*transport.StatResult, error) {
+func (s *nativeCommands) Stat(ctx context.Context, path string) (transport.StatResult, error) {
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return transport.StatResult{}, ctx.Err()
 	}
 	// TODO use os.Stat instead of cmds fallback
 	return executils.New(s.tr, false).Stat(ctx, path)

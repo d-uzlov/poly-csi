@@ -29,7 +29,7 @@ spec:
       # hostPID: false
       containers:
       - name: iscsi-mounter
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.33
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.55
         args:
         - --plugin-type=mounter
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -53,15 +53,6 @@ spec:
         # prevent crazy error messages due to the /dev host mount
         terminationMessagePath: /tmp/termination-log
         terminationMessagePolicy: File
-        # livenessProbe:
-        #   failureThreshold: 3
-        #   exec:
-        #     command:
-        #     - bin/liveness-probe
-        #     - --csi-address=/csi-data/csi.sock
-        #   initialDelaySeconds: 10
-        #   timeoutSeconds: 15
-        #   periodSeconds: 60
         volumeMounts:
         - mountPath: /var/lib/kubelet
           name: kubelet-dir
@@ -69,8 +60,6 @@ spec:
         # - mountPath: /lib/modules
         #   name: modules-dir
         #   readOnly: true
-        # - mountPath: /etc/localtime
-        #   name: localtime
         #   readOnly: true
         # - mountPath: /run/udev
         #   name: udev-data
@@ -93,7 +82,7 @@ spec:
           subPath: etc/iscsi/
 
       - name: multipath
-        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.31
+        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.53
         args:
         - --plugin-type=multipath
         - --node-config=/poly-csi/multipath-config/config.yaml
@@ -125,9 +114,6 @@ spec:
       # - name: modules-dir
       #   hostPath:
       #     path: /lib/modules
-      - name: localtime
-        hostPath:
-          path: /etc/localtime
       # - name: udev-data
       #   hostPath:
       #     path: /run/udev

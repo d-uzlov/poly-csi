@@ -6,25 +6,25 @@ import (
 	"meoe.io/poly-csi/pkg/node/mounts"
 )
 
-type NodeInfo struct {
+type RegNodeInfo struct {
 	Id   string            `json:"id"`
 	Data map[string]string `json:"data"`
 }
 
-func (ni *NodeInfo) SetMounterInfo(info mounts.MounterNodeInfo, aesSecret []byte) error {
-	if info.Id == "" {
+func (ni *RegNodeInfo) SetMounterInfo(id string, info mounts.MounterNodeInfo, aesSecret []byte) error {
+	if id == "" {
 		return fmt.Errorf("mounter info: id is empty")
 	}
 	serialized, err := info.Serialize(aesSecret)
 	if err != nil {
-		return fmt.Errorf("mounter %s: serialize failed: %w", info.Id, err)
+		return fmt.Errorf("mounter %s: serialize failed: %w", id, err)
 	}
-	mounterInfoKey := "mounter." + info.Id
+	mounterInfoKey := "mounter." + id
 	ni.Data[mounterInfoKey] = serialized
 	return nil
 }
 
-func (ni *NodeInfo) GetMounterInfo(mounterId string, aesSecret []byte) (*mounts.MounterNodeInfo, error) {
+func (ni *RegNodeInfo) GetMounterInfo(mounterId string, aesSecret []byte) (*mounts.MounterNodeInfo, error) {
 	mounterInfoKey := "mounter." + mounterId
 	mountInfoRaw := ni.Data[mounterInfoKey]
 	if mountInfoRaw == "" {

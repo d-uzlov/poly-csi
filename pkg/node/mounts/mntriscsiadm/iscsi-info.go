@@ -28,7 +28,6 @@ func (m *iscsiadmMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo,
 	}
 
 	return &mounts.MounterNodeInfo{
-		Id:     m.id,
 		Public: string(public),
 		Secret: "",
 	}, nil
@@ -38,7 +37,7 @@ func ParseIscsiInfo(src mounts.MounterNodeInfo) (IscsiPublicInfo, error) {
 	var result IscsiPublicInfo
 	err := json.Unmarshal([]byte(src.Public), &result)
 	if err != nil {
-		return IscsiPublicInfo{}, err
+		return IscsiPublicInfo{}, fmt.Errorf("parsing '%v': %w", src.Public, err)
 	}
 	return result, nil
 }

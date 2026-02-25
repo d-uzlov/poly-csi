@@ -11,13 +11,11 @@ import (
 )
 
 type iscsiadmMounter struct {
-	id     string
 	config Config
 }
 
-func NewIscsiadmMounter(id string, config Config) mounts.NodeMounter {
+func NewIscsiadmMounter(config Config) mounts.NodeMounter {
 	return &iscsiadmMounter{
-		id:     id,
 		config: config,
 	}
 }
@@ -56,7 +54,7 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 
 	tr := transport.FromContext(ctx)
 
-	var connectError string
+	var combinedError string
 	successCount := 0
 	for _, v := range req.AddressOptions {
 		addr := fmt.Sprintf("%s:%s", v.Address, pc.Port)
@@ -67,7 +65,7 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 			}
 
 			slogctx.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err)
-			connectError += fmt.Sprintf("failed to configure connection to %s: %s ; ", addr, err.Error())
+			combinedError += fmt.Sprintf("failed to configure connection to %s: %s ; ", addr, err.Error())
 			continue
 		}
 		err = snip.connect(pc.Iqn, addr)
@@ -77,13 +75,13 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 			}
 
 			slogctx.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err)
-			connectError += fmt.Sprintf("failed to connect to %s: %s ; ", addr, err.Error())
+			combinedError += fmt.Sprintf("failed to connect to %s: %s ; ", addr, err.Error())
 			continue
 		}
 		successCount++
 	}
 	if successCount == 0 {
-		return nil, fmt.Errorf("all %d iscsi multipath connections failed: %s", len(req.AddressOptions), connectError)
+		return nil, fmt.Errorf("all %d iscsi multipath connections failed: %s", len(req.AddressOptions), combinedError)
 	}
 	is, err := snip.findSessions(pc.Iqn)
 	if err != nil {
@@ -96,20 +94,22 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
 			stat, err := tr.Cmds().Stat(ctx, deviceLink)
 			if err != nil {
-				return fmt.Errorf("call stat %s (check if link exists): %w", deviceLink, err)
+				// runtime errors should be self-explanatory
+				return err
 			}
-			if stat == nil {
+			if !stat.FileExists {
 				return fmt.Errorf("link does not exist: %s", deviceLink)
 			}
 			devices = append(devices, stat.Path)
 			return nil
 		})
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("iscsi: failed to get device file", "address", v.address, "error", err)
+			combinedError += fmt.Sprintf("failed to get iscsi device file link at %s: %s ; ", deviceLink, err.Error())
+			slogctx.FromCtx(ctx).Error("failed to get iscsi device file link", "address", v.address, "path", deviceLink, "error", err)
 		}
 	}
 	if len(devices) == 0 {
-		return nil, fmt.Errorf("iscsi device is not found")
+		return nil, fmt.Errorf("iscsi device is not found: %s", combinedError)
 	}
 	return &mounts.ConnectResult{
 		FolderPath: "",

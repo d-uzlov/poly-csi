@@ -9,14 +9,16 @@ import (
 )
 
 type MounterNodeInfo struct {
-	Id     string `json:"id"`
 	Public string `json:"public"`
 	Secret string `json:"secret"`
 }
 
 func (m MounterNodeInfo) Serialize(aesSecret []byte) (string, error) {
 	secret := ""
-	if aesSecret != nil && m.Secret != "" {
+	if m.Secret != "" {
+		if aesSecret == nil {
+			return "", fmt.Errorf("mounter has secret values but aesSecret is missing")
+		}
 		ciphertext, err := encrypt.EncryptAes(aesSecret, m.Secret)
 		if err != nil {
 			return "", fmt.Errorf("EncryptAes: %w", err)
@@ -24,7 +26,6 @@ func (m MounterNodeInfo) Serialize(aesSecret []byte) (string, error) {
 		secret = base64.StdEncoding.EncodeToString(ciphertext)
 	}
 	encoded, err := json.Marshal(MounterNodeInfo{
-		Id:     m.Id,
 		Public: m.Public,
 		Secret: secret,
 	})
@@ -43,7 +44,6 @@ func DeserializeMounterNodeInfo(raw string, aesSecret []byte) (MounterNodeInfo, 
 
 	if aesSecret == nil || result.Secret == "" {
 		return MounterNodeInfo{
-			Id:     result.Id,
 			Public: result.Public,
 			Secret: "",
 		}, nil

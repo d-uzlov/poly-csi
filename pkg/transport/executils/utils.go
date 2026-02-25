@@ -200,58 +200,76 @@ func (ec *ExecCommands) RmFile(ctx context.Context, path string) error {
 	return nil
 }
 
-func (ec *ExecCommands) Stat(ctx context.Context, path string) (*transport.StatResult, error) {
+func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatResult, error) {
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return transport.StatResult{}, ctx.Err()
 	}
 
-	cmd := []string{"readlink", "--canonicalize", "--no-newline", path}
+	// -f      Canonicalize by following all symlinks
+	// -n      Don't add newline
+	// can't use proper --canonicalize and --no-newline because we need to support busybox version of readlink
+	cmd := []string{"readlink", "-f", "-n", path}
 	if ec.sudo {
 		cmd = append([]string{"sudo"}, cmd...)
 	}
 	runResult, err := ec.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("readlink: %w", err)
+		return transport.StatResult{}, fmt.Errorf("readlink: %w", err)
 	}
 	if runResult.ExitCode != 0 {
-		if runResult.ExitCode == 1 && len(runResult.Stdout) == 0 {
+		if runResult.ExitCode == 1 && len(runResult.Stdout) == 0 && len(runResult.Stderr) == 0 {
 			// it's arguable if we should return nil value or an error here
 			// TODO change interface?
-			return nil, fmt.Errorf("parent folder does not exist")
+			return transport.StatResult{
+				Type:         0,
+				Path:         "",
+				FileExists:   false,
+				ParentExists: false,
+			}, nil
 		}
-		return nil, transport.FormatRunError(runResult)
+		return transport.StatResult{}, transport.FormatRunError(runResult)
 	}
 	if len(runResult.Stdout) == 0 {
-		return nil, fmt.Errorf("readlink gave empty result")
+		return transport.StatResult{}, fmt.Errorf("readlink gave empty result")
 	}
 
 	realPath := string(runResult.Stdout)
 
-	cmd = []string{"stat", realPath, "--printf=%F\n%N"}
+	// -c FMT  Use the specified format
+	// can't use proper --printf because we need to support busybox version of stat
+	cmd = []string{"stat", realPath, "-c", "%F"}
 	if ec.sudo {
 		cmd = append([]string{"sudo"}, cmd...)
 	}
 	runResult, err = ec.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("stat: %w", err)
+		return transport.StatResult{}, fmt.Errorf("stat: %w", err)
 	}
 	if runResult.ExitCode != 0 {
 		if strings.Contains(string(runResult.Stderr), "No such file or directory") {
-			return nil, nil
+			return transport.StatResult{
+				Type:         0,
+				Path:         realPath,
+				FileExists:   false,
+				ParentExists: true,
+			}, nil
 		}
-		return nil, transport.FormatRunError(runResult)
+		return transport.StatResult{}, transport.FormatRunError(runResult)
 	}
-	if len(runResult.Stdout) == 0 {
-		return nil, fmt.Errorf("stat gave empty result")
+	statStdout := strings.TrimSpace(string(runResult.Stdout))
+	if statStdout == "" {
+		return transport.StatResult{}, fmt.Errorf("stat gave empty result")
 	}
-	lines := strings.Split(string(runResult.Stdout), "\n")
-	if len(lines) != 2 {
-		return nil, fmt.Errorf("stat gave unexpected result: %s", string(runResult.Stdout))
+	lines := strings.Split(statStdout, "\n")
+	if len(lines) != 1 {
+		return transport.StatResult{}, fmt.Errorf("stat gave unexpected result: '%s', expected 1 values but got %d values", string(runResult.Stdout), len(lines))
 	}
 	fileType := lines[0]
 
-	result := &transport.StatResult{
-		Path: realPath,
+	result := transport.StatResult{
+		Path:         realPath,
+		FileExists:   true,
+		ParentExists: true,
 	}
 	switch fileType {
 	case "directory":

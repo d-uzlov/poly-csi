@@ -41,7 +41,7 @@ func ParseMount(ctx context.Context, c *MountConfig) *ParsedMount {
 		}
 	}
 
-	inflater, err := GetByType(c.Id, c.Type, c.Subtype, byteConfig)
+	inflater, err := GetByType(c.Type, c.Subtype, byteConfig)
 	if err != nil {
 		logger.Error("mount_config: could not create", "id", c.Id, "error", err)
 		return &ParsedMount{

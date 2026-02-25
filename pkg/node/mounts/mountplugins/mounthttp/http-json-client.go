@@ -68,12 +68,25 @@ func (m *client) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
 		return nil, fmt.Errorf("status code %d: %s", resp.StatusCode, body)
 	}
 
-	var res mounts.MounterNodeInfo
-	err = json.Unmarshal(body, &res)
+	var pr PluginResponse
+	err = json.Unmarshal(body, &pr)
 	if err != nil {
 		return nil, err
 	}
-	return &res, nil
+	switch pr.Status {
+	case responseStatusOk:
+		var mni mounts.MounterNodeInfo
+		err = json.Unmarshal([]byte(pr.Result), &mni)
+		if err != nil {
+			return nil, err
+		}
+
+		return &mni, nil
+	case responseStatusError:
+		return nil, fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+	}
+	return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
+
 }
 
 func (m *client) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
@@ -103,12 +116,8 @@ func (m *client) Connect(ctx context.Context, req mounts.ConnectRequest) (*mount
 	}
 	switch pr.Status {
 	case responseStatusOk:
-		mcBytes, err := json.Marshal(pr.Result)
-		if err != nil {
-			return nil, fmt.Errorf("http-json-client: marshal result: %w", err)
-		}
 		var mc mounts.ConnectResult
-		err = json.Unmarshal(mcBytes, &mc)
+		err = json.Unmarshal([]byte(pr.Result), &mc)
 		if err != nil {
 			return nil, fmt.Errorf("http-json-client: unmarshal result: %w", err)
 		}

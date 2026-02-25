@@ -70,7 +70,11 @@ func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
 	if err != nil {
 		return nil, fmt.Errorf("check if folder '%s' exists: %w", path, err)
 	}
-	if stat == nil {
+	if !stat.ParentExists {
+		return nil, fmt.Errorf("folder /sys/kernel/config/nvmet/subsystems/%s/namespaces does not exist", nqn)
+	}
+	if !stat.FileExists {
+		// ns does not exist in nvmet
 		return nil, nil
 	}
 

@@ -32,7 +32,7 @@ type Commands interface {
 	// Delete file. Can fail on directories
 	RmFile(ctx context.Context, path string) error
 	// Stat returns StatResult for existing directory, or null if directory is not found
-	Stat(ctx context.Context, path string) (*StatResult, error)
+	Stat(ctx context.Context, path string) (StatResult, error)
 	Df(ctx context.Context, path string) (*FsSizeInfo, error)
 	CreateSymlink(ctx context.Context, link string, target string) error
 	MkFifo(ctx context.Context, path string) (alreadyExists bool, err error)
@@ -45,7 +45,9 @@ type Commands interface {
 }
 
 const (
-	FtDirectory = iota
+	// skip zero to be able to detect uninitialized variables
+	__zero = iota
+	FtDirectory
 	// FtLink
 	FtBlock
 	FtFile
@@ -53,7 +55,10 @@ const (
 
 type StatResult struct {
 	Type int
-	Path string
+	// Path is the full file path with all symlinks resolved.
+	Path         string
+	FileExists   bool
+	ParentExists bool
 }
 
 type FsSizeInfo struct {

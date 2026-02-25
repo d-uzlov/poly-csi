@@ -14,23 +14,23 @@ import (
 type NodeRegistry struct {
 	srv  *http.Server
 	mu   sync.RWMutex
-	data map[string]regnodeinfo.NodeInfo
+	data map[string]regnodeinfo.RegNodeInfo
 }
 
 func NewNodeRegistry() *NodeRegistry {
 	return &NodeRegistry{
-		data: map[string]regnodeinfo.NodeInfo{},
+		data: map[string]regnodeinfo.RegNodeInfo{},
 	}
 }
 
-func (nr *NodeRegistry) Set(ni regnodeinfo.NodeInfo) {
+func (nr *NodeRegistry) Set(ni regnodeinfo.RegNodeInfo) {
 	nr.mu.Lock()
 	defer nr.mu.Unlock()
 
 	nr.data[ni.Id] = ni
 }
 
-func (nr *NodeRegistry) Get(id string) *regnodeinfo.NodeInfo {
+func (nr *NodeRegistry) Get(id string) *regnodeinfo.RegNodeInfo {
 	nr.mu.Lock()
 	defer nr.mu.Unlock()
 
@@ -46,7 +46,7 @@ func (nr *NodeRegistry) handleRegister(w http.ResponseWriter, req *http.Request)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var ni regnodeinfo.NodeInfo
+	var ni regnodeinfo.RegNodeInfo
 	dec := json.NewDecoder(req.Body)
 	if err := dec.Decode(&ni); err != nil {
 		http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)
