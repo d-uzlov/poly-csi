@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/node/multipath"
@@ -111,13 +112,8 @@ func (m *client) Setup(ctx context.Context, devices []string) (*multipath.Multip
 	return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
 }
 
-func (m *client) Destroy(ctx context.Context, mc multipath.MultipathContext) error {
-	b, err := json.Marshal(mc)
-	if err != nil {
-		return fmt.Errorf("http-json-client: marshal request: %w", err)
-	}
-
-	resp, err := m.hc.Post("http://unix/destroy", "application/json", bytes.NewReader(b))
+func (m *client) Destroy(ctx context.Context, serializedData string) error {
+	resp, err := m.hc.Post("http://unix/destroy", "application/text", strings.NewReader(serializedData))
 	if err != nil {
 		return fmt.Errorf("http-json-client: post /destroy: %w", err)
 	}

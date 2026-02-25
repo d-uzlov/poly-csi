@@ -71,6 +71,7 @@
     "noatime",
     "node.session.auth.authmethod",
     "nodeconfig",
+    "nodedispatcher",
     "nodeinfo",
     "noderegistry",
     "nodeserver",

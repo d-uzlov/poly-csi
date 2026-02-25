@@ -2,6 +2,8 @@ package mounterfactory
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/mounts"
@@ -17,29 +19,43 @@ const (
 	MounterTypeIscsiadm = "iscsiadm"
 )
 
-var allBuiltinTypes = []string{
-	MounterTypeNfs,
-	MounterTypeNvme,
-	MounterTypeIscsiadm,
+var builtinTypes = map[string]func(id string, byteConfig []byte) (func() mounts.NodeMounter, error){
+	MounterTypeNfs: func(id string, byteConfig []byte) (func() mounts.NodeMounter, error) {
+		return func() mounts.NodeMounter { return mntrnfs.NewNfsMounter(id) }, nil
+	},
+	MounterTypeNvme: func(id string, byteConfig []byte) (func() mounts.NodeMounter, error) {
+		var cfg mntrnvme.Config
+		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
+			return nil, fmt.Errorf("parse config: %w", err)
+		}
+		cfg.FillDefaults()
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("validate config: %w", err)
+		}
+		return func() mounts.NodeMounter { return mntrnvme.NewNvmeMounter(id, cfg) }, nil
+	},
+	MounterTypeIscsiadm: func(id string, byteConfig []byte) (func() mounts.NodeMounter, error) {
+		var cfg mntriscsiadm.Config
+		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
+			return nil, fmt.Errorf("parse config: %w", err)
+		}
+		cfg.FillDefaults()
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("validate config: %w", err)
+		}
+		return func() mounts.NodeMounter {
+			return mntriscsiadm.NewIscsiadmMounter(id, cfg)
+		}, nil
+	},
 }
 
 func GetByType(id string, mtype string, subtype string, byteConfig []byte) (func() mounts.NodeMounter, error) {
 	if mtype == "builtin" {
-		switch subtype {
-		case MounterTypeNfs:
-			return func() mounts.NodeMounter { return mntrnfs.NewNfsMounter(id) }, nil
-		case MounterTypeNvme:
-			return func() mounts.NodeMounter { return mntrnvme.NewNvmeMounter(id) }, nil
-		case MounterTypeIscsiadm:
-			var cfg mntriscsiadm.Config
-			if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
-				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
-			}
-			return func() mounts.NodeMounter {
-				return mntriscsiadm.NewIscsiadmMounter(id, cfg)
-			}, nil
+		v, ok := builtinTypes[subtype]
+		if !ok {
+			return nil, fmt.Errorf("unknown mounter subtype: '%s/%s', must be one of: %v", mtype, subtype, slices.Collect(maps.Keys(builtinTypes)))
 		}
-		return nil, fmt.Errorf("unknown mounter subtype: '%s/%s', must be one of: %v", mtype, subtype, allBuiltinTypes)
+		return v(id, byteConfig)
 	}
 	if mtype == "plugin" {
 		switch subtype {

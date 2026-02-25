@@ -13,18 +13,20 @@ import (
 )
 
 type nvmeMounter struct {
-	id   string
-	snip NvmeSnippets
+	id     string
+	snip   NvmeSnippets
+	config Config
 }
 
-func NewNvmeMounter(id string) mounts.NodeMounter {
+func NewNvmeMounter(id string, config Config) mounts.NodeMounter {
 	return &nvmeMounter{
-		id:   id,
-		snip: newNvmeSnippets(),
+		id:     id,
+		snip:   newNvmeSnippets(config.NvmeCmd, config.DevFolder, config.ParseKernelLog),
+		config: config,
 	}
 }
 
-func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.MounterContext, error) {
+func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
 	pc, err := ParsePublishContext(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -68,7 +70,7 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 		return nil, fmt.Errorf("nvmeFindNamespace: %w", err)
 	}
 
-	namespaceDevicePath := "/dev/" + namespaceDevice
+	namespaceDevicePath := m.config.DevFolder + "/" + namespaceDevice
 	deviceFound := false
 	for range 10 {
 		_, err = os.Stat(namespaceDevicePath)
@@ -87,7 +89,7 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 		return nil, fmt.Errorf("nvme device not found: %s", namespaceDevicePath)
 	}
 
-	return &mounts.MounterContext{
+	return &mounts.ConnectResult{
 		FolderPath: "",
 		Devices:    []string{namespaceDevicePath},
 		ManagedOps: mounts.ManagedOperations{
@@ -95,31 +97,32 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 			UnmountFs: true,
 			ExpandFs:  true,
 		},
-		Extra: map[string]string{
-			"nvme.nqn":              pc.TargetNqn,
-			"nvme.namespace-device": namespaceDevicePath,
+		MounterData: VolumeData{
+			Nqn: pc.TargetNqn,
 		},
 	}, nil
 }
 
-func (m *nvmeMounter) Disconnect(ctx context.Context, nvi mounts.MounterContext) error {
-	nqn, ok := nvi.Extra["nvme.nqn"]
-	if !ok {
-		return fmt.Errorf("local volume info: 'nvme.nqn' missing")
+func (m *nvmeMounter) Disconnect(ctx context.Context, serializedMounterData string) error {
+	vd, err := parseVolumeData(serializedMounterData)
+	if err != nil {
+		return fmt.Errorf("parse serialized mounter data: %w", err)
 	}
-	err := m.snip.Disconnect(ctx, nqn)
+
+	err = m.snip.Disconnect(ctx, vd.Nqn)
 	if err != nil {
 		return fmt.Errorf("nvmeDisconnect: %w", err)
 	}
 	return nil
 }
 
-func (m *nvmeMounter) Expand(ctx context.Context, nvi mounts.MounterContext) error {
-	nqn, ok := nvi.Extra["nvme.nqn"]
-	if !ok {
-		return fmt.Errorf("local volume info: 'nvme.nqn' missing")
+func (m *nvmeMounter) Expand(ctx context.Context, serializedMounterData string) error {
+	vd, err := parseVolumeData(serializedMounterData)
+	if err != nil {
+		return fmt.Errorf("parse serialized mounter data: %w", err)
 	}
-	err := m.snip.Rescan(ctx, nqn)
+
+	err = m.snip.Rescan(ctx, vd.Nqn)
 	if err != nil {
 		return fmt.Errorf("nvmeRescan: %w", err)
 	}

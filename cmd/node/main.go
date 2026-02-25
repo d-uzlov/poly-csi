@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"meoe.io/poly-csi/cmd/node/config"
-	"meoe.io/poly-csi/pkg/node"
+	"meoe.io/poly-csi/pkg/node/nodedispatcher"
 	"meoe.io/poly-csi/pkg/node/nodeserver"
 	"meoe.io/poly-csi/pkg/utils/configwatcher"
 
@@ -40,12 +40,12 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = node.ParseConfig(ctx, configContent)
+	_, err = nodedispatcher.ParseConfig(ctx, configContent)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	nodeInstance, err := node.CreateNode(logger, appConfig.CsiName, config.GetVersion(), appConfig.CsiNodeId)
+	nodeInstance, err := nodedispatcher.CreateNode(logger, appConfig.CsiName, config.GetVersion(), appConfig.CsiNodeId)
 	if err != nil {
 		logger.Error("could not create node controller", "error", err)
 		panic(err)
@@ -56,7 +56,7 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
-		nodeConfig, err := node.ParseConfig(ctx, configContent)
+		nodeConfig, err := nodedispatcher.ParseConfig(ctx, configContent)
 		if err != nil {
 			panic(err.Error())
 		}

@@ -9,4 +9,5 @@ mounter:
   type: builtin
   subtype: iscsiadm
   config:
-    iscsiadmCommand: chroot /host iscsiadm
+    iscsiadmCmd: [ "chroot", "/host", "iscsiadm" ]
+    devFolder: /host/dev

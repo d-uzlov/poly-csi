@@ -2,6 +2,7 @@ package mplocal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -75,25 +76,31 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.Multi
 		return nil
 	})
 
+	encoded, err := json.Marshal(Data{
+		Wwid: wwid,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode context data: %w", err)
+	}
+
 	return &multipath.MultipathContext{
-		Device: deviceLink,
-		Extra: map[string]string{
-			"wwid": wwid,
-		},
+		Device:         deviceLink,
+		SerializedData: string(encoded),
 	}, nil
 }
 
-func (l *localMp) Destroy(ctx context.Context, mc multipath.MultipathContext) error {
-	wwid := mc.Extra["wwid"]
-	if wwid == "" {
-		return fmt.Errorf("multipath_context: missing field 'wwid'")
+func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
+	data, err := parseData(serializedData)
+	if err != nil {
+		return fmt.Errorf("parse serialized data: %w", err)
 	}
-	cmd := []string{"multipath", "-f", wwid}
-	err := transport.CheckedRun(ctx, cmd)
+
+	cmd := []string{"multipath", "-f", data.Wwid}
+	err = transport.CheckedRun(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("%s (disable DM device): %w", cmd, err)
 	}
-	cmd = []string{"multipath", "-w", wwid}
+	cmd = []string{"multipath", "-w", data.Wwid}
 	err = transport.CheckedRun(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("%s (remove wwid from config): %w", cmd, err)

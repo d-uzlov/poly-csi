@@ -27,7 +27,7 @@ func (m *nfsMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, erro
 	}, nil
 }
 
-func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.MounterContext, error) {
+func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
 	pc, err := ParsePublishContext(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -52,7 +52,7 @@ func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*m
 		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, nfsPath, mi.MountPoint)
 	}
 
-	return &mounts.MounterContext{
+	return &mounts.ConnectResult{
 		FolderPath: mountTarget,
 		ManagedOps: mounts.ManagedOperations{
 			MountFs:   false,
@@ -62,12 +62,12 @@ func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*m
 	}, nil
 }
 
-func (m *nfsMounter) Disconnect(ctx context.Context, info mounts.MounterContext) error {
+func (m *nfsMounter) Disconnect(ctx context.Context, serializedMounterData string) error {
 	// unmount is managed externally
 	return nil
 }
 
-func (m *nfsMounter) Expand(ctx context.Context, info mounts.MounterContext) error {
+func (m *nfsMounter) Expand(ctx context.Context, serializedMounterData string) error {
 	// nfs volumes don't need expanding
 	return nil
 }

@@ -7,14 +7,18 @@ import (
 	"meoe.io/poly-csi/pkg/node/addropt"
 )
 
+const (
+	MountIdKey = "mounter_id"
+)
+
 type NodeMounter interface {
 	GetInfo(ctx context.Context) (*MounterNodeInfo, error)
-	Connect(ctx context.Context, req ConnectRequest) (*MounterContext, error)
-	Disconnect(ctx context.Context, mc MounterContext) error
-	Expand(ctx context.Context, mc MounterContext) error
+	Connect(ctx context.Context, req ConnectRequest) (*ConnectResult, error)
+	Disconnect(ctx context.Context, serializedMounterData string) error
+	Expand(ctx context.Context, serializedMounterData string) error
 }
 
-// mostly equivalent to csi.NodeStageVolumeRequest
+// ConnectRequest is mostly equivalent to csi.NodeStageVolumeRequest
 // except this struct can be (de)serialized without errors
 type ConnectRequest struct {
 	AddressOptions       []addropt.AddressOption           `json:"address_options"`
@@ -27,19 +31,25 @@ type ConnectRequest struct {
 	PublishContextSecret map[string]string                 `json:"publish_context_secret"`
 }
 
-const (
-	MountIdKey = "mounter_id"
-)
-
-type MounterContext struct {
-	// optional path to folder with mounted filesystem
+type ConnectResult struct {
+	// FolderPath is path to folder with mounted filesystem.
+	// If ManagedOps.MountFs is set, the value is optional, node dispatcher will try to mount filesystem from device(s).
 	FolderPath string `json:"folder_path"`
-	// if FolderPath is not set, mounter can set DevicePath and set ManagedOps
-	// to request node dispatcher to mount filesystem
-	Devices    []string          `json:"device_path"`
+	// Devices is zero, one or several paths in filesystem pointing to devices with volume data.
+	// If FolderPath is not empty, the Devices list should be empty.
+	// If FolderPath is empty, Devices must contain at least one value AND ManagedOps.MountFs must be set.
+	// When the list contains more than one device, node dispatcher will use multipathd to set up united device.
+	Devices []string `json:"device_path"`
+	// ManagedOps is a set of requests from mounter to node dispatcher
+	// which allows mounter to skip various generic operations.
 	ManagedOps ManagedOperations `json:"managed_operations"`
-	// extra is any info that mounter wants to get in later operations
-	Extra map[string]string `json:"extra"`
+
+	// MounterData and SerializedMounterData are mutually exclusive options for mounter data storage.
+	// When MounterData is set, dispatcher will try to use JSON serialization to create SerializedMounterData.
+	MounterData any `json:"-"`
+	// SerializedMounterData is data passed to later requests to mounter.
+	// It can be automatically populated from MounterData.
+	SerializedMounterData string `json:"mounter_data"`
 }
 
 type ManagedOperations struct {

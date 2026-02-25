@@ -29,7 +29,7 @@ spec:
       # hostPID: false
       containers:
       - name: iscsi-mounter
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.13
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.33
         args:
         - --plugin-type=mounter
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -93,7 +93,7 @@ spec:
           subPath: etc/iscsi/
 
       - name: multipath
-        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.13
+        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.31
         args:
         - --plugin-type=multipath
         - --node-config=/poly-csi/multipath-config/config.yaml
@@ -103,10 +103,6 @@ spec:
             - SYS_ADMIN
           privileged: true
         volumeMounts:
-        # - mountPath: /run/udev
-        #   name: udev-data
-        # - mountPath: /sys
-        #   name: sys-dir
         - mountPath: /dev
           name: dev-dir
         - mountPath: /etc/multipath/

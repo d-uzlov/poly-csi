@@ -26,7 +26,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.28
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.31
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -53,15 +53,6 @@ spec:
         # prevent crazy error messages due to the /dev host mount
         terminationMessagePath: /tmp/termination-log
         terminationMessagePolicy: File
-        # livenessProbe:
-        #   failureThreshold: 3
-        #   exec:
-        #     command:
-        #     - bin/liveness-probe
-        #     - --csi-address=/csi-data/csi.sock
-        #   initialDelaySeconds: 10
-        #   timeoutSeconds: 15
-        #   periodSeconds: 60
         volumeMounts:
         - mountPath: /csi-data
           name: socket-dir
@@ -70,20 +61,7 @@ spec:
           mountPropagation: Bidirectional
         - name: nvme-dir
           mountPath: /etc/nvme
-        # - mountPath: /lib/modules
-        #   name: modules-dir
-        #   readOnly: true
-        # - mountPath: /etc/localtime
-        #   name: localtime
-        #   readOnly: true
-        # - mountPath: /run/udev
-        #   name: udev-data
-        # - mountPath: /host
-        #   name: host-dir
-        #   mountPropagation: Bidirectional
-        - mountPath: /sys
-          name: sys-dir
-        - mountPath: /dev
+        - mountPath: /host/dev
           name: dev-dir
         - mountPath: /poly-csi/node
           name: poly-csi-config
@@ -94,9 +72,6 @@ spec:
         - mountPath: /run/io.meoe.poly-csi/plugins
           name: poly-csi-plugins
           mountPropagation: Bidirectional
-        # - mountPath: /etc/iscsi/
-        #   name: etc-iscsi
-        #   readOnly: true
 
       - name: driver-registrar
         image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
@@ -154,19 +129,6 @@ spec:
       - name: dev-dir
         hostPath:
           path: /dev
-          type: Directory
-      # - name: modules-dir
-      #   hostPath:
-      #     path: /lib/modules
-      - name: localtime
-        hostPath:
-          path: /etc/localtime
-      # - name: udev-data
-      #   hostPath:
-      #     path: /run/udev
-      - name: sys-dir
-        hostPath:
-          path: /sys
           type: Directory
       # - name: host-dir
       #   hostPath:

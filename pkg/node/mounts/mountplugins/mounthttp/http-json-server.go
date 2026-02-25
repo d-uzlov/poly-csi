@@ -16,9 +16,26 @@ import (
 )
 
 type Server struct {
-	config  ServerConfig
-	mounter mounts.NodeMounter
-	callCtx context.Context
+	config   ServerConfig
+	mounter  mounts.NodeMounter
+	callCtx  context.Context
+	handlers map[string]handler
+}
+
+const responseStatusError = "error"
+const responseStatusOk = "ok"
+
+type PluginResponse struct {
+	Status string `json:"status"`
+	Err    string `json:"error"`
+	Result any    `json:"result"`
+}
+
+type handlerFunc func(ctx context.Context, body string) (result any, err error)
+
+type handler struct {
+	httpMethodType string
+	f              handlerFunc
 }
 
 type ServerConfig struct {
@@ -30,6 +47,7 @@ func NewServer(callCtx context.Context, config ServerConfig, mounter mounts.Node
 		callCtx: callCtx,
 		config:  config,
 		mounter: mounter,
+		handlers: map[string]handler{},
 	}
 }
 
@@ -41,10 +59,10 @@ func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, 
 		Handler: mux,
 	}
 
-	mux.HandleFunc("/get_info", s.handleGetInfo)
-	mux.HandleFunc("/connect", s.handleConnect)
-	mux.HandleFunc("/disconnect", s.handleDisconnect)
-	mux.HandleFunc("/expand", s.handleExpand)
+	s.addHandler(mux, "/get_info", http.MethodGet, s.handleGetInfo)
+	s.addHandler(mux, "/connect", http.MethodPost, s.handleConnect)
+	s.addHandler(mux, "/disconnect", http.MethodPost, s.handleDisconnect)
+	s.addHandler(mux, "/expand", http.MethodPost, s.handleExpand)
 
 	serveDoneCh := make(chan struct{})
 
@@ -70,117 +88,106 @@ func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, 
 	}()
 }
 
-func (s *Server) handleGetInfo(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		http.Error(w, fmt.Sprintf("method not allowed: '%s' %s", req.Method, req.URL), http.StatusMethodNotAllowed)
+func (s *Server) addHandler(mux *http.ServeMux, path string, method string, f handlerFunc) {
+	_, ok := s.handlers[path]
+	if ok {
+		logger := slogctx.FromCtx(s.callCtx)
+		logger.Warn("trying to add handler for second time", "path", path)
 		return
 	}
-	info, err := s.mounter.GetInfo(s.callCtx)
-	if err != nil {
-		http.Error(w, "encode error: "+err.Error(), http.StatusInternalServerError)
+	s.handlers[path] = handler{
+		httpMethodType: method,
+		f:              f,
 	}
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	if err := enc.Encode(info); err != nil {
-		http.Error(w, "encode error: "+err.Error(), http.StatusInternalServerError)
-	}
+	mux.HandleFunc(path, s.handle)
 }
 
-func (s *Server) handleConnect(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		http.Error(w, fmt.Sprintf("method not allowed: '%s' %s", req.Method, req.URL), http.StatusMethodNotAllowed)
+func (s *Server) handle(w http.ResponseWriter, req *http.Request) {
+	path := req.URL.Path
+	h, ok := s.handlers[path]
+	if !ok {
+		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "method %s is not found"}`, responseStatusError, path), http.StatusBadRequest)
 		return
 	}
+
+	if req.Method != h.httpMethodType {
+		http.Error(w, fmt.Sprintf("path %s needs method %s, requested %s is not supported", path, h.httpMethodType, req.Method), http.StatusMethodNotAllowed)
+		return
+	}
+
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "read request body: %s"}`, err.Error()), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "read request body: %s"}`, responseStatusError, err.Error()), http.StatusInternalServerError)
 		return
 	}
-	slogctx.FromCtx(s.callCtx).Info("new request", "req_body", string(bodyBytes))
+
+	callRes, err := h.f(s.callCtx, string(bodyBytes))
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "%s"}`, responseStatusError, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	res, err := json.Marshal(PluginResponse{Status: responseStatusOk, Result: callRes})
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"status":"%s", "error": "connect: json marshal failed: %s"}`, responseStatusError, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(res)
+	// TODO check errors
+}
+
+func (s *Server) handleGetInfo(ctx context.Context, body string) (result any, err error) {
+	return s.mounter.GetInfo(s.callCtx)
+}
+
+func (s *Server) handleConnect(ctx context.Context, body string) (result any, err error) {
+	// TODO move logger to interface
+	logger := slogctx.FromCtx(s.callCtx).With("method", "connect")
 
 	var cr mounts.ConnectRequest
-	dec := json.NewDecoder(bytes.NewReader(bodyBytes))
+
+	dec := json.NewDecoder(bytes.NewReader([]byte(body)))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&cr); err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "invalid json: %s"}`, err.Error()), http.StatusBadRequest)
-		return
+
+	if err = dec.Decode(&cr); err != nil {
+		logger.Info("failed to parse request body", "req_body", body)
+		return nil, fmt.Errorf("decode request body: %w", err)
 	}
-	logger := slogctx.FromCtx(s.callCtx)
-	logger.Info("connect: got request", "request", cr)
+	logger.Info("new request", "request", cr)
 	mc, err := s.mounter.Connect(s.callCtx, cr)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "connect: %s"}`, err.Error()), http.StatusBadRequest)
-		return
+		return nil, err
 	}
-	res, err := json.Marshal(PluginResponse{Status: "ok", Result: mc})
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "connect: json marshal failed: %s"}`, err.Error()), http.StatusInternalServerError)
-		return
+
+	if mc.MounterData != nil {
+		if mc.SerializedMounterData != "" {
+			return nil, fmt.Errorf("mounter set both MounterData and SerializedMounterData")
+		}
+		encoded, err := json.Marshal(mc.MounterData)
+		if err != nil {
+			return nil, fmt.Errorf("serialize MounterData: %w", err)
+		}
+		mc.SerializedMounterData = string(encoded)
+		mc.MounterData = nil
 	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(res)
+
+	return mc, nil
 }
 
-func (s *Server) handleDisconnect(w http.ResponseWriter, req *http.Request) {
-	slogctx.FromCtx(s.callCtx).Info("new request", "req_body", req.Body)
-	if req.Method != http.MethodPost {
-		http.Error(w, fmt.Sprintf("method not allowed: '%s' %s", req.Method, req.URL), http.StatusMethodNotAllowed)
-		return
-	}
-	var mc mounts.MounterContext
-	dec := json.NewDecoder(req.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&mc); err != nil {
-		http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	logger := slogctx.FromCtx(s.callCtx)
-	logger.Info("disconnect: got request", "request", mc)
-	err := s.mounter.Disconnect(s.callCtx, mc)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "disconnect: %s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-	res, err := json.Marshal(PluginResponse{Status: "ok"})
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "disconnect: json marshal failed: %s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(res)
+func (s *Server) handleDisconnect(ctx context.Context, body string) (result any, err error) {
+	logger := slogctx.FromCtx(s.callCtx).With("method", "disconnect")
+
+	logger.Info("new request", "request", body)
+	err = s.mounter.Disconnect(s.callCtx, body)
+	return nil, err
 }
 
-func (s *Server) handleExpand(w http.ResponseWriter, req *http.Request) {
-	slogctx.FromCtx(s.callCtx).Info("new request", "req_body", req.Body)
-	if req.Method != http.MethodPost {
-		http.Error(w, fmt.Sprintf("method not allowed: '%s' %s", req.Method, req.URL), http.StatusMethodNotAllowed)
-		return
-	}
-	var mc mounts.MounterContext
-	dec := json.NewDecoder(req.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&mc); err != nil {
-		http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	logger := slogctx.FromCtx(s.callCtx)
-	logger.Info("expand: got request", "request", mc)
-	err := s.mounter.Expand(s.callCtx, mc)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "expand: %s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-	res, err := json.Marshal(PluginResponse{Status: "ok"})
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"status":"error", "error": "expand: json marshal failed: %s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(res)
-}
+func (s *Server) handleExpand(ctx context.Context, body string) (result any, err error) {
+	logger := slogctx.FromCtx(s.callCtx).With("method", "expand")
 
-type PluginResponse struct {
-	Status string `json:"status"`
-	Err    string `json:"error"`
-	Result any    `json:"result"`
+	logger.Info("new request", "request", body)
+	err = s.mounter.Expand(s.callCtx, body)
+	return nil, err
 }

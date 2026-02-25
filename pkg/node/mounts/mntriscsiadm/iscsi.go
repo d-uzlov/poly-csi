@@ -22,7 +22,7 @@ func NewIscsiadmMounter(id string, config Config) mounts.NodeMounter {
 	}
 }
 
-func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.MounterContext, error) {
+func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
 	pc, err := ParsePublishContext(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -56,6 +56,7 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 
 	tr := transport.FromContext(ctx)
 
+	var connectError string
 	successCount := 0
 	for _, v := range req.AddressOptions {
 		addr := fmt.Sprintf("%s:%s", v.Address, pc.Port)
@@ -66,6 +67,7 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 			}
 
 			slogctx.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err)
+			connectError += fmt.Sprintf("failed to configure connection to %s: %s ; ", addr, err.Error())
 			continue
 		}
 		err = snip.connect(pc.Iqn, addr)
@@ -75,12 +77,13 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 			}
 
 			slogctx.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err)
+			connectError += fmt.Sprintf("failed to connect to %s: %s ; ", addr, err.Error())
 			continue
 		}
 		successCount++
 	}
 	if successCount == 0 {
-		return nil, fmt.Errorf("all %d iscsi multipath connections failed, see logs for details", len(req.AddressOptions))
+		return nil, fmt.Errorf("all %d iscsi multipath connections failed: %s", len(req.AddressOptions), connectError)
 	}
 	is, err := snip.findSessions(pc.Iqn)
 	if err != nil {
@@ -93,18 +96,22 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
 			stat, err := tr.Cmds().Stat(ctx, deviceLink)
 			if err != nil {
-				return fmt.Errorf("stat %s (check if link exists): %w", deviceLink, err)
+				return fmt.Errorf("call stat %s (check if link exists): %w", deviceLink, err)
 			}
 			if stat == nil {
 				return fmt.Errorf("link does not exist: %s", deviceLink)
 			}
+			devices = append(devices, stat.Path)
 			return nil
 		})
+		if err != nil {
+			slogctx.FromCtx(ctx).Error("iscsi: failed to get device file", "address", v.address, "error", err)
+		}
 	}
 	if len(devices) == 0 {
 		return nil, fmt.Errorf("iscsi device is not found")
 	}
-	return &mounts.MounterContext{
+	return &mounts.ConnectResult{
 		FolderPath: "",
 		Devices:    devices,
 		ManagedOps: mounts.ManagedOperations{
@@ -112,25 +119,26 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 			UnmountFs: true,
 			ExpandFs:  true,
 		},
-		Extra: map[string]string{
-			"iscsi.iqn": pc.Iqn,
+		MounterData: VolumeData{
+			Iqn: pc.Iqn,
 		},
 	}, nil
 }
 
-func (m *iscsiadmMounter) Disconnect(ctx context.Context, info mounts.MounterContext) error {
-	iqn := info.Extra["iscsi.iqn"]
-	if iqn == "" {
-		return fmt.Errorf("mounter_info.extra: missing 'iscsi.iqn' field")
+func (m *iscsiadmMounter) Disconnect(ctx context.Context, serializedMounterData string) error {
+	vd, err := parseVolumeData(serializedMounterData)
+	if err != nil {
+		return fmt.Errorf("parse serialized mounter data: %w", err)
 	}
+
 	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
 
-	is, err := snip.findSessions(iqn)
+	is, err := snip.findSessions(vd.Iqn)
 	if err != nil {
 		return fmt.Errorf("find iscsi sessions: %w", err)
 	}
 	for _, v := range is {
-		err = snip.disconnect(iqn, v.address)
+		err = snip.disconnect(vd.Iqn, v.address)
 		if err != nil {
 			return fmt.Errorf("nvmeDisconnect: %w", err)
 		}
@@ -138,13 +146,7 @@ func (m *iscsiadmMounter) Disconnect(ctx context.Context, info mounts.MounterCon
 	return nil
 }
 
-func (m *iscsiadmMounter) Expand(ctx context.Context, info mounts.MounterContext) error {
-	iqn := info.Extra["iscsi.iqn"]
-	if iqn == "" {
-		return fmt.Errorf("mounter_info.extra: missing 'iscsi.iqn' field")
-	}
-	_ = iqn
-
+func (m *iscsiadmMounter) Expand(ctx context.Context, serializedMounterData string) error {
 	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
 	// TODO rescan only target devices?
 	err := snip.rescanAll()

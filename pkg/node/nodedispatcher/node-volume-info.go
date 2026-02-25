@@ -1,4 +1,4 @@
-package mountinfo
+package nodedispatcher
 
 import (
 	"encoding/json"
@@ -6,19 +6,27 @@ import (
 	"os"
 
 	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/multipath"
 )
 
 type NodeVolumeInfo struct {
-	MounterId         string                     `json:"mounter_id"`
-	MounterPath       string                     `json:"mounter_path"`
-	FolderPath        string                     `json:"folder_path"`
-	DevicePath        string                     `json:"device_path"`
-	DeviceIsMultipath bool                       `json:"device_is_multipath"`
-	MultipathContext  multipath.MultipathContext `json:"multipath_context"`
-	MounterContext    mounts.MounterContext      `json:"mounter_context"`
+	// MounterId holds id of the mounter, to be used on disconnect and other operations.
+	MounterId string `json:"mounter_id"`
+	// MounterPath is a path to a folder,
+	// which was created to allow mounter to store data in filesystem
+	// or create mounts.
+	// TODO remove this? mounters should not manually store data in filesystem
+	MounterPath string `json:"mounter_path"`
+	// Folder path is a path to the main volume mount
+	FolderPath string `json:"folder_path"`
+	// SerializedMultipathData contains serialized data returned by multipath module
+	SerializedMultipathData string `json:"multipath_data"`
+	// ManagedOps is copied from mounter ConnectResult
+	ManagedOps mounts.ManagedOperations `json:"managed_ops"`
+	// ManagedOps contains serialized data returned by mounter connect
+	SerializedMounterData string `json:"mounter_data"`
 }
 
+// mountSuffix defines name of the file inside staging folder containing NodeVolumeInfo
 const mountSuffix = "/mount-info.json"
 
 func SaveMountInfo(stagingPath string, info NodeVolumeInfo) error {

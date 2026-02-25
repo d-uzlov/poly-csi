@@ -22,6 +22,6 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.Multi
 	return nil, fmt.Errorf("multipath is disabled")
 }
 
-func (l *localMp) Destroy(ctx context.Context, mc multipath.MultipathContext) error {
+func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
 	return fmt.Errorf("multipath is disabled")
 }

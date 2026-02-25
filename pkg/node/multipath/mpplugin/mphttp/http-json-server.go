@@ -142,15 +142,9 @@ func (s *Server) handleSetup(body []byte) (any, error) {
 }
 
 func (s *Server) handleDestroy(body []byte) (any, error) {
-	var mc multipath.MultipathContext
-	dec := json.NewDecoder(bytes.NewReader(body))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&mc); err != nil {
-		return nil, fmt.Errorf("request body: invalid json: %s", err)
-	}
 	logger := slogctx.FromCtx(s.callCtx)
-	logger.Info("connect: got request", "request", mc)
-	err := s.mp.Destroy(s.callCtx, mc)
+	logger.Info("connect: got request", "request", string(body))
+	err := s.mp.Destroy(s.callCtx, string(body))
 	if err != nil {
 		return nil, fmt.Errorf("call setup: %s", err)
 	}

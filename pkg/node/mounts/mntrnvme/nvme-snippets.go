@@ -13,14 +13,14 @@ import (
 
 type NvmeSnippets struct {
 	cmd            []string
+	devFolder        string
 	parseKernelLog bool
 }
 
-func newNvmeSnippets() NvmeSnippets {
-	// TODO make it configurable
+func newNvmeSnippets(cmd []string, devFolder string, parseKernelLog bool) NvmeSnippets {
 	return NvmeSnippets{
-		cmd:            []string{"nvme"},
-		parseKernelLog: true,
+		cmd:            cmd,
+		parseKernelLog: parseKernelLog,
 	}
 }
 
@@ -228,7 +228,7 @@ func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
 	anySuccess := false
 	err = nil
 	for _, c := range nqnInfo.Controllers {
-		devPath := "/dev/" + c.Controller
+		devPath := snip.devFolder + "/" + c.Controller
 		cmd := append(snip.cmd, "ns-rescan", "--verbose", devPath)
 		err = transport.CheckedRun(ctx, cmd)
 		if err != nil {

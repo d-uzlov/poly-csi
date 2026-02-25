@@ -1,4 +1,4 @@
-package node
+package nodedispatcher
 
 import (
 	"context"
@@ -10,57 +10,57 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/mount-utils"
-	"meoe.io/poly-csi/pkg/node/mountinfo"
 	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 	"meoe.io/poly-csi/pkg/node/multipath"
 )
 
-func ensureDevicePath(ctx context.Context, nvi *mountinfo.NodeVolumeInfo, mp multipath.Multipath) error {
-	if len(nvi.MounterContext.Devices) == 0 {
-		return fmt.Errorf("no devices in context")
+func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string, mp multipath.Multipath) (string, error) {
+	if len(devices) == 0 {
+		return "", fmt.Errorf("no devices in context")
 	}
-	if len(nvi.MounterContext.Devices) == 1 {
-		nvi.DevicePath = nvi.MounterContext.Devices[0]
-		return nil
+	if len(devices) == 1 {
+		return devices[0], nil
 	}
 	if mp == nil {
-		return fmt.Errorf("multipath instance is nil")
+		return "", fmt.Errorf("multipath instance is nil")
 	}
 
-	mc, err := mp.Setup(ctx, nvi.MounterContext.Devices)
+	mc, err := mp.Setup(ctx, devices)
 	if err != nil {
-		return fmt.Errorf("multipath.Setup: %w", err)
+		return "", fmt.Errorf("multipath.Setup: %w", err)
 	}
-	nvi.MultipathContext = *mc
-	nvi.DevicePath = mc.Device
-	nvi.DeviceIsMultipath = true
-	return nil
+	if mc.SerializedData == "" {
+		// we later determine if device is using multipath based on SerializedMultipathData
+		return "", fmt.Errorf("multipath did not set data")
+	}
+	nvi.SerializedMultipathData = mc.SerializedData
+	return mc.Device, nil
 }
 
-func ensureFolderPath(ctx context.Context, nvi *mountinfo.NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
-	if nvi.DevicePath == "" {
+func ensureFolderPath(ctx context.Context, devicePath string, nvi *NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
+	if devicePath == "" {
 		return fmt.Errorf("device path is not set")
 	}
 
-	fsInfo, err := fsutils.GetBlkid(ctx, nvi.DevicePath)
+	fsInfo, err := fsutils.GetBlkid(ctx, devicePath)
 	if err != nil {
 		return fmt.Errorf("GetFsInfo: %w", err)
 	}
 
 	if fsInfo == nil {
-		err = fsutils.FormatFs(ctx, nvi.DevicePath, requestMount.FsType, nil)
+		err = fsutils.FormatFs(ctx, devicePath, requestMount.FsType, nil)
 		if err != nil {
 			return fmt.Errorf("format: %w", err)
 		}
 	}
 
 	nvi.FolderPath = targetPath
-	mi, err := fsutils.EnsureMounted(nvi.DevicePath, nvi.FolderPath, "", requestMount.MountFlags)
+	mi, err := fsutils.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}
-	if mi.Source != nvi.DevicePath {
-		return fmt.Errorf("already mounted from different source: real %s != expected %s: mounted at %s", mi.Source, nvi.DevicePath, mi.MountPoint)
+	if mi.Source != devicePath {
+		return fmt.Errorf("already mounted from different source: real %s != expected %s: mounted at %s", mi.Source, devicePath, mi.MountPoint)
 	}
 	// do we need to also check that mounted filesystem type matches requested?
 	// if mi.FsType != requestMount.FsType {
@@ -70,7 +70,7 @@ func ensureFolderPath(ctx context.Context, nvi *mountinfo.NodeVolumeInfo, reques
 	return nil
 }
 
-func ensureFolderUnmounted(nvi *mountinfo.NodeVolumeInfo) error {
+func ensureFolderUnmounted(nvi *NodeVolumeInfo) error {
 	if nvi.FolderPath == "" {
 		return nil
 	}
@@ -90,15 +90,14 @@ func ensureFolderUnmounted(nvi *mountinfo.NodeVolumeInfo) error {
 	return nil
 }
 
-func ensureMultipathDisabled(ctx context.Context, nvi *mountinfo.NodeVolumeInfo, mp multipath.Multipath) error {
-	if !nvi.DeviceIsMultipath {
-		nvi.DevicePath = ""
+func ensureMultipathDisabled(ctx context.Context, nvi *NodeVolumeInfo, mp multipath.Multipath) error {
+	if nvi.SerializedMultipathData == "" {
 		return nil
 	}
 	if mp == nil {
 		return fmt.Errorf("multipath instance is nil")
 	}
-	err := mp.Destroy(ctx, nvi.MultipathContext)
+	err := mp.Destroy(ctx, nvi.SerializedMultipathData)
 	if err != nil {
 		return err
 	}

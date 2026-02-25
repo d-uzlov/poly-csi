@@ -22,6 +22,10 @@ mounters:
 - id: nvme
   type: builtin
   subtype: nvme
+  config:
+    nvmeCmd: [ "nvme" ]
+    parseKernelLog: true
+    devFolder: /host/dev
 - id: iscsi
   type: plugin
   subtype: http.json.dev

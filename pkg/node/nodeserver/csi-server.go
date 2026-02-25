@@ -12,7 +12,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 	"google.golang.org/grpc"
-	"meoe.io/poly-csi/pkg/node"
+	"meoe.io/poly-csi/pkg/node/nodedispatcher"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 )
@@ -58,7 +58,7 @@ func Listen(ctx context.Context, address string) (net.Listener, func(), error) {
 	}
 }
 
-func (s *Server) GoListenAndServe(ctx context.Context, address string, node *node.Node, doneCallback func()) error {
+func (s *Server) GoListenAndServe(ctx context.Context, address string, node *nodedispatcher.Node, doneCallback func()) error {
 	listener, cleanup, err := Listen(ctx, address)
 	if err != nil {
 		// s.logger.Error("Failed to listen", "error", err)
