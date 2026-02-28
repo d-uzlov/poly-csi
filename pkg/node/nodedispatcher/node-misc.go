@@ -59,11 +59,11 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 		return nil, fmt.Errorf("node volume info: FolderPath is empty")
 	}
 
-	mounter := n.findMounterById(nvi.MounterId)
-	if mounter == nil {
-		return nil, fmt.Errorf("mounter with id '%s' is not found", nvi.MounterId)
+	connector := n.findConnectorById(nvi.ConnectorId)
+	if connector == nil {
+		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
-	err = mounter.Expand(ctx, nvi.SerializedMounterData)
+	err = connector.Expand(ctx, nvi.SerializedConnectorData)
 	if err != nil {
 		return nil, err
 	}

@@ -14,7 +14,7 @@ parameters:
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.shareType: targetcli
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.mounterId: iscsi
+  dispatch.connectorId: iscsi
   dispatch.addressNames: storage,k8s
   zfs.parentDataset: tulip/test-guid
   iscsi.auth: chap-provision

@@ -1,10 +1,10 @@
-package mntrnvme
+package cntrnvme
 
 import (
 	"context"
 	"encoding/json"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
 type NvmePublicInfo struct {
@@ -12,7 +12,7 @@ type NvmePublicInfo struct {
 	HostId  string `json:"host_id"`
 }
 
-func (m *nvmeMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
+func (m *nvmeConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	info, err := nvmeGetNodeInfo(ctx)
 	if err != nil {
 		return nil, err
@@ -26,13 +26,13 @@ func (m *nvmeMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, err
 		return nil, err
 	}
 
-	return &mounts.MounterNodeInfo{
+	return &connectors.ConnectorNodeInfo{
 		Public: string(public),
 		Secret: "",
 	}, nil
 }
 
-func ParseNvmeInfo(src mounts.MounterNodeInfo) (NvmePublicInfo, error) {
+func ParseNvmeInfo(src connectors.ConnectorNodeInfo) (NvmePublicInfo, error) {
 	var result NvmePublicInfo
 	err := json.Unmarshal([]byte(src.Public), &result)
 	if err != nil {

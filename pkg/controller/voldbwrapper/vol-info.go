@@ -9,7 +9,7 @@ import (
 const mainVolumeModule = "volume.json"
 
 type VolumeInfo struct {
-	MounterId     string            `json:"mount_id"`
+	ConnectorId   string            `json:"mount_id"`
 	TransportId   string            `json:"transport_id"`
 	VolumeContext map[string]string `json:"volume_context"`
 	AddressIds    []string          `json:"address_ids"`

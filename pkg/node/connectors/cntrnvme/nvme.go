@@ -1,4 +1,4 @@
-package mntrnvme
+package cntrnvme
 
 import (
 	"context"
@@ -9,24 +9,24 @@ import (
 	"time"
 
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
-type nvmeMounter struct {
+type nvmeConnector struct {
 	snip      NvmeSnippets
 	config    Config
 	devFolder string
 }
 
-func NewNvmeMounter(config Config, devFolder string) mounts.NodeMounter {
-	return &nvmeMounter{
+func New(config Config, devFolder string) connectors.Connector {
+	return &nvmeConnector{
 		snip:      newNvmeSnippets(config.NvmeCmd, devFolder, config.ParseKernelLog),
 		config:    config,
 		devFolder: devFolder,
 	}
 }
 
-func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
+func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
 	pc, err := ParsePublishContext(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -89,24 +89,24 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 		return nil, fmt.Errorf("nvme device not found: %s", namespaceDevicePath)
 	}
 
-	return &mounts.ConnectResult{
+	return &connectors.ConnectResult{
 		FolderPath: "",
 		Devices:    []string{namespaceDevicePath},
-		ManagedOps: mounts.ManagedOperations{
+		ManagedOps: connectors.ManagedOperations{
 			MountFs:   true,
 			UnmountFs: true,
 			ExpandFs:  true,
 		},
-		MounterData: VolumeData{
+		ConnectorData: VolumeData{
 			Nqn: pc.TargetNqn,
 		},
 	}, nil
 }
 
-func (m *nvmeMounter) Disconnect(ctx context.Context, serializedMounterData string) error {
-	vd, err := parseVolumeData(serializedMounterData)
+func (m *nvmeConnector) Disconnect(ctx context.Context, serializedConnectorData string) error {
+	vd, err := parseVolumeData(serializedConnectorData)
 	if err != nil {
-		return fmt.Errorf("parse serialized mounter data: %w", err)
+		return fmt.Errorf("parse serialized connector data: %w", err)
 	}
 
 	err = m.snip.Disconnect(ctx, vd.Nqn)
@@ -116,10 +116,10 @@ func (m *nvmeMounter) Disconnect(ctx context.Context, serializedMounterData stri
 	return nil
 }
 
-func (m *nvmeMounter) Expand(ctx context.Context, serializedMounterData string) error {
-	vd, err := parseVolumeData(serializedMounterData)
+func (m *nvmeConnector) Expand(ctx context.Context, serializedConnectorData string) error {
+	vd, err := parseVolumeData(serializedConnectorData)
 	if err != nil {
-		return fmt.Errorf("parse serialized mounter data: %w", err)
+		return fmt.Errorf("parse serialized connector data: %w", err)
 	}
 
 	err = m.snip.Rescan(ctx, vd.Nqn)

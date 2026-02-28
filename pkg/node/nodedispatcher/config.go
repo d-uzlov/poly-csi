@@ -10,7 +10,7 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/node/mounts/mounterfactory"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
@@ -27,7 +27,7 @@ type parsedConfig struct {
 	Encrypt    ParsedEncrypt
 	NodeInfoDb nodeconfig.NodeInfoDbConfig
 	Multipath  mpfactory.ParsedMultipath
-	Mounts     []*mounterfactory.ParsedMount
+	Mounts     []*connectorfactory.ParsedConnector
 	Networks   []nodeconfig.NodeNetworkConfig
 }
 
@@ -54,10 +54,10 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return nil, fmt.Errorf("load controller public key: %w", err)
 	}
 
-	ml := []*mounterfactory.ParsedMount{}
-	logger.Info(fmt.Sprintf("mounts in config: %d", len(config.Mounters)))
-	for i, v := range config.Mounters {
-		parsed := mounterfactory.ParseMount(ctx, v, config.DevFolder)
+	ml := []*connectorfactory.ParsedConnector{}
+	logger.Info(fmt.Sprintf("connectors in config: %d", len(config.Connectors)))
+	for i, v := range config.Connectors {
+		parsed := connectorfactory.ParseMount(ctx, v, config.DevFolder)
 		if parsed == nil {
 			logger.Info(fmt.Sprintf("parsing mount %d failed", i))
 			continue
@@ -77,9 +77,9 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		// }
 
 		if parsed.Valid {
-			logger.Info(fmt.Sprintf("successfully parsed mounter '%s'", parsed.Conf.Id))
+			logger.Info(fmt.Sprintf("successfully parsed connector '%s'", parsed.Conf.Id))
 		} else {
-			logger.Error(fmt.Sprintf("parsing mounter '%s' failed", parsed.Conf.Id))
+			logger.Error(fmt.Sprintf("parsing connector '%s' failed", parsed.Conf.Id))
 		}
 	}
 
@@ -117,7 +117,7 @@ func loadOrGenerateKey(filepath string) (*encrypt.RsaPrivateKey, error) {
 	return rsa, nil
 }
 
-func (c *parsedConfig) findMounterById(id string) *mounterfactory.ParsedMount {
+func (c *parsedConfig) findConnectorById(id string) *connectorfactory.ParsedConnector {
 	for _, v := range c.Mounts {
 		if v.Conf.Id == id {
 			return v

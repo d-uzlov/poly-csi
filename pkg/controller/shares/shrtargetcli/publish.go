@@ -7,8 +7,8 @@ import (
 
 	"github.com/thanhpk/randstr"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/mounts/mntriscsiadm"
+	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 )
 
 type publishData struct {
@@ -48,7 +48,7 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	if !sh.cmds.ready(ctx) {
 		return nil, fmt.Errorf("targetcli is not ready")
 	}
@@ -58,17 +58,17 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
-	iscsiInfo, err := mntriscsiadm.ParseIscsiInfo(mi)
+	iscsiInfo, err := cntriscsiadm.ParseIscsiInfo(mi)
 	if err != nil {
-		return nil, fmt.Errorf("parse mounter info as iscsi: %w", err)
+		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
 	}
 
-	chap := mntriscsiadm.ChapNone
+	chap := cntriscsiadm.ChapNone
 	if c.AuthType == authTypeChapProvision {
-		chap = mntriscsiadm.ChapFromPublishSecret
+		chap = cntriscsiadm.ChapFromPublishSecret
 	}
 	pc := map[string]string{}
-	err = mntriscsiadm.InjectPublishContext(pc, mntriscsiadm.IscsiPublishContext{
+	err = cntriscsiadm.InjectPublishContext(pc, cntriscsiadm.IscsiPublishContext{
 		Iqn:       c.Iqn,
 		Port:      c.Port,
 		Transport: c.Transport,
@@ -115,8 +115,8 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 	}
 	if acl == nil {
 		acl = &chapAcl{
-			client:     mntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
-			controller: mntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
+			client:     cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
+			controller: cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
 		}
 
 		err = snip.setupClientAcl(c.Iqn, iscsiInfo.HostIqn, *acl)

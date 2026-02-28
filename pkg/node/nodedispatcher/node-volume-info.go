@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
 )
 
@@ -18,21 +18,21 @@ type NodeVolumeInfo struct {
 	// Partially-initialized volumes have this as false.
 	// Initialized bool `json:"initialized"` // TODO make it useful or remove
 
-	// MounterId holds id of the mounter, to be used on disconnect and other operations.
-	MounterId string `json:"mounter_id"`
-	// MounterPath is a path to a folder,
-	// which was created to allow mounter to store data in filesystem
+	// ConnectorId holds id of the connector, to be used on disconnect and other operations.
+	ConnectorId string `json:"connector_id"`
+	// ConnectorPath is a path to a folder,
+	// which was created to allow connector to store data in filesystem
 	// or create mounts.
-	// TODO remove this? mounters should not manually store data in filesystem
-	MounterPath string `json:"mounter_path"`
+	// TODO remove this? connectors should not manually store data in filesystem
+	ConnectorPath string `json:"connector_path"`
 	// Folder path is a path to the main volume mount
 	FolderPath string `json:"folder_path"`
 	// SerializedMultipathData contains serialized data returned by multipath module
 	SerializedMultipathData string `json:"multipath_data"`
-	// ManagedOps is copied from mounter ConnectResult
-	ManagedOps mounts.ManagedOperations `json:"managed_ops"`
-	// ManagedOps contains serialized data returned by mounter connect
-	SerializedMounterData string `json:"mounter_data"`
+	// ManagedOps is copied from connector ConnectResult
+	ManagedOps connectors.ManagedOperations `json:"managed_ops"`
+	// ManagedOps contains serialized data returned by connector connect
+	SerializedConnectorData string `json:"connector_data"`
 
 	parentFolder           string   `json:"-"`
 	intermediateDeviceList []string `json:"-"`
@@ -41,7 +41,7 @@ type NodeVolumeInfo struct {
 // a bunch of constants defining file names at staging path
 const (
 	metadataFile     = "/mount-info.json"
-	mounterFolder    = "/mounter_staging"
+	connectorFolder  = "/connector_staging"
 	managedMountPath = "/fs_mount"
 )
 
@@ -90,17 +90,17 @@ func (v *NodeVolumeInfo) writeMetadataToDisk() error {
 	return os.WriteFile(v.parentFolder+metadataFile, encoded, 0660)
 }
 
-func (v *NodeVolumeInfo) mounterConnect(ctx context.Context, mounterId string, mounter mounts.NodeMounter, req mounts.ConnectRequest) error {
-	v.MounterId = mounterId
-	v.MounterPath = v.parentFolder + mounterFolder
-	req.StagingTargetPath = v.MounterPath
+func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connector connectors.Connector, req connectors.ConnectRequest) error {
+	v.ConnectorId = connectorId
+	v.ConnectorPath = v.parentFolder + connectorFolder
+	req.StagingTargetPath = v.ConnectorPath
 
-	err := os.MkdirAll(v.MounterPath, 0777)
+	err := os.MkdirAll(v.ConnectorPath, 0777)
 	if err != nil {
-		return fmt.Errorf("create folder for mounter staging: %w", err)
+		return fmt.Errorf("create folder for connector staging: %w", err)
 	}
 
-	cr, err := mounter.Connect(ctx, req)
+	cr, err := connector.Connect(ctx, req)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
@@ -110,17 +110,17 @@ func (v *NodeVolumeInfo) mounterConnect(ctx context.Context, mounterId string, m
 
 	v.ManagedOps = cr.ManagedOps
 
-	if cr.MounterData != nil {
-		if cr.SerializedMounterData != "" {
-			return fmt.Errorf("mounter has set both MounterData and SerializedMounterData")
+	if cr.ConnectorData != nil {
+		if cr.SerializedConnectorData != "" {
+			return fmt.Errorf("connector has set both ConnectorData and serializedConnectorData")
 		}
-		encoded, err := json.Marshal(cr.MounterData)
+		encoded, err := json.Marshal(cr.ConnectorData)
 		if err != nil {
-			return fmt.Errorf("serialize MounterData: %w", err)
+			return fmt.Errorf("serialize ConnectorData: %w", err)
 		}
-		v.SerializedMounterData = string(encoded)
+		v.SerializedConnectorData = string(encoded)
 	} else {
-		v.SerializedMounterData = cr.SerializedMounterData
+		v.SerializedConnectorData = cr.SerializedConnectorData
 	}
 
 	if cr.FolderPath != "" {
@@ -140,7 +140,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, mp multipath.Mult
 	}
 
 	if !v.ManagedOps.MountFs {
-		return fmt.Errorf("mounter did not set FolderPath and did not request automatic mount")
+		return fmt.Errorf("connector did not set FolderPath and did not request automatic mount")
 	}
 
 	// ensureDevicePath will setup multipath if needed
@@ -161,7 +161,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, mp multipath.Mult
 	return nil
 }
 
-func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, mounter mounts.NodeMounter) error {
+func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, connector connectors.Connector) error {
 	var err error
 
 	if v.ManagedOps.UnmountFs {
@@ -178,11 +178,11 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, mo
 	}
 	// logger.Info("ManagedOps: multipath disabled OK")
 
-	err = mounter.Disconnect(ctx, v.SerializedMounterData)
+	err = connector.Disconnect(ctx, v.SerializedConnectorData)
 	if err != nil {
-		return fmt.Errorf("mounter.Disconnect: %w", err)
+		return fmt.Errorf("connector.Disconnect: %w", err)
 	}
-	// logger.Info("mounter.Disconnect: success")
+	// logger.Info("connector.Disconnect: success")
 	if v.FolderPath != "" {
 		err = os.Remove(v.FolderPath)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -191,9 +191,9 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, mo
 		v.FolderPath = ""
 	}
 
-	err = os.Remove(v.MounterPath)
+	err = os.Remove(v.ConnectorPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("remove mounter staging dir: %w", err)
+		return fmt.Errorf("remove connector staging dir: %w", err)
 	}
 
 	return nil

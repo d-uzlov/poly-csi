@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/node/addropt"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
@@ -33,9 +33,9 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, status.Error(codes.InvalidArgument, "volume capability missing")
 	}
 
-	mounterId, ok := req.VolumeContext[mounts.MountIdKey]
+	connectorId, ok := req.VolumeContext[connectors.ConnectorIdKey]
 	if !ok {
-		return nil, fmt.Errorf("volume context: '%s' missing", mounts.MountIdKey)
+		return nil, fmt.Errorf("volume context: '%s' missing", connectors.ConnectorIdKey)
 	}
 
 	pcSecretEnc := req.PublishContext["_secret"]
@@ -56,16 +56,15 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}
 
-	mounter := n.findMounterById(mounterId)
-	if mounter == nil {
-		return nil, fmt.Errorf("mounter with id '%s' is not found", mounterId)
+	connector := n.findConnectorById(connectorId)
+	if connector == nil {
+		return nil, fmt.Errorf("connector with id '%s' is not found", connectorId)
 	}
-
 
 	nvi := newVolumeHandle(req.StagingTargetPath)
 	defer func() {
 		if err != nil {
-			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), mounter)
+			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), connector)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
 				logger.Error("failed to cleanup partially initialized volume", "error", err)
@@ -78,10 +77,10 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse address options from publish context: %w", err)
 	}
 
-	err = nvi.mounterConnect(ctx, mounterId, mounter, mounts.ConnectRequest{
-		AddressOptions:       addressOptions,
-		VolumeContext:        req.VolumeContext,
-		PublishContext:       req.PublishContext,
+	err = nvi.connect(ctx, connectorId, connector, connectors.ConnectRequest{
+		AddressOptions: addressOptions,
+		VolumeContext:  req.VolumeContext,
+		PublishContext: req.PublishContext,
 		// StagingTargetPath:    "", // StagingTargetPath is set automatically
 		AccessBlock:          req.VolumeCapability.GetBlock(),
 		AccessMount:          req.VolumeCapability.GetMount(),
@@ -89,9 +88,9 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		PublishContextSecret: pcSecret,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("connect via mounter[id=%s]: %w", mounterId, err)
+		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
 	}
-	logger.Info("mounter.Connect: success")
+	logger.Info("connector.Connect: success")
 
 	mountRequest := req.VolumeCapability.GetMount()
 	if mountRequest == nil {
@@ -100,7 +99,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 
 	err = nvi.ensureFolderPath(ctx, n.getMultipath(), mountRequest)
 	if err != nil {
-		return nil, fmt.Errorf("mounter[id=%s]: ensure folder path exists: %w", mounterId, err)
+		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", connectorId, err)
 	}
 
 	// nvi.Initialized = true
@@ -138,12 +137,12 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 		return nil, fmt.Errorf("node volume info is not found")
 	}
 
-	mounter := n.findMounterById(nvi.MounterId)
-	if mounter == nil {
-		return nil, fmt.Errorf("mounter with id '%s' is not found", nvi.MounterId)
+	connector := n.findConnectorById(nvi.ConnectorId)
+	if connector == nil {
+		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
 
-	err = nvi.cleanup(ctx, n.getMultipath(), mounter)
+	err = nvi.cleanup(ctx, n.getMultipath(), connector)
 	if err != nil {
 		return nil, fmt.Errorf("cleanup: %w", err)
 	}

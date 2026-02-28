@@ -6,7 +6,7 @@ serverConfig:
 
 devFolder: /host/dev
 
-mounter:
+connector:
   id: iscsi
   type: builtin
   subtype: iscsiadm

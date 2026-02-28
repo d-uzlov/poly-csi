@@ -1,4 +1,4 @@
-package mntriscsiadm
+package cntriscsiadm
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -14,7 +14,7 @@ type IscsiPublicInfo struct {
 	HostIqn string `json:"host_iqn"`
 }
 
-func (m *iscsiadmMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
+func (m *iscsiadmConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	iqn, err := parseIqn(ctx)
 	if err != nil {
 		return nil, err
@@ -27,13 +27,13 @@ func (m *iscsiadmMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo,
 		return nil, err
 	}
 
-	return &mounts.MounterNodeInfo{
+	return &connectors.ConnectorNodeInfo{
 		Public: string(public),
 		Secret: "",
 	}, nil
 }
 
-func ParseIscsiInfo(src mounts.MounterNodeInfo) (IscsiPublicInfo, error) {
+func ParseIscsiInfo(src connectors.ConnectorNodeInfo) (IscsiPublicInfo, error) {
 	var result IscsiPublicInfo
 	err := json.Unmarshal([]byte(src.Public), &result)
 	if err != nil {

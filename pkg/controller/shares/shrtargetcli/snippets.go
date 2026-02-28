@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/mounts/mntriscsiadm"
+	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -157,8 +157,8 @@ func (s targetcliSnippets) deleteTarget(subsysConfig iscsiTargetConfig) error {
 }
 
 type chapAcl struct {
-	client     mntriscsiadm.Chap
-	controller mntriscsiadm.Chap
+	client     cntriscsiadm.Chap
+	controller cntriscsiadm.Chap
 }
 
 func (s targetcliSnippets) readClientAcl(targetIqn string, clientIqn string) (*chapAcl, error) {
@@ -174,7 +174,7 @@ func (s targetcliSnippets) readClientAcl(targetIqn string, clientIqn string) (*c
 	if user == "" || pass == "" {
 		return nil, nil
 	}
-	client := mntriscsiadm.Chap{User: user, Pass: pass}
+	client := cntriscsiadm.Chap{User: user, Pass: pass}
 
 	path = fmt.Sprintf("/iscsi/%s/tpg1", targetIqn)
 	user, err = s.readAttribute(path, "auth", "mutual_userid")
@@ -188,7 +188,7 @@ func (s targetcliSnippets) readClientAcl(targetIqn string, clientIqn string) (*c
 	if user == "" || pass == "" {
 		return nil, nil
 	}
-	controller := mntriscsiadm.Chap{User: user, Pass: pass}
+	controller := cntriscsiadm.Chap{User: user, Pass: pass}
 
 	return &chapAcl{
 		client:     client,

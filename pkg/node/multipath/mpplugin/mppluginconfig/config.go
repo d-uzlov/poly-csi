@@ -20,7 +20,7 @@ type Config struct {
 
 type parsedConfig struct {
 	InflateServer mppluginfactory.Inflate
-	Mounter       *mpfactory.ParsedMultipath
+	Multipath     *mpfactory.ParsedMultipath
 }
 
 func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
@@ -49,7 +49,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 
 	pm := mpfactory.ParseMultipath(ctx, config.Multipath, config.DevFolder)
 	if pm == nil {
-		return nil, fmt.Errorf("mounterfactory.ParseMount failed")
+		return nil, fmt.Errorf("mpfactory.ParseMount failed")
 	}
 
 	// el, wl := parsed.Validate()
@@ -70,7 +70,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	}
 
 	return &parsedConfig{
-		Mounter:       pm,
+		Multipath:     pm,
 		InflateServer: inflateServer,
 	}, nil
 }

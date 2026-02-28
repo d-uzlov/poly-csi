@@ -10,7 +10,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
@@ -55,7 +55,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		panic(err.Error())
 	}
 
-	mounts := map[string]mounts.NodeMounter{}
+	mounts := map[string]connectors.Connector{}
 	for _, v := range newConf.Mounts {
 		if !v.Valid {
 			continue
@@ -97,11 +97,11 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 	return nil
 }
 
-func (n *Node) findMounterById(id string) mounts.NodeMounter {
+func (n *Node) findConnectorById(id string) connectors.Connector {
 	n.confMutex.RLock()
 	defer n.confMutex.RUnlock()
 
-	res := n.conf.findMounterById(id)
+	res := n.conf.findConnectorById(id)
 	if res == nil {
 		return nil
 	}

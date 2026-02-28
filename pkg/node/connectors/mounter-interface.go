@@ -1,4 +1,4 @@
-package mounts
+package connectors
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 )
 
 const (
-	MountIdKey = "mounter_id"
+	ConnectorIdKey = "connector_id"
 )
 
-type NodeMounter interface {
-	GetInfo(ctx context.Context) (*MounterNodeInfo, error)
+type Connector interface {
+	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
 	Connect(ctx context.Context, req ConnectRequest) (*ConnectResult, error)
-	Disconnect(ctx context.Context, serializedMounterData string) error
-	Expand(ctx context.Context, serializedMounterData string) error
+	Disconnect(ctx context.Context, serializedData string) error
+	Expand(ctx context.Context, serializedData string) error
 }
 
 // ConnectRequest is mostly equivalent to csi.NodeStageVolumeRequest
@@ -40,16 +40,16 @@ type ConnectResult struct {
 	// If FolderPath is empty, Devices must contain at least one value AND ManagedOps.MountFs must be set.
 	// When the list contains more than one device, node dispatcher will use multipathd to set up united device.
 	Devices []string `json:"device_path"`
-	// ManagedOps is a set of requests from mounter to node dispatcher
-	// which allows mounter to skip various generic operations.
+	// ManagedOps is a set of requests from connector to node dispatcher
+	// which allows connector to skip various generic operations.
 	ManagedOps ManagedOperations `json:"managed_operations"`
 
-	// MounterData and SerializedMounterData are mutually exclusive options for mounter data storage.
-	// When MounterData is set, dispatcher will try to use JSON serialization to create SerializedMounterData.
-	MounterData any `json:"-"`
-	// SerializedMounterData is data passed to later requests to mounter.
-	// It can be automatically populated from MounterData.
-	SerializedMounterData string `json:"mounter_data"`
+	// ConnectorData and SerializedConnectorData are mutually exclusive options for connector data storage.
+	// When ConnectorData is set, dispatcher will try to use JSON serialization to create SerializedConnectorData.
+	ConnectorData any `json:"-"`
+	// SerializedConnectorData is data passed to later requests to connector.
+	// It can be automatically populated from ConnectorData.
+	SerializedConnectorData string `json:"connector_data"`
 }
 
 type ManagedOperations struct {

@@ -4,13 +4,13 @@ import (
 	"context"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
 type ShareManager interface {
 	GetCapabilities() Capabilities
 	CreateShare(ctx context.Context, req CreateShareRequest) (shareData string, err error)
-	Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*PublishContext, error)
+	Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
 	Unpublish(ctx context.Context, shareData string, serialized string) error
 	UnpublishAll(ctx context.Context, shareData string) error
 	DeleteShare(ctx context.Context, shareData string) error

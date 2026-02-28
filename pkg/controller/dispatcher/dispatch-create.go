@@ -17,7 +17,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -429,7 +429,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}()
 
 	volumeContext := map[string]string{}
-	volumeContext[mounts.MountIdKey] = dispatchParams.mounterId
+	volumeContext[connectors.ConnectorIdKey] = dispatchParams.connectorId
 	volumeContext["uuid"] = uuidString
 
 	var addressIds []string
@@ -449,7 +449,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	wrapped := voldbwrapper.New(dbEntry)
 	// TODO save req.VolumeContentSource
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
-		MounterId:     dispatchParams.mounterId,
+		ConnectorId:   dispatchParams.connectorId,
 		TransportId:   srv.conf.StableId,
 		VolumeContext: volumeContext,
 		AddressIds:    addressIds,

@@ -6,12 +6,12 @@ import (
 )
 
 type DispatchParams struct {
-	onFailPolicy      string
+	onFailPolicy      string // TODO use ?
 	storageType       string
 	storageIdTemplate string
 	shareType         string
 	shareIdTemplate   string
-	mounterId         string
+	connectorId       string
 	addressNames      string
 	serverName        string
 }
@@ -23,7 +23,7 @@ const (
 	keyStorageIdTemplate = "dispatch.storageIdTemplate"
 	keyShareType         = "dispatch.shareType"
 	keyShareIdTemplate   = "dispatch.shareIdTemplate"
-	keyMounterId         = "dispatch.mounterId"
+	keyConnectorId       = "dispatch.connectorId"
 	keyAddressNames      = "dispatch.addressNames"
 	keyServerName        = "dispatch.serverName"
 )
@@ -51,8 +51,8 @@ func parseDispatchParams(global map[string]string, static map[string]string, mut
 			result.shareType = v
 		case keyShareIdTemplate:
 			result.shareIdTemplate = v
-		case keyMounterId:
-			result.mounterId = v
+		case keyConnectorId:
+			result.connectorId = v
 		case keyAddressNames:
 			result.addressNames = v
 		case keyServerName:
@@ -74,8 +74,8 @@ func parseDispatchParams(global map[string]string, static map[string]string, mut
 	if result.shareType == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyShareType)
 	}
-	if result.mounterId == "" {
-		return DispatchParams{}, fmt.Errorf("missing %s", keyMounterId)
+	if result.connectorId == "" {
+		return DispatchParams{}, fmt.Errorf("missing %s", keyConnectorId)
 	}
 	if result.addressNames == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyAddressNames)

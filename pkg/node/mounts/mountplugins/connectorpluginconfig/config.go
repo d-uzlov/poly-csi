@@ -1,4 +1,4 @@
-package mountpluginconfig
+package connectorpluginconfig
 
 import (
 	"bytes"
@@ -7,20 +7,20 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/node/mounts/mounterfactory"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/mountpluginfactory"
 )
 
 type Config struct {
-	ServerType   string                      `yaml:"serverType"`
-	ServerConfig map[string]any              `yaml:"serverConfig"`
-	Mounter      *mounterfactory.MountConfig `yaml:"mounter"`
-	DevFolder    string                      `yaml:"devFolder"`
+	ServerType   string                        `yaml:"serverType"`
+	ServerConfig map[string]any                `yaml:"serverConfig"`
+	Connector    *connectorfactory.MountConfig `yaml:"connector"`
+	DevFolder    string                        `yaml:"devFolder"`
 }
 
 type parsedConfig struct {
 	InflateServer mountpluginfactory.Inflate
-	Mounter       *mounterfactory.ParsedMount
+	Connector     *connectorfactory.ParsedConnector
 }
 
 func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
@@ -47,9 +47,9 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return nil, fmt.Errorf("mountpluginfactory.PluginServerFromType: %w", err)
 	}
 
-	pm := mounterfactory.ParseMount(ctx, config.Mounter, config.DevFolder)
+	pm := connectorfactory.ParseMount(ctx, config.Connector, config.DevFolder)
 	if pm == nil {
-		return nil, fmt.Errorf("mounterfactory.ParseMount failed")
+		return nil, fmt.Errorf("connectorfactory.ParseMount failed")
 	}
 
 	// el, wl := parsed.Validate()
@@ -64,13 +64,13 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	// }
 
 	if pm.Valid {
-		logger.Info(fmt.Sprintf("successfully parsed mounter '%s'", pm.Conf.Id))
+		logger.Info(fmt.Sprintf("successfully parsed connector '%s'", pm.Conf.Id))
 	} else {
-		logger.Error(fmt.Sprintf("parsing mounter '%s' failed", pm.Conf.Id))
+		logger.Error(fmt.Sprintf("parsing connector '%s' failed", pm.Conf.Id))
 	}
 
 	return &parsedConfig{
-		Mounter:       pm,
+		Connector:     pm,
 		InflateServer: inflateServer,
 	}, nil
 }

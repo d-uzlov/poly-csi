@@ -1,4 +1,4 @@
-package mntriscsiadm
+package cntriscsiadm
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ const (
 )
 
 type IscsiPublishContext struct {
-	Iqn         string
-	Port        string
-	Transport   string
-	Chap        string
+	Iqn       string
+	Port      string
+	Transport string
+	Chap      string
 }
 
 func InjectPublishContext(dst map[string]string, src IscsiPublishContext) error {
@@ -53,10 +53,10 @@ func ParsePublishContext(src map[string]string) (IscsiPublishContext, error) {
 	}
 
 	return IscsiPublishContext{
-		Iqn:         nqn,
-		Port:        port,
-		Transport:   transport,
-		Chap:        chap,
+		Iqn:       nqn,
+		Port:      port,
+		Transport: transport,
+		Chap:      chap,
 	}, nil
 }
 

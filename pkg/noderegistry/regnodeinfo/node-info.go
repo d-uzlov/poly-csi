@@ -3,7 +3,7 @@ package regnodeinfo
 import (
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
 type RegNodeInfo struct {
@@ -11,26 +11,26 @@ type RegNodeInfo struct {
 	Data map[string]string `json:"data"`
 }
 
-func (ni *RegNodeInfo) SetMounterInfo(id string, info mounts.MounterNodeInfo, aesSecret []byte) error {
+func (ni *RegNodeInfo) SetConnectorInfo(id string, info connectors.ConnectorNodeInfo, aesSecret []byte) error {
 	if id == "" {
-		return fmt.Errorf("mounter info: id is empty")
+		return fmt.Errorf("connector info: id is empty")
 	}
 	serialized, err := info.Serialize(aesSecret)
 	if err != nil {
-		return fmt.Errorf("mounter %s: serialize failed: %w", id, err)
+		return fmt.Errorf("connector %s: serialize failed: %w", id, err)
 	}
-	mounterInfoKey := "mounter." + id
-	ni.Data[mounterInfoKey] = serialized
+	connectorInfoKey := "connector." + id
+	ni.Data[connectorInfoKey] = serialized
 	return nil
 }
 
-func (ni *RegNodeInfo) GetMounterInfo(mounterId string, aesSecret []byte) (*mounts.MounterNodeInfo, error) {
-	mounterInfoKey := "mounter." + mounterId
-	mountInfoRaw := ni.Data[mounterInfoKey]
+func (ni *RegNodeInfo) GetConnectorInfo(connectorId string, aesSecret []byte) (*connectors.ConnectorNodeInfo, error) {
+	connectorInfoKey := "connector." + connectorId
+	mountInfoRaw := ni.Data[connectorInfoKey]
 	if mountInfoRaw == "" {
-		return nil, fmt.Errorf("node_info: key '%s' missing", mounterInfoKey)
+		return nil, fmt.Errorf("node_info: key '%s' missing", connectorInfoKey)
 	}
-	mountInfo, err := mounts.DeserializeMounterNodeInfo(mountInfoRaw, aesSecret)
+	mountInfo, err := connectors.DeserializeConnectorNodeInfo(mountInfoRaw, aesSecret)
 	if err != nil {
 		return nil, err
 	}

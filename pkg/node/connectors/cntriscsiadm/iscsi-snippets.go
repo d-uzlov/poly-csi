@@ -1,4 +1,4 @@
-package mntriscsiadm
+package cntriscsiadm
 
 import (
 	"context"

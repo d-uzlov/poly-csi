@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"meoe.io/poly-csi/cmd/builtinplugin/config"
-	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/mountpluginconfig"
+	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/node/multipath/mpplugin/mppluginconfig"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
@@ -45,22 +45,22 @@ func main() {
 
 	serverDoneCh := make(chan struct{})
 	switch appConfig.PluginType {
-	case "mounter":
+	case "connector":
 		configContent, err := os.ReadFile(appConfig.ConfigPath)
 		if err != nil {
 			panic(err.Error())
 		}
-		conf, err := mountpluginconfig.ParseConfig(ctx, configContent)
+		conf, err := connectorpluginconfig.ParseConfig(ctx, configContent)
 		if err != nil {
 			panic(err.Error())
 		}
 
-		if !conf.Mounter.Valid {
-			panic("mounter config is not valid")
+		if !conf.Connector.Valid {
+			panic("connector config is not valid")
 		}
 
-		mounterInstance := conf.Mounter.Inflate()
-		serverInstance := conf.InflateServer(transport.MakeContext(ctx, tr), mounterInstance)
+		instance := conf.Connector.Inflate()
+		serverInstance := conf.InflateServer(transport.MakeContext(ctx, tr), instance)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {
@@ -80,11 +80,11 @@ func main() {
 			panic(err.Error())
 		}
 
-		if !conf.Mounter.Valid {
+		if !conf.Multipath.Valid {
 			panic("multipath config is not valid")
 		}
-		mounterInstance := conf.Mounter.Inflate()
-		serverInstance := conf.InflateServer(transport.MakeContext(ctx, tr), mounterInstance)
+		instance := conf.Multipath.Inflate()
+		serverInstance := conf.InflateServer(transport.MakeContext(ctx, tr), instance)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {

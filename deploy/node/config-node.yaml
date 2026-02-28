@@ -17,7 +17,7 @@ multipath:
   config:
     socket: /run/io.meoe.poly-csi/plugins/multipath-container/multipath.sock
 
-mounters:
+connectors:
 - id: nfs
   type: builtin
   subtype: nfs

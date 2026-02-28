@@ -18,7 +18,7 @@ func printVersion() {
 	}
 	buildInfo.Deps = nil
 
-	fmt.Println("node mounter plugin for poly-csi, using builtin components")
+	fmt.Println("node connector plugin for poly-csi, using builtin components")
 
 	if externalVersion != "" {
 		fmt.Println("version", externalVersion)

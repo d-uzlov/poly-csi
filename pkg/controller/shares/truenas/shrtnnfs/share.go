@@ -7,8 +7,8 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/truenas"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/mounts/mntrnfs"
+	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
 )
 
 type share struct {
@@ -57,14 +57,14 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	return c.serialize(), nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	c, err := parseShareData(shareData)
 	if err != nil {
 		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
 	pc := map[string]string{}
-	err = mntrnfs.InjectPublishContext(pc, mntrnfs.NfsMountContext{
+	err = cntrnfs.InjectPublishContext(pc, cntrnfs.NfsMountContext{
 		Path: c.Folder,
 	})
 	if err != nil {

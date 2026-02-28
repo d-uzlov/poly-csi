@@ -27,7 +27,7 @@ type ServerConfig struct {
 	Socket string `yaml:"socket"`
 }
 
-func NewServer(callCtx context.Context, config ServerConfig, mp multipath.Multipath, devFolder string) mountplugins.MounterPlugin {
+func NewServer(callCtx context.Context, config ServerConfig, mp multipath.Multipath, devFolder string) mountplugins.ConnectorPlugin {
 	return &Server{
 		callCtx:   callCtx,
 		config:    config,

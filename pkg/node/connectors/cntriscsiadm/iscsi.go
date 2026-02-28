@@ -1,4 +1,4 @@
-package mntriscsiadm
+package cntriscsiadm
 
 import (
 	"context"
@@ -6,23 +6,23 @@ import (
 	"time"
 
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-type iscsiadmMounter struct {
+type iscsiadmConnector struct {
 	config    Config
 	devFolder string
 }
 
-func NewIscsiadmMounter(config Config, devFolder string) mounts.NodeMounter {
-	return &iscsiadmMounter{
+func New(config Config, devFolder string) connectors.Connector {
+	return &iscsiadmConnector{
 		config:    config,
 		devFolder: devFolder,
 	}
 }
 
-func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
+func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
 	pc, err := ParsePublishContext(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -91,7 +91,7 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 	}
 	var devices []string
 	for _, v := range is {
-		deviceLink := fmt.Sprintf(m.devFolder + "/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
+		deviceLink := fmt.Sprintf(m.devFolder+"/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
 		// iscsi creates links in background, need to wait for it to appear
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
 			stat, err := tr.Cmds().Stat(ctx, deviceLink)
@@ -113,24 +113,24 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 	if len(devices) == 0 {
 		return nil, fmt.Errorf("iscsi device is not found: %s", combinedError)
 	}
-	return &mounts.ConnectResult{
+	return &connectors.ConnectResult{
 		FolderPath: "",
 		Devices:    devices,
-		ManagedOps: mounts.ManagedOperations{
+		ManagedOps: connectors.ManagedOperations{
 			MountFs:   true,
 			UnmountFs: true,
 			ExpandFs:  true,
 		},
-		MounterData: VolumeData{
+		ConnectorData: VolumeData{
 			Iqn: pc.Iqn,
 		},
 	}, nil
 }
 
-func (m *iscsiadmMounter) Disconnect(ctx context.Context, serializedMounterData string) error {
-	vd, err := parseVolumeData(serializedMounterData)
+func (m *iscsiadmConnector) Disconnect(ctx context.Context, serializedConnectorData string) error {
+	vd, err := parseVolumeData(serializedConnectorData)
 	if err != nil {
-		return fmt.Errorf("parse serialized mounter data: %w", err)
+		return fmt.Errorf("parse serialized connector data: %w", err)
 	}
 
 	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
@@ -148,7 +148,7 @@ func (m *iscsiadmMounter) Disconnect(ctx context.Context, serializedMounterData 
 	return nil
 }
 
-func (m *iscsiadmMounter) Expand(ctx context.Context, serializedMounterData string) error {
+func (m *iscsiadmConnector) Expand(ctx context.Context, serializedConnectorData string) error {
 	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
 	// TODO rescan only target devices?
 	err := snip.rescanAll()

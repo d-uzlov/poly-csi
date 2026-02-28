@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/mounts/mntrnvme"
+	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
@@ -48,7 +48,7 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	if !sh.cmds.ready(ctx) {
 		return nil, fmt.Errorf("nvmet is not ready")
 	}
@@ -59,9 +59,9 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 
 	snip := nvmet.NewSnippets(ctx, true)
 
-	nvmeInfo, err := mntrnvme.ParseNvmeInfo(mi)
+	nvmeInfo, err := cntrnvme.ParseNvmeInfo(mi)
 	if err != nil {
-		return nil, fmt.Errorf("parse mounter info as nvme: %w", err)
+		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
 	}
 	err = snip.ConfigureHost(nvmet.Host{
 		Nqn: nvmeInfo.HostNqn,
@@ -80,11 +80,11 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 	}
 
 	pc := map[string]string{}
-	err = mntrnvme.NvmePublishContext{
+	err = cntrnvme.NvmePublishContext{
 		TargetNqn:     c.Nqn,
 		HostNqn:       nvmeInfo.HostNqn,
 		HostId:        nvmeInfo.HostId,
-		AuthType:      mntrnvme.AuthTypeNqn,
+		AuthType:      cntrnvme.AuthTypeNqn,
 		ConnectPort:   c.Port,
 		TransportType: c.Transport,
 		IoQueues:      c.IoQueues,

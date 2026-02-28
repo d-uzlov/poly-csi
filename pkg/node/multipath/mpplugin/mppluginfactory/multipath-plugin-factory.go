@@ -10,7 +10,7 @@ import (
 	"meoe.io/poly-csi/pkg/node/multipath/mpplugin/mphttp"
 )
 
-type Inflate func(ctx context.Context, mp multipath.Multipath) mpplugin.MounterPlugin
+type Inflate func(ctx context.Context, mp multipath.Multipath) mpplugin.ConnectorPlugin
 
 func PluginServerFromType(serverType string, byteConfig []byte, devFolder string) (Inflate, error) {
 	switch serverType {
@@ -19,7 +19,7 @@ func PluginServerFromType(serverType string, byteConfig []byte, devFolder string
 		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
 			return nil, fmt.Errorf("parse %s config: %w", serverType, err)
 		}
-		return func(ctx context.Context, mp multipath.Multipath) mpplugin.MounterPlugin {
+		return func(ctx context.Context, mp multipath.Multipath) mpplugin.ConnectorPlugin {
 			return mphttp.NewServer(ctx, cfg, mp, devFolder)
 		}, nil
 	default:

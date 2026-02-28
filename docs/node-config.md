@@ -26,7 +26,7 @@ multipath:
   config:
     socket: /run/io.meoe.poly-csi/plugins/multipath-container/multipath.sock
 
-mounters:
+connectors:
 - id: nfs
   type: builtin
   subtype: nfs
@@ -96,34 +96,34 @@ config:
   socket: /run/io.meoe.poly-csi/plugins/multipath-container/multipath.sock
 ```
 
-The format is the same as `mounters`, except it uses different types:
+The format is the same as `connectors`, except it uses different types:
 
 - `builtin/none`: disable multipath
 - `builtin/local`: use local `multipath` binary
 - `plugin/http.json.dev`
 
-Multipath docs:
+If you want to learn more about underlying technology for Multipath, you can check out these links:
 - https://manpages.debian.org/testing/multipath-tools/multipath.conf.5.en.html
 - https://man.archlinux.org/man/multipath.conf.5.en
 
-## Mounters
+## Connectors
 
-`mounters` is a list of all possible ways a node can connect to storage.
+`connectors` is a list of all possible ways a node can connect to storage.
 
 Each entry in the list has the following structure:
 
 ```yaml
 id: example
 type: builtin
-subtype: actual_mounter_type
+subtype: actual_connector_type
 config:
   qwe: asd
 ```
 
-`id` is the main identifier of mounter.
+`id` is the main identifier of connector.
 It can be an arbitrary value, consisting of `0-9` digits, `a-z` lower case latin letters, or `-` dash symbols.
 
-`type + subtype` determine full mounter type.
+`type + subtype` determine full connector type.
 The following types are available:
 - `builtin`: various built-in components
 - - `builtin/nfs`: mount NFS shares
@@ -132,14 +132,14 @@ The following types are available:
 - `plugin`: delegate storage connection to external application
 - - `plugin/http.json.dev`
 
-`config` is an optional config for the mounter. Its content structure depends on mounter type.
+`config` is an optional config for the connector. Its content structure depends on connector type.
 
 ---
 
-When you create a new volume which is supposed to be used via iSCSI, for example, it does not automatically mean `builtin/iscsiadm` mounter.
-Volume must set the mounter `id` to `iscsi`, and then node looks up its list of supported mounters.
+When you create a new volume which is supposed to be used via iSCSI, for example, it does not automatically mean `builtin/iscsiadm` connector.
+Volume must set the connector `id` to `iscsi`, and then node looks up its list of supported connectors.
 
-In the example above `iscsi` mounter uses `plugin/http.json.dev` instead of `builtin/iscsiadm`.
+In the example above `iscsi` connector uses `plugin/http.json.dev` instead of `builtin/iscsiadm`.
 
-There are no restrictions on the list of mounters.
-You can configure several mounters for the same type of volumes, of completely disable some type by not listing it.
+There are no restrictions on the list of connectors.
+You can configure several connectors for the same type of volumes, of completely disable some type by not listing it.

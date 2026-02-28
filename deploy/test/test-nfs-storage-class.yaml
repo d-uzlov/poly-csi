@@ -14,7 +14,7 @@ parameters:
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.shareType: zfs-sharenfs
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.mounterId: nfs
+  dispatch.connectorId: nfs
   dispatch.addressNames: storage
   zfs.parentDataset: tulip/test-guid
   fsType: nfs4

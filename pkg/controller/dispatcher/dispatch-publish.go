@@ -68,15 +68,14 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: validation failed: %w", err)
 	}
 
-	logger.Warn("printing mounters", "value", ni.Mounters)
-	mountInfo, ok := ni.Mounters[mh.vi.MounterId]
+	mountInfo, ok := ni.Connectors[mh.vi.ConnectorId]
 	if !ok {
-		return nil, fmt.Errorf("node info does not list mounter %s", mh.vi.MounterId)
+		return nil, fmt.Errorf("node info does not list connector %s", mh.vi.ConnectorId)
 	}
 
 	pc, err := shrInstance.Publish(ctx, mh.vi.ShareData, mountInfo)
 	if err != nil {
-		return nil, fmt.Errorf("shareInstance.Publish to %s/%s: %w", req.NodeId, mh.vi.MounterId, err)
+		return nil, fmt.Errorf("shareInstance.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
 	}
 	logger.Info("share.Publish: success")
 	if pc == nil {

@@ -28,10 +28,10 @@ spec:
       # hostIPC: true
       # hostPID: false
       containers:
-      - name: iscsi-mounter
+      - name: iscsi-connector
         image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.57
         args:
-        - --plugin-type=mounter
+        - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml
         resources:
           limits:

@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/mounts"
-	"meoe.io/poly-csi/pkg/node/mounts/mntrnvme"
+	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -50,15 +50,15 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.MounterNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	c, err := parseShareData(shareData)
 	if err != nil {
 		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
-	nvmeInfo, err := mntrnvme.ParseNvmeInfo(mi)
+	nvmeInfo, err := cntrnvme.ParseNvmeInfo(mi)
 	if err != nil {
-		return nil, fmt.Errorf("parse mounter info as nvme: %w", err)
+		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
 	}
 
 	// todo this will create ephemeral one-use hosts on every publish
@@ -67,13 +67,13 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 	hostNqn := nvmeInfo.HostNqn + ":" + hostId
 
 	secret := map[string]string{}
-	mounterAuthType := ""
+	authType := ""
 
 	switch c.AuthType {
 	case authTypeNone:
 		// no need to configure hosts
 	case authTypeNqn:
-		mounterAuthType = mntrnvme.AuthTypeNqn
+		authType = cntrnvme.AuthTypeNqn
 
 		cmd := append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
 			Nqn:      hostNqn,
@@ -84,7 +84,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 			return nil, fmt.Errorf("host create: %w", err)
 		}
 	case authTypeChapProvision:
-		mounterAuthType = mntrnvme.AuthTypeDhChap
+		authType = cntrnvme.AuthTypeDhChap
 
 		cmd := []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
 		hostKey, err := transport.CheckedRunStdout(ctx, cmd)
@@ -103,7 +103,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 			return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
 		}
 
-		err = mntrnvme.NvmeSecrets{
+		err = cntrnvme.NvmeSecrets{
 			HostKey:       hostKey,
 			ControllerKey: controllerKey,
 		}.Inject(secret)
@@ -132,11 +132,11 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi mounts.Mounte
 	}
 
 	pc := map[string]string{}
-	err = mntrnvme.NvmePublishContext{
+	err = cntrnvme.NvmePublishContext{
 		TargetNqn:     c.Nqn,
 		HostNqn:       hostNqn,
 		HostId:        hostId,
-		AuthType:      mounterAuthType,
+		AuthType:      authType,
 		ConnectPort:   c.Port,
 		TransportType: c.Transport,
 		IoQueues:      c.IoQueues,

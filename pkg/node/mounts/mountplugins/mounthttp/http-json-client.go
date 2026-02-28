@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
 type client struct {
@@ -40,7 +40,7 @@ func (c *ClientConfig) Validate() error {
 	return nil
 }
 
-func NewHttpJsonMounterPlugin(config ClientConfig, devFolder string) mounts.NodeMounter {
+func NewHttpJsonConnectorPlugin(config ClientConfig, devFolder string) connectors.Connector {
 	httpClient := http.Client{
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
@@ -55,7 +55,7 @@ func NewHttpJsonMounterPlugin(config ClientConfig, devFolder string) mounts.Node
 	}
 }
 
-func (m *client) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
+func (m *client) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	resp, err := m.hc.Get("http://unix/get_info")
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (m *client) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
 	}
 	switch pr.Status {
 	case responseStatusOk:
-		var mni mounts.MounterNodeInfo
+		var mni connectors.ConnectorNodeInfo
 		err = json.Unmarshal([]byte(pr.Result), &mni)
 		if err != nil {
 			return nil, err
@@ -91,7 +91,7 @@ func (m *client) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
 
 }
 
-func (m *client) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
+func (m *client) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("http-json-client: marshal request: %w", err)
@@ -118,7 +118,7 @@ func (m *client) Connect(ctx context.Context, req mounts.ConnectRequest) (*mount
 	}
 	switch pr.Status {
 	case responseStatusOk:
-		var mc mounts.ConnectResult
+		var mc connectors.ConnectResult
 		err = json.Unmarshal([]byte(pr.Result), &mc)
 		if err != nil {
 			return nil, fmt.Errorf("http-json-client: unmarshal result: %w", err)
@@ -139,7 +139,7 @@ func (m *client) Connect(ctx context.Context, req mounts.ConnectRequest) (*mount
 	return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
 }
 
-func (m *client) Disconnect(ctx context.Context, serializedMounterData string) error {
+func (m *client) Disconnect(ctx context.Context, serializedConnectorData string) error {
 	// for k, v := range info.Devices {
 	// 	v, ok := strings.CutPrefix(v, m.config.DevPath)
 	// 	if !ok {
@@ -148,7 +148,7 @@ func (m *client) Disconnect(ctx context.Context, serializedMounterData string) e
 	// 	info.Devices[k] = v
 	// }
 
-	resp, err := m.hc.Post("http://unix/disconnect", "application/text", strings.NewReader(serializedMounterData))
+	resp, err := m.hc.Post("http://unix/disconnect", "application/text", strings.NewReader(serializedConnectorData))
 	if err != nil {
 		return fmt.Errorf("http-json-client: post /disconnect: %w", err)
 	}
@@ -176,8 +176,8 @@ func (m *client) Disconnect(ctx context.Context, serializedMounterData string) e
 	return fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
 }
 
-func (m *client) Expand(ctx context.Context, serializedMounterData string) error {
-	resp, err := m.hc.Post("http://unix/expand", "application/json", strings.NewReader(serializedMounterData))
+func (m *client) Expand(ctx context.Context, serializedConnectorData string) error {
+	resp, err := m.hc.Post("http://unix/expand", "application/json", strings.NewReader(serializedConnectorData))
 	if err != nil {
 		return fmt.Errorf("http-json-client: post /expand: %w", err)
 	}

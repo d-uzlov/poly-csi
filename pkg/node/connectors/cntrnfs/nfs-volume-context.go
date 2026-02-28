@@ -1,11 +1,11 @@
-package mntrnfs
+package cntrnfs
 
 import (
 	"fmt"
 )
 
 type NfsMountContext struct {
-	Path    string
+	Path string
 }
 
 func InjectPublishContext(dst map[string]string, src NfsMountContext) error {
@@ -19,6 +19,6 @@ func ParsePublishContext(vc map[string]string) (NfsMountContext, error) {
 		return NfsMountContext{}, fmt.Errorf("volume_context: 'nfs.share_path': field is empty")
 	}
 	return NfsMountContext{
-		Path:    share,
+		Path: share,
 	}, nil
 }

@@ -1,28 +1,28 @@
-package mntrnfs
+package cntrnfs
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 )
 
-type nfsMounter struct {
+type nfsConnector struct {
 }
 
-func NewNfsMounter() mounts.NodeMounter {
-	return &nfsMounter{}
+func New() connectors.Connector {
+	return &nfsConnector{}
 }
 
 const nfsMountSuffix = "/nfs_mount"
 
-func (m *nfsMounter) GetInfo(ctx context.Context) (*mounts.MounterNodeInfo, error) {
-	return &mounts.MounterNodeInfo{}, nil
+func (m *nfsConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*mounts.ConnectResult, error) {
+func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
 	pc, err := ParsePublishContext(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -31,7 +31,7 @@ func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*m
 		return nil, fmt.Errorf("nfs does not support block mounting")
 	}
 	if len(req.AddressOptions) != 1 {
-		return nil, fmt.Errorf("nfs mounter does not support more than one address")
+		return nil, fmt.Errorf("nfs connector does not support more than one address")
 	}
 	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
 
@@ -47,9 +47,9 @@ func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*m
 		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, nfsPath, mi.MountPoint)
 	}
 
-	return &mounts.ConnectResult{
+	return &connectors.ConnectResult{
 		FolderPath: mountTarget,
-		ManagedOps: mounts.ManagedOperations{
+		ManagedOps: connectors.ManagedOperations{
 			MountFs:   false,
 			UnmountFs: true,
 			ExpandFs:  false,
@@ -57,12 +57,12 @@ func (m *nfsMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*m
 	}, nil
 }
 
-func (m *nfsMounter) Disconnect(ctx context.Context, serializedMounterData string) error {
+func (m *nfsConnector) Disconnect(ctx context.Context, serializedConnectorData string) error {
 	// unmount is managed externally
 	return nil
 }
 
-func (m *nfsMounter) Expand(ctx context.Context, serializedMounterData string) error {
+func (m *nfsConnector) Expand(ctx context.Context, serializedConnectorData string) error {
 	// nfs volumes don't need expanding
 	return nil
 }

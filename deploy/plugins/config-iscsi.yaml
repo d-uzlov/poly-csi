@@ -4,10 +4,12 @@ serverConfig:
   socket: /run/io.meoe.poly-csi/plugins/iscsi/iscsi.sock
   # socket: ./iscsi.sock
 
-mounter:
+devFolder: /dev
+
+connector:
   id: iscsi
   type: builtin
   subtype: iscsi
   config:
-    # iscsiadmCommand: chroot /host iscsiadm
+    iscsiadmCmd: [ "iscsiadm" ]
     iscsiadmCommand: iscsiadm

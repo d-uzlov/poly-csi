@@ -12,13 +12,13 @@ import (
 	"time"
 
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/mounts/mountplugins"
 )
 
 type Server struct {
 	config    ServerConfig
-	mounter   mounts.NodeMounter
+	connector connectors.Connector
 	callCtx   context.Context
 	handlers  map[string]handler
 	devFolder string
@@ -44,11 +44,11 @@ type ServerConfig struct {
 	Socket string `yaml:"socket"`
 }
 
-func NewServer(callCtx context.Context, config ServerConfig, mounter mounts.NodeMounter, devFolder string) mountplugins.MounterPlugin {
+func NewServer(callCtx context.Context, config ServerConfig, connector connectors.Connector, devFolder string) mountplugins.ConnectorPlugin {
 	return &Server{
 		callCtx:   callCtx,
 		config:    config,
-		mounter:   mounter,
+		connector: connector,
 		handlers:  map[string]handler{},
 		devFolder: devFolder,
 	}
@@ -149,14 +149,14 @@ func (s *Server) handle(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) handleGetInfo(ctx context.Context, body string) (result any, err error) {
-	return s.mounter.GetInfo(s.callCtx)
+	return s.connector.GetInfo(s.callCtx)
 }
 
 func (s *Server) handleConnect(ctx context.Context, body string) (result any, err error) {
 	// TODO move logger to interface
 	logger := slogctx.FromCtx(s.callCtx).With("method", "connect")
 
-	var cr mounts.ConnectRequest
+	var cr connectors.ConnectRequest
 
 	dec := json.NewDecoder(bytes.NewReader([]byte(body)))
 	dec.DisallowUnknownFields()
@@ -166,7 +166,7 @@ func (s *Server) handleConnect(ctx context.Context, body string) (result any, er
 		return nil, fmt.Errorf("decode request body: %w", err)
 	}
 	logger.Info("new request", "request", cr)
-	mc, err := s.mounter.Connect(s.callCtx, cr)
+	mc, err := s.connector.Connect(s.callCtx, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -179,16 +179,16 @@ func (s *Server) handleConnect(ctx context.Context, body string) (result any, er
 		}
 	}
 
-	if mc.MounterData != nil {
-		if mc.SerializedMounterData != "" {
-			return nil, fmt.Errorf("mounter set both MounterData and SerializedMounterData")
+	if mc.ConnectorData != nil {
+		if mc.SerializedConnectorData != "" {
+			return nil, fmt.Errorf("connector set both ConnectorData and serializedConnectorData")
 		}
-		encoded, err := json.Marshal(mc.MounterData)
+		encoded, err := json.Marshal(mc.ConnectorData)
 		if err != nil {
-			return nil, fmt.Errorf("serialize MounterData: %w", err)
+			return nil, fmt.Errorf("serialize ConnectorData: %w", err)
 		}
-		mc.SerializedMounterData = string(encoded)
-		mc.MounterData = nil
+		mc.SerializedConnectorData = string(encoded)
+		mc.ConnectorData = nil
 	}
 
 	return mc, nil
@@ -198,7 +198,7 @@ func (s *Server) handleDisconnect(ctx context.Context, body string) (result any,
 	logger := slogctx.FromCtx(s.callCtx).With("method", "disconnect")
 
 	logger.Info("new request", "request", body)
-	err = s.mounter.Disconnect(s.callCtx, body)
+	err = s.connector.Disconnect(s.callCtx, body)
 	return nil, err
 }
 
@@ -206,6 +206,6 @@ func (s *Server) handleExpand(ctx context.Context, body string) (result any, err
 	logger := slogctx.FromCtx(s.callCtx).With("method", "expand")
 
 	logger.Info("new request", "request", body)
-	err = s.mounter.Expand(s.callCtx, body)
+	err = s.connector.Expand(s.callCtx, body)
 	return nil, err
 }

@@ -1,4 +1,4 @@
-package mounts
+package connectors
 
 import (
 	"encoding/base64"
@@ -8,16 +8,16 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-type MounterNodeInfo struct {
+type ConnectorNodeInfo struct {
 	Public string `json:"public"`
 	Secret string `json:"secret"`
 }
 
-func (m MounterNodeInfo) Serialize(aesSecret []byte) (string, error) {
+func (m ConnectorNodeInfo) Serialize(aesSecret []byte) (string, error) {
 	secret := ""
 	if m.Secret != "" {
 		if aesSecret == nil {
-			return "", fmt.Errorf("mounter has secret values but aesSecret is missing")
+			return "", fmt.Errorf("connector has secret values but aesSecret is missing")
 		}
 		ciphertext, err := encrypt.EncryptAes(aesSecret, m.Secret)
 		if err != nil {
@@ -25,7 +25,7 @@ func (m MounterNodeInfo) Serialize(aesSecret []byte) (string, error) {
 		}
 		secret = base64.StdEncoding.EncodeToString(ciphertext)
 	}
-	encoded, err := json.Marshal(MounterNodeInfo{
+	encoded, err := json.Marshal(ConnectorNodeInfo{
 		Public: m.Public,
 		Secret: secret,
 	})
@@ -35,26 +35,26 @@ func (m MounterNodeInfo) Serialize(aesSecret []byte) (string, error) {
 	return string(encoded), nil
 }
 
-func DeserializeMounterNodeInfo(raw string, aesSecret []byte) (MounterNodeInfo, error) {
-	var result MounterNodeInfo
+func DeserializeConnectorNodeInfo(raw string, aesSecret []byte) (ConnectorNodeInfo, error) {
+	var result ConnectorNodeInfo
 	err := json.Unmarshal([]byte(raw), &result)
 	if err != nil {
-		return MounterNodeInfo{}, err
+		return ConnectorNodeInfo{}, err
 	}
 
 	if aesSecret == nil || result.Secret == "" {
-		return MounterNodeInfo{
+		return ConnectorNodeInfo{
 			Public: result.Public,
 			Secret: "",
 		}, nil
 	}
 	ciphertext, err := base64.StdEncoding.DecodeString(result.Secret)
 	if err != nil {
-		return MounterNodeInfo{}, fmt.Errorf("parse base64: %w", err)
+		return ConnectorNodeInfo{}, fmt.Errorf("parse base64: %w", err)
 	}
 	plaintext, err := encrypt.DecryptAes(aesSecret, ciphertext)
 	if err != nil {
-		return MounterNodeInfo{}, fmt.Errorf("decrypt: %w", err)
+		return ConnectorNodeInfo{}, fmt.Errorf("decrypt: %w", err)
 	}
 	result.Secret = string(plaintext)
 	return result, nil

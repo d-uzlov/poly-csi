@@ -5,6 +5,6 @@ import (
 	"time"
 )
 
-type MounterPlugin interface {
+type ConnectorPlugin interface {
 	StartServe(ctx context.Context, shutdownTimeout time.Duration, doneCallback func(error))
 }

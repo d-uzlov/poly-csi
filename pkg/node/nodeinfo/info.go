@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/mounts"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 type NodeInfo struct {
-	Id           string                            `json:"id"`
-	PublicKey    *encrypt.RsaPublicKey             `json:"public_key"`
-	HasMultipath bool                              `json:"has_multipath"`
-	Mounters     map[string]mounts.MounterNodeInfo `json:"mounters"`
-	Ips          []string                          `json:"ips"`
+	Id           string                                  `json:"id"`
+	PublicKey    *encrypt.RsaPublicKey                   `json:"public_key"`
+	HasMultipath bool                                    `json:"has_multipath"`
+	Connectors   map[string]connectors.ConnectorNodeInfo `json:"connectors"`
+	Ips          []string                                `json:"ips"`
 }
 
 func (ni *NodeInfo) Validate() error {
@@ -36,12 +36,12 @@ func (ni *NodeInfo) Serialize(remotePubKey encrypt.RsaPublicKey, aesSecret []byt
 	if ni.HasMultipath {
 		result["has_multipath"] = "1"
 	}
-	for k, v := range ni.Mounters {
+	for k, v := range ni.Connectors {
 		serialized, err := v.Serialize(aesSecret)
 		if err != nil {
-			return nil, fmt.Errorf("mounter %s: serialize failed: %w", k, err)
+			return nil, fmt.Errorf("connector %s: serialize failed: %w", k, err)
 		}
-		key := "mounter." + k
+		key := "connector." + k
 		result[key] = serialized
 	}
 
@@ -57,7 +57,7 @@ func ParseNodeInfo(src map[string]string, privateKey encrypt.RsaPrivateKey) (*No
 	}
 
 	result := NodeInfo{
-		Mounters: map[string]mounts.MounterNodeInfo{},
+		Connectors: map[string]connectors.ConnectorNodeInfo{},
 	}
 	for k, v := range src {
 		switch k {
@@ -79,13 +79,13 @@ func ParseNodeInfo(src map[string]string, privateKey encrypt.RsaPrivateKey) (*No
 		case "ips":
 			result.Ips = strings.Fields(v)
 		}
-		mounterId, foundMounter := strings.CutPrefix(k, "mounter.")
-		if foundMounter {
-			mountInfo, err := mounts.DeserializeMounterNodeInfo(v, aesSecret)
+		connectorId, foundConnector := strings.CutPrefix(k, "connector.")
+		if foundConnector {
+			mountInfo, err := connectors.DeserializeConnectorNodeInfo(v, aesSecret)
 			if err != nil {
-				return nil, fmt.Errorf("deserialize mounter %s info: %w", mounterId, err)
+				return nil, fmt.Errorf("deserialize connector %s info: %w", connectorId, err)
 			}
-			result.Mounters[mounterId] = mountInfo
+			result.Connectors[connectorId] = mountInfo
 			continue
 		}
 		// TODO add logs for ignored fields?
