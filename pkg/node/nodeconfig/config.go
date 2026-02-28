@@ -13,6 +13,7 @@ type NodeConfig struct {
 	Multipath  mpfactory.MultipathConfig     `yaml:"multipath"`
 	Mounters   []*mounterfactory.MountConfig `yaml:"mounters"`
 	Networks   []NodeNetworkConfig           `yaml:"networks"`
+	DevFolder  string                        `yaml:"devFolder"`
 }
 
 type NodeInfoDbConfig struct {

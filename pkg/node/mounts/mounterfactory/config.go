@@ -21,7 +21,7 @@ type ParsedMount struct {
 	Conf    *MountConfig
 }
 
-func ParseMount(ctx context.Context, c *MountConfig) *ParsedMount {
+func ParseMount(ctx context.Context, c *MountConfig, devFolder string) *ParsedMount {
 	logger := slogctx.FromCtx(ctx)
 
 	if c.Type == "" {
@@ -41,7 +41,7 @@ func ParseMount(ctx context.Context, c *MountConfig) *ParsedMount {
 		}
 	}
 
-	inflater, err := GetByType(c.Type, c.Subtype, byteConfig)
+	inflater, err := GetByType(c.Type, c.Subtype, byteConfig, devFolder)
 	if err != nil {
 		logger.Error("mount_config: could not create", "id", c.Id, "error", err)
 		return &ParsedMount{

@@ -26,7 +26,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.56
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.57
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -50,9 +50,6 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: spec.nodeName
-        # prevent crazy error messages due to the /dev host mount
-        terminationMessagePath: /tmp/termination-log
-        terminationMessagePolicy: File
         volumeMounts:
         - mountPath: /csi-data
           name: socket-dir

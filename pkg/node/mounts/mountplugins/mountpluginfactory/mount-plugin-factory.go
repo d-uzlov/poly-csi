@@ -12,7 +12,7 @@ import (
 
 type Inflate func(ctx context.Context, mounter mounts.NodeMounter) mountplugins.MounterPlugin
 
-func PluginServerFromType(serverType string, byteConfig []byte) (Inflate, error) {
+func PluginServerFromType(serverType string, byteConfig []byte, devFolder string) (Inflate, error) {
 	switch serverType {
 	case "http-json":
 		var cfg mounthttp.ServerConfig
@@ -20,7 +20,7 @@ func PluginServerFromType(serverType string, byteConfig []byte) (Inflate, error)
 			return nil, fmt.Errorf("parse %s config: %w", serverType, err)
 		}
 		return func(ctx context.Context, mounter mounts.NodeMounter) mountplugins.MounterPlugin {
-			return mounthttp.NewServer(ctx, cfg, mounter)
+			return mounthttp.NewServer(ctx, cfg, mounter, devFolder)
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown server type: %s", serverType)

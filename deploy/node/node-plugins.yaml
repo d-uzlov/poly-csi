@@ -29,7 +29,7 @@ spec:
       # hostPID: false
       containers:
       - name: iscsi-mounter
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.55
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.57
         args:
         - --plugin-type=mounter
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -50,26 +50,15 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: spec.nodeName
-        # prevent crazy error messages due to the /dev host mount
-        terminationMessagePath: /tmp/termination-log
-        terminationMessagePolicy: File
         volumeMounts:
         - mountPath: /var/lib/kubelet
           name: kubelet-dir
           mountPropagation: Bidirectional
-        # - mountPath: /lib/modules
-        #   name: modules-dir
-        #   readOnly: true
-        #   readOnly: true
-        # - mountPath: /run/udev
-        #   name: udev-data
         - mountPath: /host
           name: host-dir
           mountPropagation: Bidirectional
         - mountPath: /sys
           name: sys-dir
-        - mountPath: /dev
-          name: dev-dir
         - mountPath: /poly-csi/iscsi-config
           name: iscsi-config
         - mountPath: /run/io.meoe.poly-csi/plugins/iscsi-container
@@ -82,7 +71,7 @@ spec:
           subPath: etc/iscsi/
 
       - name: multipath
-        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.55
+        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.57
         args:
         - --plugin-type=multipath
         - --node-config=/poly-csi/multipath-config/config.yaml

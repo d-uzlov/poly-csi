@@ -15,6 +15,7 @@ type Config struct {
 	ServerType   string                      `yaml:"serverType"`
 	ServerConfig map[string]any              `yaml:"serverConfig"`
 	Mounter      *mounterfactory.MountConfig `yaml:"mounter"`
+	DevFolder    string                      `yaml:"devFolder"`
 }
 
 type parsedConfig struct {
@@ -41,12 +42,12 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return nil, fmt.Errorf("marshal server config: %w", err)
 	}
 
-	inflateServer, err := mountpluginfactory.PluginServerFromType(config.ServerType, serverByteConfig)
+	inflateServer, err := mountpluginfactory.PluginServerFromType(config.ServerType, serverByteConfig, config.DevFolder)
 	if err != nil {
 		return nil, fmt.Errorf("mountpluginfactory.PluginServerFromType: %w", err)
 	}
 
-	pm := mounterfactory.ParseMount(ctx, config.Mounter)
+	pm := mounterfactory.ParseMount(ctx, config.Mounter, config.DevFolder)
 	if pm == nil {
 		return nil, fmt.Errorf("mounterfactory.ParseMount failed")
 	}

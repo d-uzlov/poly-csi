@@ -12,7 +12,7 @@ import (
 
 type Inflate func(ctx context.Context, mp multipath.Multipath) mpplugin.MounterPlugin
 
-func PluginServerFromType(serverType string, byteConfig []byte) (Inflate, error) {
+func PluginServerFromType(serverType string, byteConfig []byte, devFolder string) (Inflate, error) {
 	switch serverType {
 	case "http-json":
 		var cfg mphttp.ServerConfig
@@ -20,7 +20,7 @@ func PluginServerFromType(serverType string, byteConfig []byte) (Inflate, error)
 			return nil, fmt.Errorf("parse %s config: %w", serverType, err)
 		}
 		return func(ctx context.Context, mp multipath.Multipath) mpplugin.MounterPlugin {
-			return mphttp.NewServer(ctx, cfg, mp)
+			return mphttp.NewServer(ctx, cfg, mp, devFolder)
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown server type: %s", serverType)

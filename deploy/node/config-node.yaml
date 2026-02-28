@@ -8,6 +8,8 @@ encrypt:
   controllerPublicKey:
     path: /poly-csi/controller/controller_key.pub.pem
 
+devFolder: /host/dev
+
 multipath:
   id: multipath
   type: plugin
@@ -25,7 +27,6 @@ mounters:
   config:
     nvmeCmd: [ "nvme" ]
     parseKernelLog: true
-    devFolder: /host/dev
 - id: iscsi
   type: plugin
   subtype: http.json.dev

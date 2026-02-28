@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -16,20 +17,22 @@ import (
 )
 
 type Server struct {
-	config  ServerConfig
-	mp      multipath.Multipath
-	callCtx context.Context
+	config    ServerConfig
+	mp        multipath.Multipath
+	callCtx   context.Context
+	devFolder string
 }
 
 type ServerConfig struct {
 	Socket string `yaml:"socket"`
 }
 
-func NewServer(callCtx context.Context, config ServerConfig, mp multipath.Multipath) mountplugins.MounterPlugin {
+func NewServer(callCtx context.Context, config ServerConfig, mp multipath.Multipath, devFolder string) mountplugins.MounterPlugin {
 	return &Server{
-		callCtx: callCtx,
-		config:  config,
-		mp:      mp,
+		callCtx:   callCtx,
+		config:    config,
+		mp:        mp,
+		devFolder: devFolder,
 	}
 }
 
@@ -134,9 +137,24 @@ func (s *Server) handleSetup(body []byte) (any, error) {
 	}
 	logger := slogctx.FromCtx(s.callCtx)
 	logger.Info("connect: got request", "request", devices)
+
+	// http client in this package strips /dev equivalent prefix, so we need to append it back
+	for k, v := range devices {
+		if v[0] != '/' {
+			v = "/" + v
+		}
+		devices[k] = s.devFolder + v
+	}
+
 	mc, err := s.mp.Setup(s.callCtx, devices)
 	if err != nil {
 		return nil, fmt.Errorf("call setup: %s", err)
+	}
+
+	// allow for different /dev mount
+	devPath, ok := strings.CutPrefix(mc.Device, s.devFolder)
+	if ok {
+		mc.Device = devPath
 	}
 	return mc, nil
 }

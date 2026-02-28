@@ -3,9 +3,11 @@ serverType: http-json
 serverConfig:
   socket: /run/io.meoe.poly-csi/plugins/multipath-container/multipath.sock
 
+devFolder: /dev
+
 multipath:
   id: multipath
   type: builtin
   subtype: local
   config:
-    iscsiadmCommand: chroot /host iscsiadm
+    mapperFolder: /dev/mapper

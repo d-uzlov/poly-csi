@@ -15,6 +15,7 @@ type Config struct {
 	ServerType   string                     `yaml:"serverType"`
 	ServerConfig map[string]any             `yaml:"serverConfig"`
 	Multipath    *mpfactory.MultipathConfig `yaml:"multipath"`
+	DevFolder    string                     `yaml:"devFolder"`
 }
 
 type parsedConfig struct {
@@ -41,12 +42,12 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return nil, fmt.Errorf("marshal server config: %w", err)
 	}
 
-	inflateServer, err := mppluginfactory.PluginServerFromType(config.ServerType, serverByteConfig)
+	inflateServer, err := mppluginfactory.PluginServerFromType(config.ServerType, serverByteConfig, config.DevFolder)
 	if err != nil {
 		return nil, fmt.Errorf("mountpluginfactory.PluginServerFromType: %w", err)
 	}
 
-	pm := mpfactory.ParseMultipath(ctx, config.Multipath)
+	pm := mpfactory.ParseMultipath(ctx, config.Multipath, config.DevFolder)
 	if pm == nil {
 		return nil, fmt.Errorf("mounterfactory.ParseMount failed")
 	}

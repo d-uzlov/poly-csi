@@ -57,7 +57,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	ml := []*mounterfactory.ParsedMount{}
 	logger.Info(fmt.Sprintf("mounts in config: %d", len(config.Mounters)))
 	for i, v := range config.Mounters {
-		parsed := mounterfactory.ParseMount(ctx, v)
+		parsed := mounterfactory.ParseMount(ctx, v, config.DevFolder)
 		if parsed == nil {
 			logger.Info(fmt.Sprintf("parsing mount %d failed", i))
 			continue
@@ -83,7 +83,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		}
 	}
 
-	mp := mpfactory.ParseMultipath(ctx, &config.Multipath)
+	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 
 	return &parsedConfig{
 		Encrypt: ParsedEncrypt{

@@ -11,12 +11,14 @@ import (
 )
 
 type iscsiadmMounter struct {
-	config Config
+	config    Config
+	devFolder string
 }
 
-func NewIscsiadmMounter(config Config) mounts.NodeMounter {
+func NewIscsiadmMounter(config Config, devFolder string) mounts.NodeMounter {
 	return &iscsiadmMounter{
-		config: config,
+		config:    config,
+		devFolder: devFolder,
 	}
 }
 
@@ -89,7 +91,7 @@ func (m *iscsiadmMounter) Connect(ctx context.Context, req mounts.ConnectRequest
 	}
 	var devices []string
 	for _, v := range is {
-		deviceLink := fmt.Sprintf("/dev/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
+		deviceLink := fmt.Sprintf(m.devFolder + "/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
 		// iscsi creates links in background, need to wait for it to appear
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
 			stat, err := tr.Cmds().Stat(ctx, deviceLink)

@@ -13,14 +13,16 @@ import (
 )
 
 type nvmeMounter struct {
-	snip   NvmeSnippets
-	config Config
+	snip      NvmeSnippets
+	config    Config
+	devFolder string
 }
 
-func NewNvmeMounter(config Config) mounts.NodeMounter {
+func NewNvmeMounter(config Config, devFolder string) mounts.NodeMounter {
 	return &nvmeMounter{
-		snip:   newNvmeSnippets(config.NvmeCmd, config.DevFolder, config.ParseKernelLog),
-		config: config,
+		snip:      newNvmeSnippets(config.NvmeCmd, devFolder, config.ParseKernelLog),
+		config:    config,
+		devFolder: devFolder,
 	}
 }
 
@@ -68,7 +70,7 @@ func (m *nvmeMounter) Connect(ctx context.Context, req mounts.ConnectRequest) (*
 		return nil, fmt.Errorf("nvmeFindNamespace: %w", err)
 	}
 
-	namespaceDevicePath := m.config.DevFolder + "/" + namespaceDevice
+	namespaceDevicePath := m.devFolder + "/" + namespaceDevice
 	deviceFound := false
 	for range 10 {
 		_, err = os.Stat(namespaceDevicePath)

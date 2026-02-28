@@ -16,14 +16,26 @@ type localMp struct {
 	config Config
 }
 
-type Config struct{}
+type Config struct {
+	MapperFolder string `yaml:"mapperFolder"`
+}
+
+func (c *Config) Validate() error {
+	if c.MapperFolder == "" {
+		return fmt.Errorf("missing parameter mapperFolder")
+	}
+	return nil
+}
 
 func NewLocalMp(config Config) multipath.Multipath {
-	return &localMp{config: config}
+	return &localMp{
+		config: config,
+	}
 }
 
 func (l *localMp) Ready(ctx context.Context) bool {
-	// multipathd does not support "-k value" so we need to concat it into "-kValue"
+	// multipathd does not support "-k" and "command" as different arguments,
+	// it required that "command" is concatenated to "-k"
 	cmd := []string{"multipathd", "-k" + "show status"}
 	recovered, err := transport.RelaxedRun(ctx, cmd, "failed to connect to multipathd")
 	if err != nil {
@@ -63,7 +75,7 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.Multi
 
 	tr := transport.FromContext(ctx)
 
-	deviceLink := "/dev/mapper/" + wwid
+	deviceLink := l.config.MapperFolder + "/" + wwid
 	// device mapper creates links in background, need to wait for it to appear
 	err = transport.Retry(time.Millisecond*100, time.Second, func() error {
 		stat, err := tr.Cmds().Stat(ctx, deviceLink)

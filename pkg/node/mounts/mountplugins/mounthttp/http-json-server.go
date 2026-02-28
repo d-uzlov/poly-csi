@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -16,10 +17,11 @@ import (
 )
 
 type Server struct {
-	config   ServerConfig
-	mounter  mounts.NodeMounter
-	callCtx  context.Context
-	handlers map[string]handler
+	config    ServerConfig
+	mounter   mounts.NodeMounter
+	callCtx   context.Context
+	handlers  map[string]handler
+	devFolder string
 }
 
 const responseStatusError = "error"
@@ -42,12 +44,13 @@ type ServerConfig struct {
 	Socket string `yaml:"socket"`
 }
 
-func NewServer(callCtx context.Context, config ServerConfig, mounter mounts.NodeMounter) mountplugins.MounterPlugin {
+func NewServer(callCtx context.Context, config ServerConfig, mounter mounts.NodeMounter, devFolder string) mountplugins.MounterPlugin {
 	return &Server{
-		callCtx:  callCtx,
-		config:   config,
-		mounter:  mounter,
-		handlers: map[string]handler{},
+		callCtx:   callCtx,
+		config:    config,
+		mounter:   mounter,
+		handlers:  map[string]handler{},
+		devFolder: devFolder,
 	}
 }
 
@@ -166,6 +169,14 @@ func (s *Server) handleConnect(ctx context.Context, body string) (result any, er
 	mc, err := s.mounter.Connect(s.callCtx, cr)
 	if err != nil {
 		return nil, err
+	}
+
+	// allow for different /dev mount
+	for k, v := range mc.Devices {
+		devPath, ok := strings.CutPrefix(v, s.devFolder)
+		if ok {
+			mc.Devices[k] = devPath
+		}
 	}
 
 	if mc.MounterData != nil {

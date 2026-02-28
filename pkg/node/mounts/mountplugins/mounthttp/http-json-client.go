@@ -14,8 +14,9 @@ import (
 )
 
 type client struct {
-	config ClientConfig
-	hc     http.Client
+	config    ClientConfig
+	hc        http.Client
+	devFolder string
 }
 
 type ClientConfig struct {
@@ -39,7 +40,7 @@ func (c *ClientConfig) Validate() error {
 	return nil
 }
 
-func NewHttpJsonMounterPlugin(config ClientConfig) mounts.NodeMounter {
+func NewHttpJsonMounterPlugin(config ClientConfig, devFolder string) mounts.NodeMounter {
 	httpClient := http.Client{
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
@@ -48,8 +49,9 @@ func NewHttpJsonMounterPlugin(config ClientConfig) mounts.NodeMounter {
 		},
 	}
 	return &client{
-		config: config,
-		hc:     httpClient,
+		config:    config,
+		hc:        httpClient,
+		devFolder: devFolder,
 	}
 }
 
@@ -122,12 +124,13 @@ func (m *client) Connect(ctx context.Context, req mounts.ConnectRequest) (*mount
 			return nil, fmt.Errorf("http-json-client: unmarshal result: %w", err)
 		}
 
-		// for k, v := range mc.Devices {
-		// 	if v[0] != '/' {
-		// 		v = "/" + v
-		// 	}
-		// 	mc.Devices[k] = m.config.DevPath + v
-		// }
+		// http server in this package strips /dev equivalent prefix, so we need to append it back
+		for k, v := range mc.Devices {
+			if v[0] != '/' {
+				v = "/" + v
+			}
+			mc.Devices[k] = m.config.DevPath + v
+		}
 
 		return &mc, nil
 	case responseStatusError:

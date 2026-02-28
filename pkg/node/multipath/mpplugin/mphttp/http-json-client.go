@@ -15,15 +15,16 @@ import (
 )
 
 type client struct {
-	config ClientConfig
-	hc     http.Client
+	config    ClientConfig
+	hc        http.Client
+	devFolder string
 }
 
 type ClientConfig struct {
 	Socket string `yaml:"socket"`
 }
 
-func NewHttpJsonMultipathPlugin(config ClientConfig) multipath.Multipath {
+func NewHttpJsonMultipathPlugin(config ClientConfig, devFolder string) multipath.Multipath {
 	httpClient := http.Client{
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
@@ -32,8 +33,9 @@ func NewHttpJsonMultipathPlugin(config ClientConfig) multipath.Multipath {
 		},
 	}
 	return &client{
-		config: config,
-		hc:     httpClient,
+		config:    config,
+		hc:        httpClient,
+		devFolder: devFolder,
 	}
 }
 
@@ -70,6 +72,14 @@ func (m *client) Ready(ctx context.Context) bool {
 }
 
 func (m *client) Setup(ctx context.Context, devices []string) (*multipath.MultipathContext, error) {
+	// allow for different /dev mount
+	for k, v := range devices {
+		devPath, ok := strings.CutPrefix(v, m.devFolder)
+		if ok {
+			devices[k] = devPath
+		}
+	}
+
 	b, err := json.Marshal(devices)
 	if err != nil {
 		return nil, fmt.Errorf("http-json-client: marshal request: %w", err)
@@ -105,6 +115,12 @@ func (m *client) Setup(ctx context.Context, devices []string) (*multipath.Multip
 		if err != nil {
 			return nil, fmt.Errorf("http-json-client: unmarshal result: %w", err)
 		}
+		// http server in this package strips /dev equivalent prefix, so we need to append it back
+		if mc.Device[0] != '/' {
+			mc.Device = "/" + mc.Device
+		}
+		mc.Device = m.devFolder + mc.Device
+
 		return &mc, nil
 	case "error":
 		return nil, fmt.Errorf("http-json-client: remote error: %s", pr.Err)

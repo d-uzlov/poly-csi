@@ -15,13 +15,16 @@ const (
 	MultipathTypeNone  = "none"
 )
 
-func GetByType(mtype string, subtype string, byteConfig []byte) (func() multipath.Multipath, error) {
+func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string) (func() multipath.Multipath, error) {
 	if mtype == "builtin" {
 		switch subtype {
 		case MultipathTypeLocal:
 			var cfg mplocal.Config
 			if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
 				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
+			}
+			if err := cfg.Validate(); err != nil {
+				return nil, fmt.Errorf("validate %s/%s config: %w", mtype, subtype, err)
 			}
 			return func() multipath.Multipath {
 				return mplocal.NewLocalMp(cfg)
@@ -41,7 +44,7 @@ func GetByType(mtype string, subtype string, byteConfig []byte) (func() multipat
 				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
 			}
 			return func() multipath.Multipath {
-				return mphttp.NewHttpJsonMultipathPlugin(cfg)
+				return mphttp.NewHttpJsonMultipathPlugin(cfg, devFolder)
 			}, nil
 		}
 		return nil, fmt.Errorf("unknown multipath subtype: '%s/%s', must be one of: http.json.dev", mtype, subtype)

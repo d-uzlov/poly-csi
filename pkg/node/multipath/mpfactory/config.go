@@ -21,7 +21,7 @@ type ParsedMultipath struct {
 	Conf    *MultipathConfig
 }
 
-func ParseMultipath(ctx context.Context, c *MultipathConfig) *ParsedMultipath {
+func ParseMultipath(ctx context.Context, c *MultipathConfig, devFolder string) *ParsedMultipath {
 	logger := slogctx.FromCtx(ctx)
 
 	if c.Type == "" {
@@ -41,7 +41,7 @@ func ParseMultipath(ctx context.Context, c *MultipathConfig) *ParsedMultipath {
 		}
 	}
 
-	inflater, err := GetByType(c.Type, c.Subtype, byteConfig)
+	inflater, err := GetByType(c.Type, c.Subtype, byteConfig, devFolder)
 	if err != nil {
 		logger.Error("mount_config: could not create", "id", c.Id, "error", err)
 		return &ParsedMultipath{
