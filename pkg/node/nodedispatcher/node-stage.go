@@ -19,6 +19,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
+// TODO add cleanup on fail
 func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (res *csi.NodeStageVolumeResponse, err error) {
 	logger := slogctx.FromCtx(ctx)
 
@@ -60,28 +61,16 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("mounter with id '%s' is not found", mounterId)
 	}
 
-	nvi := NodeVolumeInfo{}
-	nvi.MounterId = mounterId
-	nvi.MounterPath = req.StagingTargetPath + "/mounter"
 
-	err = os.MkdirAll(nvi.MounterPath, 0777)
-	if err != nil {
-		return nil, fmt.Errorf("create '/mounter' path for staging")
-	}
-
-	// At this point we have modified staging path (at the very least we have created nvi.MounterPath)
-	// so we can later receive Unstage call.
-	// Even if NodeVolumeInfo is only partially complete, we still want to save it, so we can use it in Unstage.
+	nvi := newVolumeHandle(req.StagingTargetPath)
 	defer func() {
-		err2 := SaveMountInfo(req.StagingTargetPath, nvi)
-		if err2 == nil {
-			return
+		if err != nil {
+			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), mounter)
+			if cleanupErr != nil {
+				// TODO retry cleanup in background?
+				logger.Error("failed to cleanup partially initialized volume", "error", err)
+			}
 		}
-		if err == nil {
-			err = fmt.Errorf("SaveMountInfo: %w", err2)
-			return
-		}
-		slogctx.FromCtx(ctx).Error("failed to save partial volume info", "error", err2)
 	}()
 
 	addressOptions, err := addropt.Parse(req.PublishContext)
@@ -89,70 +78,42 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse address options from publish context: %w", err)
 	}
 
-	cr, err := mounter.Connect(ctx, mounts.ConnectRequest{
+	err = nvi.mounterConnect(ctx, mounterId, mounter, mounts.ConnectRequest{
 		AddressOptions:       addressOptions,
 		VolumeContext:        req.VolumeContext,
 		PublishContext:       req.PublishContext,
-		StagingTargetPath:    nvi.MounterPath,
+		// StagingTargetPath:    "", // StagingTargetPath is set automatically
 		AccessBlock:          req.VolumeCapability.GetBlock(),
 		AccessMount:          req.VolumeCapability.GetMount(),
 		Secrets:              req.Secrets,
 		PublishContextSecret: pcSecret,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("mounter[id=%s].Connect: %w", mounterId, err)
-	}
-	if cr == nil {
-		return nil, fmt.Errorf("mounter[id=%s].Connect: did not set mounter context", mounterId)
-	}
-	if cr.MounterData != nil {
-		if cr.SerializedMounterData != "" {
-			return nil, fmt.Errorf("mounter set both MounterData and SerializedMounterData")
-		}
-		encoded, err := json.Marshal(cr.MounterData)
-		if err != nil {
-			return nil, fmt.Errorf("serialize MounterData: %w", err)
-		}
-		nvi.SerializedMounterData = string(encoded)
-	} else {
-		nvi.SerializedMounterData = cr.SerializedMounterData
+		return nil, fmt.Errorf("connect via mounter[id=%s]: %w", mounterId, err)
 	}
 	logger.Info("mounter.Connect: success")
 
-	nvi.ManagedOps = cr.ManagedOps
-
-	if cr.FolderPath != "" {
-		nvi.FolderPath = cr.FolderPath
-		// folder path is already set, nothing to do here
-		logger.Info("mounter has set folder path, skipping ManagedOps")
-		return &csi.NodeStageVolumeResponse{}, nil
-	}
-	if !nvi.ManagedOps.MountFs {
-		return nil, fmt.Errorf("mounter[id=%s]: FolderPath is empty", mounterId)
-	}
-
-	// ensureDevicePath will setup multipath if needed
-	device, err := ensureDevicePath(ctx, &nvi, cr.Devices, n.getMultipath())
-	if err != nil {
-		return nil, fmt.Errorf("ensureDevicePath: %w", err)
-	}
-	logger.Info("ManagedOps: got device path")
-
-	requestMount := req.VolumeCapability.GetMount()
-	if requestMount == nil {
+	mountRequest := req.VolumeCapability.GetMount()
+	if mountRequest == nil {
 		return nil, fmt.Errorf("block mounting is not implemented")
 	}
-	err = ensureFolderPath(ctx, device, &nvi, requestMount, req.StagingTargetPath+"/fs_mount")
+
+	err = nvi.ensureFolderPath(ctx, n.getMultipath(), mountRequest)
 	if err != nil {
-		return nil, fmt.Errorf("ensureFolderPath: %w", err)
+		return nil, fmt.Errorf("mounter[id=%s]: ensure folder path exists: %w", mounterId, err)
 	}
-	logger.Info("ManagedOps: mounted /fs_mount")
+
+	// nvi.Initialized = true
+	err = nvi.writeMetadataToDisk()
+	if err != nil {
+		return nil, fmt.Errorf("writeMetadataToDisk: %w", err)
+	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
 func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (res *csi.NodeUnstageVolumeResponse, err error) {
-	logger := slogctx.FromCtx(ctx)
+	// logger := slogctx.FromCtx(ctx)
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
@@ -173,53 +134,27 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 	if nvi == nil {
+		// TODO try to remove empty staging path before returning an error?
 		return nil, fmt.Errorf("node volume info is not found")
 	}
-
-	if nvi.ManagedOps.UnmountFs {
-		err = ensureFolderUnmounted(nvi)
-		if err != nil {
-			return nil, fmt.Errorf("ensureFolderUnmounted: %w", err)
-		}
-		logger.Info("ManagedOps: successfully unmounted folder")
-	}
-
-	err = ensureMultipathDisabled(ctx, nvi, n.getMultipath())
-	if err != nil {
-		return nil, fmt.Errorf("ensureMultipathDisabled: %w", err)
-	}
-	logger.Info("ManagedOps: multipath disabled OK")
 
 	mounter := n.findMounterById(nvi.MounterId)
 	if mounter == nil {
 		return nil, fmt.Errorf("mounter with id '%s' is not found", nvi.MounterId)
 	}
-	err = mounter.Disconnect(ctx, nvi.SerializedMounterData)
+
+	err = nvi.cleanup(ctx, n.getMultipath(), mounter)
 	if err != nil {
-		return nil, fmt.Errorf("mounter.Disconnect: %w", err)
-	}
-	logger.Info("mounter.Disconnect: success")
-	// Try to remove mounted folder path.
-	// This way mounters don't have to implement it.
-	// Additional benefit is that we ensure that volume is not mounted anymore.
-	if nvi.FolderPath != "" {
-		err = os.Remove(nvi.FolderPath)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("remove mounted volume folder: %w", err)
-		}
+		return nil, fmt.Errorf("cleanup: %w", err)
 	}
 
-	err = os.Remove(nvi.MounterPath)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("remove mounter staging dir: %w", err)
-	}
 	dirEntries, err := os.ReadDir(req.StagingTargetPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			slogctx.FromCtx(ctx).Warn("staging path unexpectedly disappeared")
 			return &csi.NodeUnstageVolumeResponse{}, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("check remaining files in staging path: %w", err)
 	}
 	if len(dirEntries) != 1 {
 		return nil, fmt.Errorf("staging path contains unexpected files")

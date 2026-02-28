@@ -82,7 +82,7 @@ spec:
           subPath: etc/iscsi/
 
       - name: multipath
-        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.53
+        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.55
         args:
         - --plugin-type=multipath
         - --node-config=/poly-csi/multipath-config/config.yaml

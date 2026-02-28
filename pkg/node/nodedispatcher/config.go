@@ -22,6 +22,7 @@ type ParsedEncrypt struct {
 	Conf          nodeconfig.NodeEncryptConfig
 }
 
+// TODO add cleanup policy for debugging
 type parsedConfig struct {
 	Encrypt    ParsedEncrypt
 	NodeInfoDb nodeconfig.NodeInfoDbConfig
