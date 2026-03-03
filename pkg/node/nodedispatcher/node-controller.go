@@ -20,10 +20,16 @@ import (
 )
 
 func CreateNode(logger *slog.Logger, name string, version string, nodeId string) (*Node, error) {
+	tr, err := localexec.New()
+	if err != nil {
+		panic(err.Error())
+	}
+
 	return &Node{
 		name:    name,
 		version: version,
 		nodeId:  nodeId,
+		tr:      tr,
 	}, nil
 }
 
@@ -34,6 +40,7 @@ type Node struct {
 	name    string
 	version string
 	nodeId  string
+	tr      transport.Transport
 
 	confMutex sync.RWMutex
 	conf      parsedConfig
@@ -50,17 +57,12 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		n.nodeInfoCh = nil
 	}
 
-	tr, err := localexec.New(ctx)
-	if err != nil {
-		panic(err.Error())
-	}
-
 	mounts := map[string]connectors.Connector{}
 	for _, v := range newConf.Mounts {
 		if !v.Valid {
 			continue
 		}
-		m := v.Inflate()
+		m := v.Inflate(n.tr)
 		if m == nil {
 			continue
 		}
@@ -68,19 +70,18 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 	}
 	var mp multipath.Multipath
 	if newConf.Multipath.Valid {
-		mp = newConf.Multipath.Inflate()
+		mp = newConf.Multipath.Inflate(n.tr)
 	} else {
 		slogctx.FromCtx(ctx).Error("multipath config is not valid, disabling multipath")
 	}
 
 	aesSecret := make([]byte, 32)
-	_, err = rand.Read(aesSecret)
+	_, err := rand.Read(aesSecret)
 	if err != nil {
 		return fmt.Errorf("generate random bytes for aes: %w", err)
 	}
 
 	pushCtx, pushCancel := context.WithCancel(ctx)
-	pushCtx = transport.MakeContext(pushCtx, tr)
 	pushCh := make(chan struct{})
 
 	nodeinfo.SetupPush(pushCtx, newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval, func() (regnodeinfo.RegNodeInfo, error) {
@@ -105,7 +106,7 @@ func (n *Node) findConnectorById(id string) connectors.Connector {
 	if res == nil {
 		return nil
 	}
-	return res.Inflate()
+	return res.Inflate(n.tr)
 }
 
 func (n *Node) getMultipath() multipath.Multipath {
@@ -118,7 +119,7 @@ func (n *Node) getMultipath() multipath.Multipath {
 	if n.conf.Multipath.Inflate == nil {
 		return nil
 	}
-	return n.conf.Multipath.Inflate()
+	return n.conf.Multipath.Inflate(n.tr)
 }
 
 func (n *Node) getPrivateKey() encrypt.RsaPrivateKey {

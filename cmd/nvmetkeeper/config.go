@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"meoe.io/poly-csi/pkg/nvmetkeeper"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 )
 
@@ -25,19 +24,19 @@ func init() {
 var configSaveMergeCmd = &cobra.Command{
 	Use:   "save-merge",
 	Short: "read current state of nvmet kernel config and save it as files in config folder, create new config files as needed, keep unused files as is",
+	Example: `There is no "reset-config"-style command. If you want to bulk-reset whole config, consider clearing out the config folder.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
 		err = k.SaveStateToConfig(ctx)
 		if err != nil {
@@ -56,14 +55,13 @@ var configRestoreMergeCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := false
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
 		err = k.RestoreConfig(ctx)
 		if err != nil {

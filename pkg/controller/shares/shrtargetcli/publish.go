@@ -49,7 +49,7 @@ func parsePublishData(serialized string) (publishData, error) {
 }
 
 func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return nil, fmt.Errorf("targetcli is not ready")
 	}
 
@@ -88,15 +88,15 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		}, nil
 	}
 
-	snip := newTargetcliSnippets(ctx, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
 
-	err = snip.createClient(c.Iqn, iscsiInfo.HostIqn)
+	err = snip.createClient(ctx, c.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
 		return nil, fmt.Errorf("create client: %w", err)
 	}
 
 	if c.AuthType == authTypeIqn {
-		err = snip.save()
+		err = snip.save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("save config: %w", err)
 		}
@@ -109,7 +109,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	secret := map[string]string{}
 
-	acl, err := snip.readClientAcl(c.Iqn, iscsiInfo.HostIqn)
+	acl, err := snip.readClientAcl(ctx, c.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
 		return nil, fmt.Errorf("read client auth: %w", err)
 	}
@@ -119,7 +119,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			controller: cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
 		}
 
-		err = snip.setupClientAcl(c.Iqn, iscsiInfo.HostIqn, *acl)
+		err = snip.setupClientAcl(ctx, c.Iqn, iscsiInfo.HostIqn, *acl)
 		if err != nil {
 			return nil, fmt.Errorf("setup client acl: %w", err)
 		}
@@ -128,7 +128,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	acl.client.Inject(secret, "chap.client")
 	acl.controller.Inject(secret, "chap.target")
 
-	err = snip.save()
+	err = snip.save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
 	}
@@ -141,7 +141,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 }
 
 func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return fmt.Errorf("targetcli is not ready")
 	}
 
@@ -154,14 +154,14 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 		return fmt.Errorf("parse publish data: %w", err)
 	}
 
-	snip := newTargetcliSnippets(ctx, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
 
-	err = snip.deleteClientAcl(c.Iqn, pd.HostIqn)
+	err = snip.deleteClientAcl(ctx, c.Iqn, pd.HostIqn)
 	if err != nil {
 		return fmt.Errorf("delete client acl: %w", err)
 	}
 
-	err = snip.save()
+	err = snip.save(ctx)
 	if err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}

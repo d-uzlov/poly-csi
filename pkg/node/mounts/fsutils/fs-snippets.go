@@ -13,17 +13,26 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
+type FsSnippets struct {
+	tr transport.Transport
+}
+
+func New(tr transport.Transport) *FsSnippets {
+	return &FsSnippets{
+		tr: tr,
+	}
+}
+
 type FsInfo struct {
 	Uuid      string `json:"uuid"`
 	BlockSize string `json:"block_size"`
 	FsType    string `json:"type"`
 }
 
-func GetBlkid(ctx context.Context, devicePath string) (*FsInfo, error) {
+func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, error) {
 	// can't use '-o json' here because busybox does not support it
 	cmd := []string{"blkid", devicePath}
-	tr := transport.FromContext(ctx)
-	runResult, err := tr.RunCommand(ctx, cmd)
+	runResult, err := s.tr.RunCommand(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("command failed: %w", err)
 	}
@@ -62,7 +71,7 @@ func GetBlkid(ctx context.Context, devicePath string) (*FsInfo, error) {
 	return &result, nil
 }
 
-func EnsureMounted(sourcePath string, targetPath string, fsType string, mountOptions []string) (*mount.MountInfo, error) {
+func (s *FsSnippets) EnsureMounted(sourcePath string, targetPath string, fsType string, mountOptions []string) (*mount.MountInfo, error) {
 	err := os.MkdirAll(targetPath, 0777)
 	if err != nil {
 		return nil, fmt.Errorf("create target path: %w", err)
@@ -70,7 +79,7 @@ func EnsureMounted(sourcePath string, targetPath string, fsType string, mountOpt
 
 	// if mountpoint already exists, `mount` will create a new mountpoint in the same place, without altering the first one
 	// let's check if mountpoint is already mounted, to avoid this
-	mi, err := findMount(targetPath)
+	mi, err := s.findMount(targetPath)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +98,7 @@ func EnsureMounted(sourcePath string, targetPath string, fsType string, mountOpt
 	if err != nil {
 		return nil, fmt.Errorf("mount: %w", err)
 	}
-	mi, err = findMount(targetPath)
+	mi, err = s.findMount(targetPath)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +108,7 @@ func EnsureMounted(sourcePath string, targetPath string, fsType string, mountOpt
 	return mi, nil
 }
 
-func findMount(mountedPath string) (*mount.MountInfo, error) {
+func (s *FsSnippets) findMount(mountedPath string) (*mount.MountInfo, error) {
 	realPath, err := filepath.EvalSymlinks(mountedPath)
 	if err != nil {
 		return nil, fmt.Errorf("EvalSymlinks: %w", err)
@@ -116,13 +125,13 @@ func findMount(mountedPath string) (*mount.MountInfo, error) {
 	return nil, nil
 }
 
-func FormatFs(ctx context.Context, devicePath string, fsType string, formatOptions []string) error {
+func (s *FsSnippets) FormatFs(ctx context.Context, devicePath string, fsType string, formatOptions []string) error {
 	switch fsType {
 	// TODO more filesystem options
 	case "ext4":
 		// TODO use format options
 		cmd := []string{"mkfs.ext4", devicePath}
-		err := transport.CheckedRun(ctx, cmd)
+		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd, err)
 		}
@@ -131,8 +140,8 @@ func FormatFs(ctx context.Context, devicePath string, fsType string, formatOptio
 	return fmt.Errorf("filesystem %s is not supported", fsType)
 }
 
-func ExpandFs(ctx context.Context, mountedPath string) error {
-	mi, err := findMount(mountedPath)
+func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string) error {
+	mi, err := s.findMount(mountedPath)
 	if err != nil {
 		return err
 	}
@@ -141,7 +150,7 @@ func ExpandFs(ctx context.Context, mountedPath string) error {
 	switch mi.FsType {
 	case "ext4":
 		cmd := []string{"resize2fs", mi.Source}
-		err := transport.CheckedRun(ctx, cmd)
+		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd, err)
 		}
@@ -150,7 +159,7 @@ func ExpandFs(ctx context.Context, mountedPath string) error {
 	return fmt.Errorf("filesystem %s is not supported", mi.FsType)
 }
 
-func EnsureBindMount(sourcePath string, targetPath string) error {
+func (s *FsSnippets) EnsureBindMount(sourcePath string, targetPath string) error {
 	err := os.MkdirAll(targetPath, 0777)
 	if err != nil {
 		return fmt.Errorf("create target path: %w", err)
@@ -175,9 +184,9 @@ func EnsureBindMount(sourcePath string, targetPath string) error {
 	return nil
 }
 
-func Unmount(ctx context.Context, targetPath string) error {
+func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 	cmd := []string{"umount", "-r", "-l", "-f", "-d", targetPath}
-	_, err := transport.RelaxedRun(ctx, cmd, "Invalid argument")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "Invalid argument")
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -193,7 +202,7 @@ type StatsResult struct {
 	InodesAvailable int64
 }
 
-func GetMountStats(targetPath string) (StatsResult, error) {
+func (s *FsSnippets) GetMountStats(targetPath string) (StatsResult, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(targetPath, &stat)
 	if err != nil {

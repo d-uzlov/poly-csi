@@ -12,6 +12,7 @@ import (
 	"k8s.io/mount-utils"
 	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 	"meoe.io/poly-csi/pkg/node/multipath"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string, mp multipath.Multipath) (string, error) {
@@ -37,25 +38,27 @@ func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string
 	return mc.Device, nil
 }
 
-func ensureFolderPath(ctx context.Context, devicePath string, nvi *NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
+func ensureFolderPath(ctx context.Context, tr transport.Transport, devicePath string, nvi *NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
 	if devicePath == "" {
 		return fmt.Errorf("device path is not set")
 	}
 
-	fsInfo, err := fsutils.GetBlkid(ctx, devicePath)
+	fsnip := fsutils.New(tr)
+
+	fsInfo, err := fsnip.GetBlkid(ctx, devicePath)
 	if err != nil {
 		return fmt.Errorf("GetFsInfo: %w", err)
 	}
 
 	if fsInfo == nil {
-		err = fsutils.FormatFs(ctx, devicePath, requestMount.FsType, nil)
+		err = fsnip.FormatFs(ctx, devicePath, requestMount.FsType, nil)
 		if err != nil {
 			return fmt.Errorf("format: %w", err)
 		}
 	}
 
 	nvi.FolderPath = targetPath
-	mi, err := fsutils.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
+	mi, err := fsnip.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}

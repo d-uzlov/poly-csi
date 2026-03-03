@@ -7,7 +7,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
@@ -22,9 +21,7 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 
 	snapshotId := createSnapshotId(mh.srv.conf.StableId, mh.volumeName, req.Name)
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	strInstance, err := storagefactory.StorageFromType(mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +76,7 @@ func (d *Dispatcher) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 		return nil, fmt.Errorf("snapshot not found")
 	}
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	strInstance, err := storagefactory.StorageFromType(mh.si.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.si.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}

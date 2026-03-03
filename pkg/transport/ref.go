@@ -8,8 +8,7 @@ import (
 )
 
 // CheckedRunStdout is same as CheckedRun, but it also returns command stdout on success
-func CheckedRunStdout(ctx context.Context, cmd []string) (stdout string, err error) {
-	tr := FromContext(ctx)
+func CheckedRunStdout(ctx context.Context, tr Transport, cmd []string) (stdout string, err error) {
 	runResult, err := tr.RunCommand(ctx, cmd)
 	if err != nil {
 		return "", err
@@ -22,8 +21,7 @@ func CheckedRunStdout(ctx context.Context, cmd []string) (stdout string, err err
 
 // CheckedRun runs a commands, expecting zero exit code
 // If command has exited with a different exit code, it returns an error.
-func CheckedRun(ctx context.Context, cmd []string) error {
-	tr := FromContext(ctx)
+func CheckedRun(ctx context.Context, tr Transport, cmd []string) error {
 	runResult, err := tr.RunCommand(ctx, cmd, WithoutStdout())
 	if err != nil {
 		return  err
@@ -35,8 +33,7 @@ func CheckedRun(ctx context.Context, cmd []string) error {
 }
 
 // RelaxedRun is same as CheckedRun, but it allows non-zero exit code in case command stderr contains specified substring
-func RelaxedRun(ctx context.Context, cmd []string, allowStderr string) (recovered bool, err error) {
-	tr := FromContext(ctx)
+func RelaxedRun(ctx context.Context, tr Transport, cmd []string, allowStderr string) (recovered bool, err error) {
 	runResult, err := tr.RunCommand(ctx, cmd, WithoutStdout())
 	if err != nil {
 		return false, err

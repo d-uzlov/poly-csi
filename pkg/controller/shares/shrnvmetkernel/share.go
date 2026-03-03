@@ -6,15 +6,17 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
 type share struct {
+	tr   transport.Transport
 	gp   globalParams
 	cmds commands
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
@@ -24,6 +26,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
 	return &share{
+		tr:   tr,
 		gp:   gp,
 		cmds: cmds,
 	}, nil
@@ -38,7 +41,7 @@ func (sh *share) GetCapabilities() shares.Capabilities {
 }
 
 func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return "", fmt.Errorf("nvmet is not ready")
 	}
 	p, err := parseParams(req.StaticParams, req.MutableParams)
@@ -53,7 +56,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	nqn := fmt.Sprintf("%s:%s", sh.gp.nqnBase, req.ShareId)
 
-	snip := nvmet.NewSnippets(ctx, true)
+	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
 	err = snip.ConfigureSubsys(nvmet.Subsys{
 		Nqn:          nqn,
@@ -76,7 +79,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("attach port: %w", err)
 	}
 
-	err = sh.cmds.save(ctx)
+	err = sh.cmds.save(ctx, sh.tr)
 	if err != nil {
 		return "", fmt.Errorf("nvmet_save: %w", err)
 	}
@@ -96,7 +99,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 }
 
 func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
 	}
 	c, err := parseShareData(shareData)
@@ -104,7 +107,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := nvmet.NewSnippets(ctx, true)
+	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
 	err = snip.DetachNqnFromPort(c.Nqn, "1")
 	if err != nil {
@@ -119,7 +122,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("delete subsys: %w", err)
 	}
 
-	err = sh.cmds.save(ctx)
+	err = sh.cmds.save(ctx, sh.tr)
 	if err != nil {
 		return fmt.Errorf("nvmet_save: %w", err)
 	}

@@ -6,14 +6,16 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
+	tr   transport.Transport
 	gp   globalParams
 	cmds commands
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
@@ -23,6 +25,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
 	return &share{
+		tr:   tr,
 		gp:   gp,
 		cmds: cmds,
 	}, nil
@@ -37,7 +40,7 @@ func (sh *share) GetCapabilities() shares.Capabilities {
 }
 
 func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return "", fmt.Errorf("targetcli is not ready")
 	}
 	p, err := parseParams(req.StaticParams, req.MutableParams)
@@ -52,10 +55,10 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	iqn := fmt.Sprintf("%s:%s", sh.gp.iqnBase, req.ShareId)
 
-	snip := newTargetcliSnippets(ctx, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
 
 	backstoreName := iqn
-	err = snip.configureBackstore(backstoreName, devicePath)
+	err = snip.configureBackstore(ctx, backstoreName, devicePath)
 	if err != nil {
 		return "", fmt.Errorf("configure backstore: %w", err)
 	}
@@ -73,7 +76,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		enforceAuth = true
 		disableAuth = false
 	}
-	err = snip.configureTarget(iscsiTargetConfig{
+	err = snip.configureTarget(ctx, iscsiTargetConfig{
 		iqn:           iqn,
 		backstoreName: backstoreName,
 		auth:          enforceAuth,
@@ -83,7 +86,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("configure target: %w", err)
 	}
 
-	err = snip.save()
+	err = snip.save(ctx)
 	if err != nil {
 		return "", fmt.Errorf("save config: %w", err)
 	}
@@ -104,7 +107,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 }
 
 func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return fmt.Errorf("targetcli is not ready")
 	}
 
@@ -113,19 +116,19 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newTargetcliSnippets(ctx, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
 
-	err = snip.deleteTarget(iscsiTargetConfig{
+	err = snip.deleteTarget(ctx, iscsiTargetConfig{
 		iqn: c.Iqn,
 	})
 	if err != nil {
 		return fmt.Errorf("delete target: %w", err)
 	}
-	err = snip.deleteBackstore(c.BackstoreName)
+	err = snip.deleteBackstore(ctx, c.BackstoreName)
 	if err != nil {
 		return fmt.Errorf("delete backstore: %w", err)
 	}
-	err = snip.save()
+	err = snip.save(ctx)
 	if err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}

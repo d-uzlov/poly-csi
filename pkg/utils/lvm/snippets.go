@@ -8,11 +8,13 @@ import (
 )
 
 type Snippets struct {
+	tr     transport.Transport
 	lvmCmd []string
 }
 
-func NewSnippets(lvmCmd []string) Snippets {
+func NewSnippets(tr transport.Transport, lvmCmd []string) Snippets {
 	return Snippets{
+		tr:     tr,
 		lvmCmd: lvmCmd,
 	}
 }
@@ -23,7 +25,7 @@ func (s *Snippets) MakeLvPath(vgName string, lvName string) string {
 
 func (s *Snippets) LvCreate(ctx context.Context, vgName string, lvName string, size int64) (alreadyExists bool, err error) {
 	cmd := append(s.lvmCmd, "lvcreate", fmt.Sprintf("--size=%dB", size), vgName, "--name", lvName)
-	alreadyExists, err = transport.RelaxedRun(ctx, cmd, "already exists in volume group")
+	alreadyExists, err = transport.RelaxedRun(ctx, s.tr, cmd, "already exists in volume group")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -32,7 +34,7 @@ func (s *Snippets) LvCreate(ctx context.Context, vgName string, lvName string, s
 
 func (s *Snippets) LvDelete(ctx context.Context, vgName string, lvName string) (notFound bool, err error) {
 	cmd := append(s.lvmCmd, "lvremove", "-y", s.MakeLvPath(vgName, lvName))
-	notFound, err = transport.RelaxedRun(ctx, cmd, "Failed to find logical volume")
+	notFound, err = transport.RelaxedRun(ctx, s.tr, cmd, "Failed to find logical volume")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -41,7 +43,7 @@ func (s *Snippets) LvDelete(ctx context.Context, vgName string, lvName string) (
 
 func (s *Snippets) LvSnapshot(ctx context.Context, vgName string, lvName string, snapName string, size int64) (alreadyExists bool, err error) {
 	cmd := append(s.lvmCmd, "lvcreate", "--snapshot", s.MakeLvPath(vgName, lvName), fmt.Sprintf("--size=%dB", size), "--name", snapName, "--permission=r")
-	alreadyExists, err = transport.RelaxedRun(ctx, cmd, "already exists in volume group")
+	alreadyExists, err = transport.RelaxedRun(ctx, s.tr, cmd, "already exists in volume group")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -50,7 +52,7 @@ func (s *Snippets) LvSnapshot(ctx context.Context, vgName string, lvName string,
 
 func (s *Snippets) LvSetSize(ctx context.Context, vgName string, lvName string, newSize int64) error {
 	cmd := append(s.lvmCmd, "lvresize", fmt.Sprintf("--size=%dB", newSize), s.MakeLvPath(vgName, lvName))
-	_, err := transport.RelaxedRun(ctx, cmd, "matches existing size")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "matches existing size")
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -64,7 +66,7 @@ func (s *Snippets) LvSetActive(ctx context.Context, vgName string, lvName string
 		argVal = "y"
 	}
 	cmd := append(s.lvmCmd, "lvchange", "-y", "--activate", argVal, s.MakeLvPath(vgName, lvName))
-	_, err := transport.RelaxedRun(ctx, cmd, "matches existing size")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "matches existing size")
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}

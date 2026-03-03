@@ -12,7 +12,6 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
@@ -28,9 +27,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	shrInstance, err := sharefactory.ShareFromType(mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
@@ -138,9 +135,7 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	shrInstance, err := sharefactory.ShareFromType(mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}

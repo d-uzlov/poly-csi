@@ -294,7 +294,7 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 func (ec *ExecCommands) Df(ctx context.Context, path string) (*transport.FsSizeInfo, error) {
 	cmd := []string{"df", "--output=size,used,avail", "--block-size=1", path}
 	// cmd := fmt.Sprintf("df --output=avail --block-size=1 '%s' | tail -n +2", path)
-	stdout, err := transport.CheckedRunStdout(ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, ec.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)
 	}

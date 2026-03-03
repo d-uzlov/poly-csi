@@ -11,6 +11,7 @@ import (
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/mounthttp"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 const (
@@ -19,11 +20,11 @@ const (
 	ConnectorTypeIscsiadm = "iscsiadm"
 )
 
-var builtinTypes = map[string]func(byteConfig []byte, devFolder string) (func() connectors.Connector, error){
-	ConnectorTypeNfs: func(byteConfig []byte, devFolder string) (func() connectors.Connector, error) {
-		return func() connectors.Connector { return cntrnfs.New() }, nil
+var builtinTypes = map[string]func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error){
+	ConnectorTypeNfs: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
+		return func(tr transport.Transport) connectors.Connector { return cntrnfs.New(tr) }, nil
 	},
-	ConnectorTypeNvme: func(byteConfig []byte, devFolder string) (func() connectors.Connector, error) {
+	ConnectorTypeNvme: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
 		var cfg cntrnvme.Config
 		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
 			return nil, fmt.Errorf("parse config: %w", err)
@@ -32,9 +33,9 @@ var builtinTypes = map[string]func(byteConfig []byte, devFolder string) (func() 
 		if err := cfg.Validate(); err != nil {
 			return nil, fmt.Errorf("validate config: %w", err)
 		}
-		return func() connectors.Connector { return cntrnvme.New(cfg, devFolder) }, nil
+		return func(tr transport.Transport) connectors.Connector { return cntrnvme.New(tr, cfg, devFolder) }, nil
 	},
-	ConnectorTypeIscsiadm: func(byteConfig []byte, devFolder string) (func() connectors.Connector, error) {
+	ConnectorTypeIscsiadm: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
 		var cfg cntriscsiadm.Config
 		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
 			return nil, fmt.Errorf("parse config: %w", err)
@@ -43,13 +44,13 @@ var builtinTypes = map[string]func(byteConfig []byte, devFolder string) (func() 
 		if err := cfg.Validate(); err != nil {
 			return nil, fmt.Errorf("validate config: %w", err)
 		}
-		return func() connectors.Connector {
-			return cntriscsiadm.New(cfg, devFolder)
+		return func(tr transport.Transport) connectors.Connector {
+			return cntriscsiadm.New(tr, cfg, devFolder)
 		}, nil
 	},
 }
 
-func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string) (func() connectors.Connector, error) {
+func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
 	if mtype == "builtin" {
 		v, ok := builtinTypes[subtype]
 		if !ok {
@@ -64,7 +65,7 @@ func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string
 			if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
 				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
 			}
-			return func() connectors.Connector {
+			return func(tr transport.Transport) connectors.Connector {
 				return mounthttp.NewHttpJsonConnectorPlugin(cfg, devFolder)
 			}, nil
 		}

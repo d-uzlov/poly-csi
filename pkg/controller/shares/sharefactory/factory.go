@@ -11,6 +11,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares/shrzfssharenfs"
 	"meoe.io/poly-csi/pkg/controller/shares/truenas/shrtniscsi"
 	"meoe.io/poly-csi/pkg/controller/shares/truenas/shrtnnfs"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 const (
@@ -23,22 +24,22 @@ const (
 	shareTnIscsi     = "truenas-iscsi"
 )
 
-func ShareFromType(vmType string, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func ShareFromType(tr transport.Transport, vmType string, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	switch vmType {
 	case shareZfsSharenfs:
-		return shrzfssharenfs.New(commands, globalParams)
+		return shrzfssharenfs.New(tr, commands, globalParams)
 	case shareNfs:
-		return shrnfs.New(commands, globalParams)
+		return shrnfs.New(tr, commands, globalParams)
 	case shareNvmetKernel:
-		return shrnvmetkernel.New(commands, globalParams)
+		return shrnvmetkernel.New(tr, commands, globalParams)
 	case shareNvmetKeeper:
-		return shrnvmetkeeper.New(commands, globalParams)
+		return shrnvmetkeeper.New(tr, commands, globalParams)
 	case shareTargetcli:
-		return shrtargetcli.New(commands, globalParams)
+		return shrtargetcli.New(tr, commands, globalParams)
 	case shareTnNfs:
-		return shrtnnfs.New(commands, globalParams)
+		return shrtnnfs.New(tr, commands, globalParams)
 	case shareTnIscsi:
-		return shrtniscsi.New(commands, globalParams)
+		return shrtniscsi.New(tr, commands, globalParams)
 	}
 	return nil, fmt.Errorf("unknown share type: %s", vmType)
 }

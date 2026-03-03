@@ -3,8 +3,6 @@ package nvmet
 import (
 	"encoding/json"
 	"fmt"
-
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 type Host struct {
@@ -73,22 +71,18 @@ func (c Host) Validate() error {
 }
 
 func (s Snippets) ListHosts() ([]string, error) {
-	tr := transport.FromContext(s.ctx)
 	path := "/sys/kernel/config/nvmet/hosts"
-	return tr.Cmds().Ls(s.ctx, path)
+	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
 func (s Snippets) ListHostAttachments(nqn string) ([]string, error) {
-	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/allowed_hosts", nqn)
-	return tr.Cmds().Ls(s.ctx, path)
+	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
 func (s Snippets) ReadHost(name string) (*Host, error) {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", name)
-	stat, err := tr.Cmds().Stat(s.ctx, path)
+	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("stat '%s': %w", path, err)
 	}
@@ -103,7 +97,7 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 	// debian 12 linux 6.1 doesn't seem to have DH-CHAP enabled by default
 	// debian 13 linux 6.12 and debian 13 linux 6.16 both have this on by default
 	attrPath := fmt.Sprintf("%s/dhchap_key", path)
-	stat, err = tr.Cmds().Stat(s.ctx, attrPath)
+	stat, err = s.tr.Cmds().Stat(s.ctx, attrPath)
 	if err != nil {
 		return nil, fmt.Errorf("stat '%s': %w", attrPath, err)
 	}
@@ -116,22 +110,22 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 	}
 
 	attrPath = fmt.Sprintf("%s/dhchap_key", path)
-	dhChapKey, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	dhChapKey, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_ctrl_key", path)
-	dhChapControllerKey, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	dhChapControllerKey, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_hash", path)
-	hashType, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	hashType, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_dhgroup", path)
-	group, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	group, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
@@ -152,10 +146,8 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 }
 
 func (s Snippets) ConfigureHost(c Host) error {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", c.Nqn)
-	err := tr.SudoCmds().Mkdir(s.ctx, path, false)
+	err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
 	}
@@ -166,7 +158,7 @@ func (s Snippets) ConfigureHost(c Host) error {
 	// debian 12 linux 6.1 doesn't seem to have DH-CHAP enabled by default
 	// debian 13 linux 6.12 and debian 13 linux 6.16 both have this on by default
 	attrPath := fmt.Sprintf("%s/dhchap_key", path)
-	stat, err := tr.Cmds().Stat(s.ctx, attrPath)
+	stat, err := s.tr.Cmds().Stat(s.ctx, attrPath)
 	if err != nil {
 		return fmt.Errorf("stat '%s': %w", attrPath, err)
 	}
@@ -175,22 +167,22 @@ func (s Snippets) ConfigureHost(c Host) error {
 	}
 
 	attrPath = fmt.Sprintf("%s/dhchap_key", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HostKey))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HostKey))
 	if err != nil {
 		return fmt.Errorf("write %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_ctrl_key", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ControllerKey))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ControllerKey))
 	if err != nil {
 		return fmt.Errorf("write %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_hash", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HashType))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HashType))
 	if err != nil {
 		return fmt.Errorf("write '%s' to %s: %w", c.HashType, attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_dhgroup", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DhGroup))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DhGroup))
 	if err != nil {
 		return fmt.Errorf("write '%s' to %s: %w", c.DhGroup, attrPath, err)
 	}
@@ -198,11 +190,9 @@ func (s Snippets) ConfigureHost(c Host) error {
 }
 
 func (s Snippets) AllowHost(subsysNqn string, hostNqn string) error {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", hostNqn)
 	link := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/allowed_hosts/%s", subsysNqn, hostNqn)
-	stat, err := tr.Cmds().Stat(s.ctx, link)
+	stat, err := s.tr.Cmds().Stat(s.ctx, link)
 	if err != nil {
 		return fmt.Errorf("stat '%s' (checking if host is already configured on nqn): %w", link, err)
 	}
@@ -217,7 +207,7 @@ func (s Snippets) AllowHost(subsysNqn string, hostNqn string) error {
 		return nil
 	}
 	// link does not exist, need to create it
-	err = tr.SudoCmds().CreateSymlink(s.ctx, link, path)
+	err = s.tr.SudoCmds().CreateSymlink(s.ctx, link, path)
 	if err != nil {
 		return fmt.Errorf("create link '%s' pointing to '%s': %w", path, link, err)
 	}
@@ -225,9 +215,8 @@ func (s Snippets) AllowHost(subsysNqn string, hostNqn string) error {
 }
 
 func (s Snippets) DisallowHost(subsysNqn string, hostNqn string) error {
-	tr := transport.FromContext(s.ctx)
 	subsysHostLink := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/allowed_hosts/%s", subsysNqn, hostNqn)
-	err := tr.SudoCmds().RmFile(s.ctx, subsysHostLink)
+	err := s.tr.SudoCmds().RmFile(s.ctx, subsysHostLink)
 	if err != nil {
 		return fmt.Errorf("rm '%s': %w", subsysHostLink, err)
 	}
@@ -235,9 +224,8 @@ func (s Snippets) DisallowHost(subsysNqn string, hostNqn string) error {
 }
 
 func (s Snippets) DeleteHost(name string) error {
-	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", name)
-	err := tr.SudoCmds().RmDir(s.ctx, path)
+	err := s.tr.SudoCmds().RmDir(s.ctx, path)
 	if err != nil {
 		return fmt.Errorf("rmdir '%s': %w", path, err)
 	}

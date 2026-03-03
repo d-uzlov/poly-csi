@@ -12,7 +12,7 @@ func (s *Snippets) CreateSnapshot(ctx context.Context, name string) (alreadyExis
 		"snapshot",
 		name,
 	)
-	recovered, err := transport.RelaxedRun(ctx, cmd, "dataset already exists")
+	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -21,7 +21,7 @@ func (s *Snippets) CreateSnapshot(ctx context.Context, name string) (alreadyExis
 
 func (s *Snippets) DestroySnapshot(ctx context.Context, name string) (recovered bool, err error) {
 	cmd := append(s.zfsCmd, "destroy", name)
-	recovered, err = transport.RelaxedRun(ctx, cmd, "could not find any snapshots to destroy; check snapshot names")
+	recovered, err = transport.RelaxedRun(ctx, s.tr, cmd, "could not find any snapshots to destroy; check snapshot names")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}

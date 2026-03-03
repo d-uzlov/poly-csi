@@ -9,12 +9,14 @@ import (
 )
 
 type iscsiSnippets struct {
+	tr          transport.Transport
 	ctx         context.Context
 	iscsiadmCmd []string
 }
 
-func newIscsiSnippets(ctx context.Context, iscsiadmCmd []string) iscsiSnippets {
+func newIscsiSnippets(tr transport.Transport, ctx context.Context, iscsiadmCmd []string) iscsiSnippets {
 	return iscsiSnippets{
+		tr:          tr,
 		ctx:         ctx,
 		iscsiadmCmd: iscsiadmCmd,
 	}
@@ -23,13 +25,13 @@ func newIscsiSnippets(ctx context.Context, iscsiadmCmd []string) iscsiSnippets {
 // creates an entry in iscsi database for remote target and sets attributes
 func (s iscsiSnippets) configureTarget(iqn string, server string, attributes map[string]string) error {
 	cmd := append(s.iscsiadmCmd, "--mode=node", "--targetname", iqn, "--portal", server, "--op=new")
-	err := transport.CheckedRun(s.ctx, cmd)
+	err := transport.CheckedRun(s.ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("add target '%s@%s' to iscsiadm local db: %w", iqn, server, err)
 	}
 	for k, v := range attributes {
 		cmd = append(s.iscsiadmCmd, "--mode=node", "--targetname", iqn, "--portal", server, "--op=update", "--name", k, "--value", v)
-		err = transport.CheckedRun(s.ctx, cmd)
+		err = transport.CheckedRun(s.ctx, s.tr, cmd)
 		if err != nil {
 			return fmt.Errorf("target '%s@%s' attribute '%s': %w", iqn, server, k, err)
 		}
@@ -41,7 +43,7 @@ func (s iscsiSnippets) configureTarget(iqn string, server string, attributes map
 // target must already exist in the local iscsi database, see configureTarget()
 func (s iscsiSnippets) connect(iqn string, server string) error {
 	cmd := append(s.iscsiadmCmd, "--mode=node", "--targetname", iqn, "--portal", server, "--login")
-	_, err := transport.RelaxedRun(s.ctx, cmd, "1 session requested, but 1 already present")
+	_, err := transport.RelaxedRun(s.ctx, s.tr, cmd, "1 session requested, but 1 already present")
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -50,7 +52,7 @@ func (s iscsiSnippets) connect(iqn string, server string) error {
 
 func (s iscsiSnippets) disconnect(iqn string, server string) error {
 	cmd := append(s.iscsiadmCmd, "--mode=node", "--targetname", iqn, "--portal", server, "--logout")
-	_, err := transport.RelaxedRun(s.ctx, cmd, "No matching sessions found")
+	_, err := transport.RelaxedRun(s.ctx, s.tr, cmd, "No matching sessions found")
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -83,7 +85,7 @@ func (s iscsiSnippets) findSessions(iqn string) ([]iscsiSession, error) {
 
 func (s iscsiSnippets) listSessions() ([]iscsiSession, error) {
 	cmd := append(s.iscsiadmCmd, "--mode=session")
-	stdout, err := transport.CheckedRunStdout(s.ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(s.ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s (list sessions): %w", cmd, err)
 	}
@@ -110,7 +112,7 @@ func (s iscsiSnippets) listSessions() ([]iscsiSession, error) {
 
 func (s iscsiSnippets) rescanAll() error {
 	cmd := append(s.iscsiadmCmd, "--mode=session", "--rescan")
-	err := transport.CheckedRun(s.ctx, cmd)
+	err := transport.CheckedRun(s.ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}

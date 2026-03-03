@@ -22,7 +22,7 @@ func TransportFromType(transportType string, byteConfig []byte) (Inflate, config
 	switch transportType {
 	case TransportTypeLocal:
 		return func(ctx context.Context) (transport.Transport, error) {
-			return localexec.New(ctx)
+			return localexec.New()
 		}, nil, nil
 	case TransportTypeSsh:
 		var cfg ssh_wrapper.SshConfig

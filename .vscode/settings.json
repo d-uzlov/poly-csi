@@ -33,6 +33,7 @@
     "executils",
     "exportfs",
     "ffdhe",
+    "fsnip",
     "fsnotify",
     "gocsi",
     "groupsnapshot",

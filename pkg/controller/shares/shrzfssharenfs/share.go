@@ -9,19 +9,22 @@ import (
 	"meoe.io/poly-csi/pkg/controller/storage/strzfsdataset"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
 type share struct {
+	tr   transport.Transport
 	cmds commands
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
 	return &share{
+		tr:   tr,
 		cmds: cmds,
 	}, nil
 }
@@ -50,7 +53,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("get local path: %w", err)
 	}
 
-	snip := zfs.NewSnippets(sh.cmds.zfsCmd)
+	snip := zfs.NewSnippets(sh.tr, sh.cmds.zfsCmd)
 
 	err = snip.SetShareNfs(ctx, zfsVol.Path, p.shareOptions)
 	if err != nil {
@@ -101,7 +104,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := zfs.NewSnippets(sh.cmds.zfsCmd)
+	snip := zfs.NewSnippets(sh.tr, sh.cmds.zfsCmd)
 
 	return snip.SetShareNfs(ctx, c.Dataset, "off")
 }

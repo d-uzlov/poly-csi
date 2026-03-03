@@ -12,11 +12,15 @@ import (
 )
 
 type JsonFileDatabase struct {
+	tr     transport.Transport
 	config JsonFileInfoManagerConfig
 }
 
-func NewJsonFileVolumeDatabase(config JsonFileInfoManagerConfig) voldb.VolumeDatabase {
-	return &JsonFileDatabase{config: config}
+func New(tr transport.Transport, config JsonFileInfoManagerConfig) voldb.VolumeDatabase {
+	return &JsonFileDatabase{
+		tr:     tr,
+		config: config,
+	}
 }
 
 func validateId(id string) bool {
@@ -34,7 +38,7 @@ func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string, uuid st
 		return nil, fmt.Errorf("entry name '%s' is invalid", name)
 	}
 
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := m.tr.Cmds()
 
 	globalLock := fmt.Sprintf("%s/entries.lock", m.config.Directory)
 
@@ -51,7 +55,7 @@ func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string, uuid st
 	}()
 
 	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
-	entry := newEntry(folder, uuid)
+	entry := newEntry(m.tr, folder, uuid)
 	err = entry.unsafeCreate(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create entry in filesystem: %w", err)
@@ -66,7 +70,7 @@ func (m *JsonFileDatabase) FindEntry(ctx context.Context, name string) (voldb.En
 	}
 
 	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
-	entry := Entry{directory: folder}
+	entry := newEntry(m.tr, folder, "")
 	// CheckValid below expects valid UUID
 	fillUuidErr := entry.fillUuid(ctx)
 	empty, err := entry.CheckValid(ctx)
@@ -87,5 +91,5 @@ func (m *JsonFileDatabase) FindEntry(ctx context.Context, name string) (voldb.En
 		return nil, fmt.Errorf("read entry uuid: %w", err)
 	}
 
-	return &entry, nil
+	return entry, nil
 }

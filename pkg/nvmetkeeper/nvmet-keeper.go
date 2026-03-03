@@ -5,30 +5,33 @@ import (
 	"fmt"
 	"io"
 
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
 type NvmetKeeper struct {
+	tr         transport.Transport
 	useSudo    bool
 	sudoPrefix string
 	str        ConfigStorage
 }
 
-func New(configFolder string, useSudo bool, saveState bool) *NvmetKeeper {
+func New(tr transport.Transport, configFolder string, useSudo bool, saveState bool) *NvmetKeeper {
 	sudoPrefix := ""
 	if useSudo {
 		sudoPrefix = "sudo"
 	}
 
 	return &NvmetKeeper{
+		tr:         tr,
 		useSudo:    useSudo,
 		sudoPrefix: sudoPrefix,
-		str:        NewConfigStorage(configFolder, useSudo, saveState),
+		str:        NewConfigStorage(tr, configFolder, useSudo, saveState),
 	}
 }
 
 func (k *NvmetKeeper) ResetState(ctx context.Context) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	ports, err := snip.ListPorts()
 	if err != nil {
@@ -91,7 +94,7 @@ func (k *NvmetKeeper) ResetState(ctx context.Context) error {
 }
 
 func (k *NvmetKeeper) ShowState(ctx context.Context, w io.Writer) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	ports, err := snip.ListPorts()
 	if err != nil {
@@ -193,7 +196,7 @@ func (k *NvmetKeeper) ShowState(ctx context.Context, w io.Writer) error {
 }
 
 func (k *NvmetKeeper) SaveStateToConfig(ctx context.Context) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	ports, err := snip.ListPorts()
 	if err != nil {
@@ -343,7 +346,7 @@ func (k *NvmetKeeper) RestoreConfig(ctx context.Context) error {
 }
 
 func (k *NvmetKeeper) DeletePort(ctx context.Context, name string) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 	err := snip.DeletePort(name)
 	if err != nil {
 		return fmt.Errorf("delete port: %w", err)
@@ -356,7 +359,7 @@ func (k *NvmetKeeper) DeletePort(ctx context.Context, name string) error {
 }
 
 func (k *NvmetKeeper) CreatePort(ctx context.Context, c nvmet.Port) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 	p, err := snip.ReadPort(c.Name)
 	if err != nil {
 		return fmt.Errorf("read existing port info: %w", err)
@@ -380,7 +383,7 @@ func (k *NvmetKeeper) CreatePort(ctx context.Context, c nvmet.Port) error {
 }
 
 func (k *NvmetKeeper) DeleteSubsys(ctx context.Context, nqn string) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	nsList, err := snip.ListNamespaces(nqn)
 	if err != nil {
@@ -409,7 +412,7 @@ func (k *NvmetKeeper) DeleteSubsys(ctx context.Context, nqn string) error {
 }
 
 func (k *NvmetKeeper) CreateSubsystem(ctx context.Context, s nvmet.Subsys) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	existingSubsys, err := snip.ReadSubsys(s.Nqn)
 	if err != nil {
@@ -435,7 +438,7 @@ func (k *NvmetKeeper) CreateSubsystem(ctx context.Context, s nvmet.Subsys) error
 }
 
 func (k *NvmetKeeper) CreateNamespace(ctx context.Context, n nvmet.Ns) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	existingNs, err := snip.ReadNamespace(n.Nqn, n.Nsid)
 	if err != nil {
@@ -466,7 +469,7 @@ func (k *NvmetKeeper) CreateNamespace(ctx context.Context, n nvmet.Ns) error {
 }
 
 func (k *NvmetKeeper) AttachNqnToPort(ctx context.Context, nqn string, port string) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	err := snip.AttachNqnToPort(nqn, port)
 	if err != nil {
@@ -481,7 +484,7 @@ func (k *NvmetKeeper) AttachNqnToPort(ctx context.Context, nqn string, port stri
 }
 
 func (k *NvmetKeeper) DetachPortFromNqn(ctx context.Context, nqn string, port string) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	err := snip.DetachNqnFromPort(nqn, port)
 	if err != nil {
@@ -496,7 +499,7 @@ func (k *NvmetKeeper) DetachPortFromNqn(ctx context.Context, nqn string, port st
 }
 
 func (k *NvmetKeeper) CreateHost(ctx context.Context, n nvmet.Host) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	existingHost, err := snip.ReadHost(n.Nqn)
 	if err != nil {
@@ -523,7 +526,7 @@ func (k *NvmetKeeper) CreateHost(ctx context.Context, n nvmet.Host) error {
 }
 
 func (k *NvmetKeeper) AllowHost(ctx context.Context, nqn string, host string) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	err := snip.AllowHost(nqn, host)
 	if err != nil {
@@ -538,7 +541,7 @@ func (k *NvmetKeeper) AllowHost(ctx context.Context, nqn string, host string) er
 }
 
 func (k *NvmetKeeper) DisallowHost(ctx context.Context, nqn string, host string) error {
-	snip := nvmet.NewSnippets(ctx, k.useSudo)
+	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	err := snip.DisallowHost(nqn, host)
 	if err != nil {

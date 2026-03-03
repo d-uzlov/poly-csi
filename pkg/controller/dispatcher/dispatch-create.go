@@ -18,7 +18,6 @@ import (
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 type IdFields struct {
@@ -67,14 +66,12 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.serverName, err)
 	}
 
-	ctx = transport.MakeContext(ctx, srv.trInstance)
-
-	str, err := storagefactory.StorageFromType(dispatchParams.storageType, srv.conf.Commands, srv.conf.GlobalParams)
+	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.conf.Commands, srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shr, err := sharefactory.ShareFromType(dispatchParams.shareType, srv.conf.Commands, srv.conf.GlobalParams)
+	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.shareType, srv.conf.Commands, srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +169,6 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	if req.VolumeContentSource != nil {
 		var sourceSnapshot storage.Snapshot
 		var sourceServer *parsedServer
-		var sourceCtx context.Context
 		var sourceCaps *storage.Capabilities
 
 		tmpSnapshotId := "snap-for-" + req.Name
@@ -191,10 +187,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				return nil, fmt.Errorf("clone from non-native snapshot is not supported")
 			}
 
-			sourceCtx = transport.MakeContext(ctx, sh.srv.trInstance)
 			sourceServer = sh.srv
 
-			sourceStr, err := storagefactory.StorageFromType(sh.si.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
+			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
 			if err != nil {
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
@@ -217,10 +212,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				return nil, fmt.Errorf("source volume is not found")
 			}
 
-			sourceCtx = transport.MakeContext(ctx, sh.srv.trInstance)
 			sourceServer = sh.srv
 
-			sourceStr, err := storagefactory.StorageFromType(sh.vi.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
+			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
 			if err != nil {
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
@@ -254,8 +248,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		if sourceSnapshot == nil {
 			return nil, fmt.Errorf("unexpectedly missing source snapshot data")
 		}
-		if sourceCtx == nil {
-			return nil, fmt.Errorf("unexpectedly missing source context")
+		if sourceServer == nil {
+			return nil, fmt.Errorf("unexpectedly missing source server")
 		}
 
 		var sendFunc sendFuncType
@@ -274,7 +268,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		} else if sourceCaps.LocalVolume != "" && targetCaps.LocalVolume != "" &&
 			sourceCaps.LocalVolume == targetCaps.LocalVolume {
 			// File-based volumes, can copy contents
-			sourcePath, releaseSnapshot, err := sourceSnapshot.GetLocalPath(sourceCtx)
+			sourcePath, releaseSnapshot, err := sourceSnapshot.GetLocalPath(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("get snapshot local path: %w", err)
 			}
@@ -293,10 +287,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			switch sourceCaps.LocalVolume {
 			case storage.VolFolder:
 				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
-					return sendTar(ctx, sourcePath, targetFile, timeout)
+					return sendTar(ctx, sourceServer.trInstance, sourcePath, targetFile, timeout)
 				}
 				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
-					err := receiveTar(ctx, sourceFile, targetPath, timeout)
+					err := receiveTar(ctx, srv.trInstance, sourceFile, targetPath, timeout)
 					if err != nil {
 						return nil, fmt.Errorf("receive tar: %w", err)
 					}
@@ -304,10 +298,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 				}
 			case storage.VolDevice:
 				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
-					return sendFile(ctx, sourcePath, targetFile, timeout)
+					return sendFile(ctx, sourceServer.trInstance, sourcePath, targetFile, timeout)
 				}
 				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
-					err := receiveFile(ctx, sourceFile, targetPath, timeout)
+					err := receiveFile(ctx, srv.trInstance, sourceFile, targetPath, timeout)
 					if err != nil {
 						return nil, fmt.Errorf("receive device file: %w", err)
 					}
@@ -331,7 +325,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("createClonePipes: %w", err)
 		}
 
-		sendCtx, sendCancel := context.WithTimeout(sourceCtx, timeout)
+		sendCtx, sendCancel := context.WithTimeout(ctx, timeout)
 		defer sendCancel()
 		sendCh := make(chan error, 1)
 		go func() {
@@ -388,7 +382,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		if err != nil {
 			return nil, fmt.Errorf("get local file: %w", err)
 		}
-		err = checkFile(ctx, strCaps.LocalVolume, localPath)
+		err = checkFile(ctx, srv.trInstance, strCaps.LocalVolume, localPath)
 		if err != nil {
 			return nil, fmt.Errorf("check local file: %w", err)
 		}
@@ -485,14 +479,12 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	strInstance, err := storagefactory.StorageFromType(mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}

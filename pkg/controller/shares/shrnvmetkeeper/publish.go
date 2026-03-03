@@ -79,7 +79,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			Nqn:      hostNqn,
 			NeedAuth: false,
 		}.Json())
-		err = transport.CheckedRun(ctx, cmd)
+		err = transport.CheckedRun(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
@@ -87,7 +87,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		authType = cntrnvme.AuthTypeDhChap
 
 		cmd := []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
-		hostKey, err := transport.CheckedRunStdout(ctx, cmd)
+		hostKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
@@ -95,7 +95,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
 		}
 		cmd = []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
-		controllerKey, err := transport.CheckedRunStdout(ctx, cmd)
+		controllerKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
@@ -119,14 +119,14 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			HashType:      nvmet.HashTypeHmacSha256,
 			DhGroup:       nvmet.DhGroup2048,
 		}.Json())
-		err = transport.CheckedRun(ctx, cmd)
+		err = transport.CheckedRun(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
 	}
 
 	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "allow", c.Nqn, hostNqn)
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("subsys allow: %w", err)
 	}
@@ -167,7 +167,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 	}
 
 	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "disallow", c.Nqn, pd.HostNqn)
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys disallow: %w", err)
 	}

@@ -10,18 +10,21 @@ import (
 )
 
 type Volume struct {
+	tr transport.Transport
+
 	Path string `json:"path"`
 }
 
 var _ storage.Volume = &Volume{}
 
-func newVolume(path string) *Volume {
+func newVolume(tr transport.Transport, path string) *Volume {
 	return &Volume{
+		tr:   tr,
 		Path: path,
 	}
 }
 
-func parseVolume(encoded string) (*Volume, error) {
+func parseVolume(tr transport.Transport, encoded string) (*Volume, error) {
 	var result Volume
 	err := json.Unmarshal([]byte(encoded), &result)
 	if err != nil {
@@ -30,6 +33,7 @@ func parseVolume(encoded string) (*Volume, error) {
 	if result.Path == "" {
 		return nil, fmt.Errorf("path is empty")
 	}
+	result.tr = tr
 	return &result, nil
 }
 
@@ -46,7 +50,7 @@ func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
 }
 
 func (v *Volume) Delete(ctx context.Context) error {
-	err := transport.FromContext(ctx).SudoCmds().RmDirRecursive(ctx, v.Path)
+	err := v.tr.SudoCmds().RmDirRecursive(ctx, v.Path)
 	if err != nil {
 		return fmt.Errorf("remove %s: %w", v.Path, err)
 	}

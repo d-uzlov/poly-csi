@@ -10,17 +10,20 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type nvmeConnector struct {
+	tr transport.Transport
 	snip      NvmeSnippets
 	config    Config
 	devFolder string
 }
 
-func New(config Config, devFolder string) connectors.Connector {
+func New(tr transport.Transport, config Config, devFolder string) connectors.Connector {
 	return &nvmeConnector{
-		snip:      newNvmeSnippets(config.NvmeCmd, devFolder, config.ParseKernelLog),
+		tr: tr,
+		snip:      newNvmeSnippets(tr, config.NvmeCmd, devFolder, config.ParseKernelLog),
 		config:    config,
 		devFolder: devFolder,
 	}

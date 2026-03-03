@@ -12,16 +12,20 @@ import (
 )
 
 type manager struct {
+	tr   transport.Transport
 	snip btrfs.Snippets
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
-	snip := btrfs.NewSnippets(cmds.btrfsCmd)
-	return &manager{snip: snip}, nil
+	snip := btrfs.NewSnippets(tr, cmds.btrfsCmd)
+	return &manager{
+		tr:   tr,
+		snip: snip,
+	}, nil
 }
 
 func (m *manager) GetCapabilities() storage.Capabilities {
@@ -39,7 +43,7 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	fsInfo, err := transport.FromContext(ctx).Cmds().Df(ctx, p.parentPath)
+	fsInfo, err := m.tr.Cmds().Df(ctx, p.parentPath)
 	if err != nil {
 		return 0, fmt.Errorf("get filesystem info: %w", err)
 	}
@@ -87,7 +91,7 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 
 	containerPath := fmt.Sprintf("%s/%s", p.parentPath, req.Id)
 
-	err = transport.FromContext(ctx).SudoCmds().Mkdir(ctx, containerPath, false)
+	err = m.tr.SudoCmds().Mkdir(ctx, containerPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("create volume container folder: %w", err)
 	}
@@ -95,7 +99,7 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 	vol := newVolume(containerPath, m.snip)
 	err = vol.createMainVolume(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("create subvol: %w", err)
+		return nil, fmt.Errorf("createMainVolume: %w", err)
 	}
 
 	success := false
@@ -128,7 +132,7 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 
 	containerPath := fmt.Sprintf("%s/%s", p.parentPath, req.Id)
 
-	err = transport.FromContext(ctx).SudoCmds().Mkdir(ctx, containerPath, false)
+	err = m.tr.SudoCmds().Mkdir(ctx, containerPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("create volume container folder: %w", err)
 	}
@@ -162,7 +166,7 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 	}()
 
 	if containerPath+"/"+volumeName != vol.getMainVolume() {
-		err = transport.FromContext(ctx).SudoCmds().Move(ctx, containerPath+"/"+volumeName, vol.getMainVolume())
+		err = m.tr.SudoCmds().Move(ctx, containerPath+"/"+volumeName, vol.getMainVolume())
 		if err != nil {
 			return nil, fmt.Errorf("move received dataset: %w", err)
 		}

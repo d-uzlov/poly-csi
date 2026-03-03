@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"meoe.io/poly-csi/pkg/nvmetkeeper"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -50,14 +49,13 @@ When need_auth=true, all host_key, controller_key, hash_type, dh_group must be s
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		var c nvmet.Host
 		err = json.Unmarshal([]byte(args[0]), &c)
 		if err != nil {

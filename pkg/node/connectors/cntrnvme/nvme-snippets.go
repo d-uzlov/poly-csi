@@ -12,13 +12,15 @@ import (
 )
 
 type NvmeSnippets struct {
+	tr             transport.Transport
 	cmd            []string
 	devFolder      string
 	parseKernelLog bool
 }
 
-func newNvmeSnippets(cmd []string, devFolder string, parseKernelLog bool) NvmeSnippets {
+func newNvmeSnippets(tr transport.Transport, cmd []string, devFolder string, parseKernelLog bool) NvmeSnippets {
 	return NvmeSnippets{
+		tr:             tr,
 		cmd:            cmd,
 		devFolder:      devFolder,
 		parseKernelLog: parseKernelLog,
@@ -30,8 +32,7 @@ type nvmeNodeInfo struct {
 	hostId  string
 }
 
-func nvmeGetNodeInfo(ctx context.Context) (*nvmeNodeInfo, error) {
-	tr := transport.FromContext(ctx)
+func nvmeGetNodeInfo(ctx context.Context, tr transport.Transport) (*nvmeNodeInfo, error) {
 	hostNqn, err := tr.Cmds().Read(ctx, "/etc/nvme/hostnqn", true)
 	if err != nil {
 		return nil, fmt.Errorf("read /etc/nvme/hostnqn: %w", err)
@@ -96,7 +97,7 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 	if controllerKey != "" {
 		cmd = append(cmd, "--dhchap-ctrl-secret", controllerKey)
 	}
-	_, err := transport.RelaxedRun(ctx, cmd, "already connected")
+	_, err := transport.RelaxedRun(ctx, snip.tr, cmd, "already connected")
 	if err != nil {
 		return fmt.Errorf("nvme connect '%s': %w", targetNqn, err)
 	}
@@ -106,7 +107,7 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 func (snip *NvmeSnippets) Disconnect(ctx context.Context, nqn string) error {
 	cmd := append(snip.cmd, "disconnect", "--nqn", nqn)
 	// nvme disconnect returns success when nqn is already disconnected
-	err := transport.CheckedRun(ctx, cmd)
+	err := transport.CheckedRun(ctx, snip.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("nvme disconnect '%s': %w", nqn, err)
 	}
@@ -203,7 +204,7 @@ type nvmeInfo struct {
 
 func (snip *NvmeSnippets) ListSubsys(ctx context.Context) ([]nvmeInfo, error) {
 	cmd := append(snip.cmd, "list", "--verbose", "--output-format=json")
-	stdout, err := transport.CheckedRunStdout(ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, snip.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("nvme list: %w", err)
 	}
@@ -231,7 +232,7 @@ func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
 	for _, c := range nqnInfo.Controllers {
 		devPath := snip.devFolder + "/" + c.Controller
 		cmd := append(snip.cmd, "ns-rescan", "--verbose", devPath)
-		err = transport.CheckedRun(ctx, cmd)
+		err = transport.CheckedRun(ctx, snip.tr, cmd)
 		if err != nil {
 			err = fmt.Errorf("nvme ns-rescan '%s': %w", devPath, err)
 			slogctx.FromCtx(ctx).Error("nvme ns-rescan failed", "error", err)

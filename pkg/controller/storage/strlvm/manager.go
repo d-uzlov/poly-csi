@@ -11,16 +11,20 @@ import (
 )
 
 type manager struct {
+	tr   transport.Transport
 	snip lvm.Snippets
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
-	snip := lvm.NewSnippets(cmds.lvmCmd)
-	return &manager{snip: snip}, nil
+	snip := lvm.NewSnippets(tr, cmds.lvmCmd)
+	return &manager{
+		tr:   tr,
+		snip: snip,
+	}, nil
 }
 
 func (m *manager) GetCapabilities() storage.Capabilities {
@@ -38,7 +42,7 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	fsInfo, err := transport.FromContext(ctx).Cmds().Df(ctx, p.vgName)
+	fsInfo, err := m.tr.Cmds().Df(ctx, p.vgName)
 	if err != nil {
 		return 0, fmt.Errorf("get filesystem info: %w", err)
 	}

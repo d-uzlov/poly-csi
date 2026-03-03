@@ -10,6 +10,7 @@ import (
 )
 
 type Snippets struct {
+	tr       transport.Transport
 	btrfsCmd []string
 }
 
@@ -21,15 +22,16 @@ type BtrfsJsonResult struct {
 	FilesystemDf []QuotaEntry `json:"filesystem-df"`
 }
 
-func NewSnippets(btrfsCmd []string) Snippets {
+func NewSnippets(tr transport.Transport, btrfsCmd []string) Snippets {
 	return Snippets{
+		tr:       tr,
 		btrfsCmd: btrfsCmd,
 	}
 }
 
 func (s *Snippets) SubvolumeTest(ctx context.Context, path string) (exists bool, err error) {
 	cmd := append(s.btrfsCmd, "subvolume", "show", path)
-	recovered, err := transport.RelaxedRun(ctx, cmd, "Not a Btrfs subvolume")
+	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "Not a Btrfs subvolume")
 	if err != nil {
 		return false, err
 	}
@@ -41,7 +43,7 @@ func (s *Snippets) SubvolumeTest(ctx context.Context, path string) (exists bool,
 
 func (s *Snippets) SubvolumeCreate(ctx context.Context, path string) (alreadyExists bool, err error) {
 	cmd := append(s.btrfsCmd, "subvolume", "create", path)
-	alreadyExists, err = transport.RelaxedRun(ctx, cmd, "target path already exists")
+	alreadyExists, err = transport.RelaxedRun(ctx, s.tr, cmd, "target path already exists")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -50,7 +52,7 @@ func (s *Snippets) SubvolumeCreate(ctx context.Context, path string) (alreadyExi
 
 func (s *Snippets) SubvolumeDelete(ctx context.Context, path string) (doesNotExist bool, err error) {
 	cmd := append(s.btrfsCmd, "subvolume", "delete", path)
-	doesNotExist, err = transport.RelaxedRun(ctx, cmd, "No such file or directory")
+	doesNotExist, err = transport.RelaxedRun(ctx, s.tr, cmd, "No such file or directory")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -59,7 +61,7 @@ func (s *Snippets) SubvolumeDelete(ctx context.Context, path string) (doesNotExi
 
 func (s *Snippets) SubvolumeSnapshot(ctx context.Context, source string, dest string) error {
 	cmd := append(s.btrfsCmd, "subvolume", "snapshot", "-r", source, dest)
-	err := transport.CheckedRun(ctx, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -71,8 +73,7 @@ func (s *Snippets) Send(ctx context.Context, sourceSnapshot string, targetFile s
 		"send",
 		sourceSnapshot,
 	)
-	tr := transport.FromContext(ctx)
-	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -87,8 +88,7 @@ func (s *Snippets) Receive(ctx context.Context, targetParent string, sourceFile 
 		"receive",
 		targetParent,
 	)
-	tr := transport.FromContext(ctx)
-	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", cmd, err)
 	}

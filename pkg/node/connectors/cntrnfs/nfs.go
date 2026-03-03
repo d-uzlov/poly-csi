@@ -7,13 +7,17 @@ import (
 
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type nfsConnector struct {
+	tr transport.Transport
 }
 
-func New() connectors.Connector {
-	return &nfsConnector{}
+func New(tr transport.Transport) connectors.Connector {
+	return &nfsConnector{
+		tr: tr,
+	}
 }
 
 const nfsMountSuffix = "/nfs_mount"
@@ -36,7 +40,7 @@ func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectReques
 	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
 
 	mountTarget := req.StagingTargetPath + nfsMountSuffix
-	mi, err := fsutils.EnsureMounted(nfsPath, mountTarget, req.AccessMount.FsType, req.AccessMount.MountFlags)
+	mi, err := fsutils.New(m.tr).EnsureMounted(nfsPath, mountTarget, req.AccessMount.FsType, req.AccessMount.MountFlags)
 	if err != nil {
 		return nil, err
 	}

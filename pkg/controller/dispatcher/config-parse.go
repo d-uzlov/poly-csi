@@ -173,6 +173,8 @@ func (c *parsedServer) InitTransport(ctx context.Context, logPrefix string) erro
 	return nil
 }
 
+// InitDatabase fills parsedServer.dbInstance
+// must be called after InitTransport
 func (c *parsedServer) InitDatabase(ctx context.Context, logPrefix string) error {
 	if c.dbInstance != nil {
 		return nil
@@ -200,7 +202,7 @@ func (c *parsedServer) InitDatabase(ctx context.Context, logPrefix string) error
 		return fmt.Errorf("config contains errors")
 	}
 
-	instance, err := inflater(ctx)
+	instance, err := inflater(c.trInstance)
 	if err != nil {
 		return fmt.Errorf("inflate: %w", err)
 	}

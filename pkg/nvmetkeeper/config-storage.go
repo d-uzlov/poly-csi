@@ -10,6 +10,7 @@ import (
 )
 
 type ConfigStorage struct {
+	tr           transport.Transport
 	configFolder string
 	useSudo      bool
 	sudoPrefix   string
@@ -23,12 +24,13 @@ type savedSubsys struct {
 	attachedHosts []string
 }
 
-func NewConfigStorage(configFolder string, useSudo bool, saveState bool) ConfigStorage {
+func NewConfigStorage(tr transport.Transport, configFolder string, useSudo bool, saveState bool) ConfigStorage {
 	sudoPrefix := ""
 	if useSudo {
 		sudoPrefix = "sudo"
 	}
 	return ConfigStorage{
+		tr:           tr,
 		configFolder: configFolder,
 		useSudo:      useSudo,
 		sudoPrefix:   sudoPrefix,
@@ -37,7 +39,7 @@ func NewConfigStorage(configFolder string, useSudo bool, saveState bool) ConfigS
 }
 
 func (k *ConfigStorage) listPorts(ctx context.Context) ([]nvmet.Port, error) {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/ports/", k.configFolder)
 	portsList, err := cmds.Ls(ctx, path)
@@ -66,7 +68,7 @@ func (k *ConfigStorage) listPorts(ctx context.Context) ([]nvmet.Port, error) {
 }
 
 func (k *ConfigStorage) listHosts(ctx context.Context) ([]nvmet.Host, error) {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/hosts/", k.configFolder)
 	hostsList, err := cmds.Ls(ctx, path)
@@ -95,7 +97,7 @@ func (k *ConfigStorage) listHosts(ctx context.Context) ([]nvmet.Host, error) {
 }
 
 func (k *ConfigStorage) listSubsystems(ctx context.Context) ([]savedSubsys, error) {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/", k.configFolder)
 	subsystemsList, err := cmds.Ls(ctx, path)
@@ -171,7 +173,7 @@ func (k *ConfigStorage) savePort(ctx context.Context, c nvmet.Port) error {
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/ports/", k.configFolder)
 	err := sudoCmds.Mkdir(ctx, path, true)
@@ -196,7 +198,7 @@ func (k *ConfigStorage) deletePortConfig(ctx context.Context, name string) error
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/ports/%s.json", k.configFolder, name)
 	err := sudoCmds.RmFile(ctx, path)
@@ -211,7 +213,7 @@ func (k *ConfigStorage) saveNamespace(ctx context.Context, c nvmet.Ns) error {
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/namespaces", k.configFolder, c.Nqn)
 	err := sudoCmds.Mkdir(ctx, path, false)
@@ -237,7 +239,7 @@ func (k *ConfigStorage) deleteNamespace(ctx context.Context, nqn string, nsid st
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/namespaces/%s.json", k.configFolder, nqn, nsid)
 	err := sudoCmds.RmFile(ctx, path)
@@ -252,7 +254,7 @@ func (k *ConfigStorage) saveSubsystem(ctx context.Context, c nvmet.Subsys) error
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s", k.configFolder, c.Nqn)
 	err := sudoCmds.Mkdir(ctx, path, true)
@@ -277,7 +279,7 @@ func (k *ConfigStorage) deleteSubsystem(ctx context.Context, nqn string) error {
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/subsys.json", k.configFolder, nqn)
 	err := sudoCmds.RmFile(ctx, path)
@@ -292,7 +294,7 @@ func (k *ConfigStorage) saveSubsystemAttachment(ctx context.Context, nqn string,
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/attachments", k.configFolder, nqn)
 	err := sudoCmds.Mkdir(ctx, path, false)
@@ -314,7 +316,7 @@ func (k *ConfigStorage) deleteSubsystemAttachment(ctx context.Context, nqn strin
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/attachments/%s", k.configFolder, nqn, port)
 	err := sudoCmds.RmFile(ctx, path)
@@ -329,7 +331,7 @@ func (k *ConfigStorage) saveHost(ctx context.Context, c nvmet.Host) error {
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/hosts/", k.configFolder)
 	err := sudoCmds.Mkdir(ctx, path, true)
@@ -356,7 +358,7 @@ func (k *ConfigStorage) saveHostAttachment(ctx context.Context, nqn string, host
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/hosts", k.configFolder, nqn)
 	err := sudoCmds.Mkdir(ctx, path, false)
@@ -378,7 +380,7 @@ func (k *ConfigStorage) deleteHostAttachment(ctx context.Context, nqn string, ho
 		return nil
 	}
 
-	sudoCmds := transport.FromContext(ctx).Cmds()
+	sudoCmds := k.tr.Cmds()
 
 	path := fmt.Sprintf("%s/subsystems/%s/hosts/%s", k.configFolder, nqn, host)
 	err := sudoCmds.RmFile(ctx, path)

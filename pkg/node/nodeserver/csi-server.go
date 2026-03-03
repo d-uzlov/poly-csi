@@ -23,7 +23,7 @@ type Server struct {
 }
 
 func NewNodeServer(ctx context.Context, logger *slog.Logger) *Server {
-	tr, err := localexec.New(ctx)
+	tr, err := localexec.New()
 	if err != nil {
 		panic(err)
 	}
@@ -116,8 +116,6 @@ func (s *Server) logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryS
 	// logMethod("GRPC request", "request", protosanitizer.StripSecrets(req))
 
 	ctx = slogctx.NewCtx(ctx, logger)
-	// node is expected to run all commands locally
-	ctx = transport.MakeContext(ctx, s.tr)
 
 	resp, err := handler(ctx, req)
 	if err != nil {

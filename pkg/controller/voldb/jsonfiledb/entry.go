@@ -10,6 +10,7 @@ import (
 )
 
 type Entry struct {
+	tr        transport.Transport
 	directory string
 	uuid      string
 }
@@ -19,15 +20,16 @@ const (
 	lockFile = "@lock"
 )
 
-func newEntry(directory string, uuid string) *Entry {
+func newEntry(tr transport.Transport, directory string, uuid string) *Entry {
 	return &Entry{
+		tr:        tr,
 		directory: directory,
 		uuid:      strings.TrimSpace(uuid),
 	}
 }
 
 func (e Entry) DeleteEntry(ctx context.Context) error {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 
 	err := cmds.RmDirRecursive(ctx, e.directory)
 	if err != nil {
@@ -38,7 +40,7 @@ func (e Entry) DeleteEntry(ctx context.Context) error {
 
 // unsafeCreate should be called after acquiring global lock
 func (e Entry) unsafeCreate(ctx context.Context) error {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 
 	err := cmds.Mkdir(ctx, e.directory, true)
 	if err != nil {
@@ -55,7 +57,7 @@ func (e Entry) unsafeCreate(ctx context.Context) error {
 
 func (e Entry) readUuid(ctx context.Context) (string, error) {
 	uuidPath := fmt.Sprintf("%s/%s", e.directory, uuidFile)
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 	uuid, err := cmds.Read(ctx, uuidPath, false)
 	if err != nil {
 		return "", err
@@ -77,14 +79,14 @@ func (e *Entry) fillUuid(ctx context.Context) error {
 
 func (e Entry) Lock(ctx context.Context) (release func(ctx context.Context) error, err error) {
 	lockPath := fmt.Sprintf("%s/%s", e.directory, lockFile)
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 	// TODO make timeout infinite?
 	release, err = cmds.CreateLock(ctx, lockPath, time.Minute)
 	return release, err
 }
 
 func (e Entry) CheckValid(ctx context.Context) (empty bool, err error) {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 
 	sr, err := cmds.Stat(ctx, e.directory)
 	if err != nil {
@@ -115,7 +117,7 @@ func (e Entry) CheckValid(ctx context.Context) (empty bool, err error) {
 }
 
 func (e Entry) ListModules(ctx context.Context) ([]string, error) {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 
 	modules, err := cmds.Ls(ctx, e.directory)
 	if err != nil {
@@ -126,7 +128,7 @@ func (e Entry) ListModules(ctx context.Context) ([]string, error) {
 }
 
 func (e Entry) SetModule(ctx context.Context, module string, data []byte) error {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 	if !validateId(module) {
 		return fmt.Errorf("module name '%s' is invalid", module)
 	}
@@ -141,7 +143,7 @@ func (e Entry) SetModule(ctx context.Context, module string, data []byte) error 
 }
 
 func (e Entry) GetModule(ctx context.Context, module string) ([]byte, error) {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 	if !validateId(module) {
 		return nil, fmt.Errorf("module name '%s' is invalid", module)
 	}
@@ -159,7 +161,7 @@ func (e Entry) GetModule(ctx context.Context, module string) ([]byte, error) {
 }
 
 func (e Entry) DeleteModule(ctx context.Context, module string) error {
-	cmds := transport.FromContext(ctx).Cmds()
+	cmds := e.tr.Cmds()
 	if !validateId(module) {
 		return fmt.Errorf("module name '%s' is invalid", module)
 	}

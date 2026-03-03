@@ -11,7 +11,6 @@ import (
 	"meoe.io/poly-csi/cmd/builtinplugin/config"
 	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/node/multipath/mpplugin/mppluginconfig"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -38,7 +37,7 @@ func main() {
 	// set log level after the 'using config' log entry, so that it is always present
 	logLevel.Set(appConfig.LogLevel)
 
-	tr, err := localexec.New(ctx)
+	tr, err := localexec.New()
 	if err != nil {
 		panic(err.Error())
 	}
@@ -59,8 +58,8 @@ func main() {
 			panic("connector config is not valid")
 		}
 
-		instance := conf.Connector.Inflate()
-		serverInstance := conf.InflateServer(transport.MakeContext(ctx, tr), instance)
+		instance := conf.Connector.Inflate(tr)
+		serverInstance := conf.InflateServer(ctx, instance)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {
@@ -83,8 +82,8 @@ func main() {
 		if !conf.Multipath.Valid {
 			panic("multipath config is not valid")
 		}
-		instance := conf.Multipath.Inflate()
-		serverInstance := conf.InflateServer(transport.MakeContext(ctx, tr), instance)
+		instance := conf.Multipath.Inflate(tr)
+		serverInstance := conf.InflateServer(ctx, instance)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {

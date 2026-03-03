@@ -98,8 +98,7 @@ func (s *Snippets) GetProperties(ctx context.Context, path string) (*DatasetStat
 	}
 	// -p Display numbers in parsable (exact) values.
 	cmd := append(s.zfsCmd, "get", strings.Join(properties, ","), path, "-p", "--json")
-	tr := transport.FromContext(ctx)
-	runResult, err := tr.RunCommand(ctx, cmd)
+	runResult, err := s.tr.RunCommand(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("zfs get dataset '%s' properties: %w", path, err)
 	}

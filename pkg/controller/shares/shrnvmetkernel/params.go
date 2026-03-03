@@ -26,12 +26,11 @@ func parseCommands(src map[string][]string) (commands, error) {
 	}, nil
 }
 
-func (c commands) ready(ctx context.Context) bool {
+func (c commands) ready(ctx context.Context, tr transport.Transport) bool {
 	if len(c.readyCmd) == 0 {
 		return true
 	}
 
-	tr := transport.FromContext(ctx)
 	runResult, err := tr.RunCommand(ctx, c.readyCmd)
 	if err != nil {
 		return false
@@ -42,12 +41,11 @@ func (c commands) ready(ctx context.Context) bool {
 	return true
 }
 
-func (c commands) save(ctx context.Context) error {
+func (c commands) save(ctx context.Context, tr transport.Transport) error {
 	if len(c.saveCmd) == 0 {
 		return fmt.Errorf("save command is not defined")
 	}
 
-	tr := transport.FromContext(ctx)
 	runResult, err := tr.RunCommand(ctx, c.saveCmd)
 	if err != nil {
 		return err

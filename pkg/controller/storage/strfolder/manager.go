@@ -9,10 +9,14 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-type manager struct{}
+type manager struct {
+	tr transport.Transport
+}
 
-func New(commands map[string][]string, globalParams map[string]string) storage.StorageManager {
-	return &manager{}
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) storage.StorageManager {
+	return &manager{
+		tr: tr,
+	}
 }
 
 func (m *manager) GetCapabilities() storage.Capabilities {
@@ -29,7 +33,7 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	fsInfo, err := transport.FromContext(ctx).Cmds().Df(ctx, p.parentFolder)
+	fsInfo, err := m.tr.Cmds().Df(ctx, p.parentFolder)
 	if err != nil {
 		return 0, fmt.Errorf("get filesystem info: %w", err)
 	}
@@ -38,7 +42,7 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 }
 
 func (m *manager) ParseVolume(serialized string) (storage.Volume, error) {
-	return parseVolume(serialized)
+	return parseVolume(m.tr, serialized)
 }
 
 func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateRequest) (storage.Volume, error) {
@@ -58,12 +62,12 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 
 	folderPath := fmt.Sprintf("%s/%s", p.parentFolder, req.Id)
 
-	err = transport.FromContext(ctx).SudoCmds().Mkdir(ctx, folderPath, true)
+	err = m.tr.SudoCmds().Mkdir(ctx, folderPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("create volume folder: %w", err)
 	}
 
-	return newVolume(folderPath), nil
+	return newVolume(m.tr, folderPath), nil
 }
 
 func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.CreateRequest, timeout time.Duration) (storage.Volume, error) {

@@ -13,6 +13,7 @@ import (
 )
 
 type localMp struct {
+	tr     transport.Transport
 	config Config
 }
 
@@ -27,8 +28,9 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func NewLocalMp(config Config) multipath.Multipath {
+func NewLocalMp(tr transport.Transport, config Config) multipath.Multipath {
 	return &localMp{
+		tr:     tr,
 		config: config,
 	}
 }
@@ -37,7 +39,7 @@ func (l *localMp) Ready(ctx context.Context) bool {
 	// multipathd does not support "-k" and "command" as different arguments,
 	// it required that "command" is concatenated to "-k"
 	cmd := []string{"multipathd", "-k" + "show status"}
-	recovered, err := transport.RelaxedRun(ctx, cmd, "failed to connect to multipathd")
+	recovered, err := transport.RelaxedRun(ctx, l.tr, cmd, "failed to connect to multipathd")
 	if err != nil {
 		err = fmt.Errorf("multipathd -k'show status': %w", err)
 		slogctx.FromCtx(ctx).Error("multipath Status check failed", "error", err)
@@ -53,7 +55,7 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.Multi
 	wwid := ""
 	for _, v := range devices {
 		cmd := []string{"multipath", "-a", v}
-		stdout, err := transport.CheckedRunStdout(ctx, cmd)
+		stdout, err := transport.CheckedRunStdout(ctx, l.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("%s (add device to config): %w", cmd, err)
 		}
@@ -68,17 +70,15 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.Multi
 		}
 	}
 	cmd := []string{"multipath", "-r"}
-	_, err := transport.CheckedRunStdout(ctx, cmd)
+	_, err := transport.CheckedRunStdout(ctx, l.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)
 	}
 
-	tr := transport.FromContext(ctx)
-
 	deviceLink := l.config.MapperFolder + "/" + wwid
 	// device mapper creates links in background, need to wait for it to appear
 	err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-		stat, err := tr.Cmds().Stat(ctx, deviceLink)
+		stat, err := l.tr.Cmds().Stat(ctx, deviceLink)
 		if err != nil {
 			// runtime errors should be self-explanatory
 			return err
@@ -112,12 +112,12 @@ func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
 	}
 
 	cmd := []string{"multipath", "-f", data.Wwid}
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, l.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s (disable DM device): %w", cmd, err)
 	}
 	cmd = []string{"multipath", "-w", data.Wwid}
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, l.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s (remove wwid from config): %w", cmd, err)
 	}

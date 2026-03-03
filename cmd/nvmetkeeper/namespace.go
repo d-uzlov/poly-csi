@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"meoe.io/poly-csi/pkg/nvmetkeeper"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -41,14 +40,13 @@ nvmet_keeper namespace create '{"nqn":"nqn.2014-08.org.com.example:subsys","nsid
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		var c nvmet.Ns
 		err = json.Unmarshal([]byte(args[0]), &c)
 		if err != nil {

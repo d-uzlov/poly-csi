@@ -9,6 +9,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/storage/strlvm"
 	"meoe.io/poly-csi/pkg/controller/storage/strzfsdataset"
 	"meoe.io/poly-csi/pkg/controller/storage/strzfszvol"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 const (
@@ -19,18 +20,18 @@ const (
 	VolumeManagerLvmThick   = "lvm-thick"
 )
 
-func StorageFromType(vmType string, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
+func StorageFromType(tr transport.Transport, vmType string, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
 	switch vmType {
 	case VolumeManagerZfsDataset:
-		return strzfsdataset.New(commands, globalParams)
+		return strzfsdataset.New(tr, commands, globalParams)
 	case VolumeManagerZfsZvol:
-		return strzfszvol.New(commands, globalParams)
+		return strzfszvol.New(tr, commands, globalParams)
 	case VolumeManagerFolder:
-		return strfolder.New(commands, globalParams), nil
+		return strfolder.New(tr, commands, globalParams), nil
 	case VolumeManagerBtrfs:
-		return strbtrfs.New(commands, globalParams)
+		return strbtrfs.New(tr, commands, globalParams)
 	case VolumeManagerLvmThick:
-		return strlvm.New(commands, globalParams)
+		return strlvm.New(tr, commands, globalParams)
 	}
 	return nil, fmt.Errorf("unknown storage type: %s", vmType)
 }

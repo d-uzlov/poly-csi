@@ -14,19 +14,19 @@ type tnNfsInfo struct {
 }
 
 type nfsSnippets struct {
-	ctx       context.Context
+	tr        transport.Transport
 	midcltCmd []string
 }
 
-func newNfsSnippets(ctx context.Context, midcltCmd []string) nfsSnippets {
+func newNfsSnippets(tr transport.Transport, midcltCmd []string) nfsSnippets {
 	return nfsSnippets{
-		ctx:       ctx,
+		tr:        tr,
 		midcltCmd: midcltCmd,
 	}
 }
 
-func (s nfsSnippets) configureNfsShare(path string) error {
-	shareList, err := s.listNfsSharesForPath(path)
+func (s nfsSnippets) configureNfsShare(ctx context.Context, path string) error {
+	shareList, err := s.listNfsSharesForPath(ctx, path)
 	if err != nil {
 		return nil
 	}
@@ -36,7 +36,7 @@ func (s nfsSnippets) configureNfsShare(path string) error {
 	}
 
 	cmd := append(s.midcltCmd, "call", "sharing.nfs.create", fmt.Sprintf(`{"path": "%s"}`, path))
-	stdout, err := transport.CheckedRunStdout(s.ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -49,9 +49,9 @@ func (s nfsSnippets) configureNfsShare(path string) error {
 	return nil
 }
 
-func (s nfsSnippets) listNfsSharesForPath(path string) ([]tnNfsInfo, error) {
+func (s nfsSnippets) listNfsSharesForPath(ctx context.Context, path string) ([]tnNfsInfo, error) {
 	cmd := append(s.midcltCmd, "call", "sharing.nfs.query", fmt.Sprintf(`[["path","=","%s"]]`, path))
-	stdout, err := transport.CheckedRunStdout(s.ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -65,8 +65,8 @@ func (s nfsSnippets) listNfsSharesForPath(path string) ([]tnNfsInfo, error) {
 	return shareList, nil
 }
 
-func (s nfsSnippets) removeNfsShare(path string) error {
-	shareList, err := s.listNfsSharesForPath(path)
+func (s nfsSnippets) removeNfsShare(ctx context.Context, path string) error {
+	shareList, err := s.listNfsSharesForPath(ctx, path)
 	if err != nil {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (s nfsSnippets) removeNfsShare(path string) error {
 
 	for _, v := range shareList {
 		cmd := append(s.midcltCmd, "call", "sharing.nfs.delete", fmt.Sprintf("%d", v.Id))
-		err := transport.CheckedRun(s.ctx, cmd)
+		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd, err)
 		}

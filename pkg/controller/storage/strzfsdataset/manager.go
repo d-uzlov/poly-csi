@@ -8,20 +8,25 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
 type manager struct {
+	tr   transport.Transport
 	snip zfs.Snippets
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
-	snip := zfs.NewSnippets(cmds.zfsCmd)
-	return &manager{snip: snip}, nil
+	snip := zfs.NewSnippets(tr, cmds.zfsCmd)
+	return &manager{
+		tr:   tr,
+		snip: snip,
+	}, nil
 }
 
 func (m *manager) GetCapabilities() storage.Capabilities {

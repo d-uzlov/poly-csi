@@ -49,7 +49,7 @@ func parsePublishData(serialized string) (publishData, error) {
 }
 
 func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return nil, fmt.Errorf("nvmet is not ready")
 	}
 	c, err := parseShareData(shareData)
@@ -57,7 +57,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := nvmet.NewSnippets(ctx, true)
+	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
 	nvmeInfo, err := cntrnvme.ParseNvmeInfo(mi)
 	if err != nil {
@@ -74,7 +74,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("allow host: %w", err)
 	}
 
-	err = sh.cmds.save(ctx)
+	err = sh.cmds.save(ctx, sh.tr)
 	if err != nil {
 		return nil, fmt.Errorf("nvmet_save: %w", err)
 	}
@@ -104,7 +104,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 }
 
 func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
-	if !sh.cmds.ready(ctx) {
+	if !sh.cmds.ready(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
 	}
 	c, err := parseShareData(shareData)
@@ -116,14 +116,14 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 		return fmt.Errorf("parse publish data: %w", err)
 	}
 
-	snip := nvmet.NewSnippets(ctx, true)
+	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
 	err = snip.DisallowHost(c.Nqn, pd.HostNqn)
 	if err != nil {
 		return fmt.Errorf("disallow host: %w", err)
 	}
 
-	err = sh.cmds.save(ctx)
+	err = sh.cmds.save(ctx, sh.tr)
 	if err != nil {
 		return fmt.Errorf("nvmet_save: %w", err)
 	}

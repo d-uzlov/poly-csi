@@ -20,18 +20,18 @@ type nfsClientOptions struct {
 }
 
 type nfsSnippets struct {
-	ctx  context.Context
+	tr   transport.Transport
 	cmds commands
 }
 
-func newNfsSnippets(ctx context.Context, cmds commands) nfsSnippets {
+func newNfsSnippets(tr transport.Transport, cmds commands) nfsSnippets {
 	return nfsSnippets{
-		ctx:  ctx,
+		tr:   tr,
 		cmds: cmds,
 	}
 }
 
-func (s nfsSnippets) configureNfsShare(share nfsShareConfig) (string, error) {
+func (s nfsSnippets) configureNfsShare(ctx context.Context, share nfsShareConfig) (string, error) {
 	line := share.path
 	if share.globalFlags != "" {
 		line = fmt.Sprintf("%s -%s", line, share.globalFlags)
@@ -45,26 +45,23 @@ func (s nfsSnippets) configureNfsShare(share nfsShareConfig) (string, error) {
 	}
 	exportsFile := fmt.Sprintf("/etc/exports.d/%s.exports", share.name)
 
-	tr := transport.FromContext(s.ctx)
-
-	err := tr.SudoCmds().Write(s.ctx, exportsFile, []byte(line))
+	err := s.tr.SudoCmds().Write(ctx, exportsFile, []byte(line))
 	if err != nil {
 		return "", fmt.Errorf("write '%s': %w", exportsFile, err)
 	}
-	err = transport.CheckedRun(s.ctx, s.cmds.reloadCmd)
+	err = transport.CheckedRun(ctx, s.tr, s.cmds.reloadCmd)
 	if err != nil {
 		return "", fmt.Errorf("nfs reload: %w", err)
 	}
 	return exportsFile, nil
 }
 
-func (s nfsSnippets) removeNfsShare(token string) error {
-	tr := transport.FromContext(s.ctx)
-	err := tr.SudoCmds().RmFile(s.ctx, token)
+func (s nfsSnippets) removeNfsShare(ctx context.Context, token string) error {
+	err := s.tr.SudoCmds().RmFile(ctx, token)
 	if err != nil {
 		return fmt.Errorf("remove '%s': %w", token, err)
 	}
-	err = transport.CheckedRun(s.ctx, s.cmds.reloadCmd)
+	err = transport.CheckedRun(ctx, s.tr, s.cmds.reloadCmd)
 	if err != nil {
 		return fmt.Errorf("nfs reload: %w", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 // ==== misc ====
@@ -30,9 +29,7 @@ func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityReques
 		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.serverName, err)
 	}
 
-	ctx = transport.MakeContext(ctx, srv.trInstance)
-
-	strInstance, err := storagefactory.StorageFromType(dispatchParams.storageType, srv.conf.Commands, srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.conf.Commands, srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -72,9 +69,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	strInstance, err := storagefactory.StorageFromType(mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +132,7 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	ctx = transport.MakeContext(ctx, mh.srv.trInstance)
-
-	strInstance, err := storagefactory.StorageFromType(mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}

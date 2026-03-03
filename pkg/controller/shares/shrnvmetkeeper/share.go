@@ -11,11 +11,12 @@ import (
 )
 
 type share struct {
+	tr   transport.Transport
 	cmds commandsConfig
 	gp   globalParams
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
@@ -25,6 +26,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
 	return &share{
+		tr:   tr,
 		cmds: cmds,
 		gp:   gp,
 	}, nil
@@ -60,7 +62,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		Nqn:          nqn,
 		AllowAnyHost: allowAnyHost,
 	}.Json())
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return "", fmt.Errorf("subsys create: %w", err)
 	}
@@ -71,13 +73,13 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		DevicePath: devicePath,
 		Enabled:    true,
 	}.Json())
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return "", fmt.Errorf("namespace create: %w", err)
 	}
 
 	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "attach", nqn, p.nvmetPort)
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return "", fmt.Errorf("subsys attach: %w", err)
 	}
@@ -104,13 +106,13 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 	}
 
 	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "detach", c.Nqn, c.Port)
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys detach: %w", err)
 	}
 
 	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "delete", c.Nqn)
-	err = transport.CheckedRun(ctx, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys delete: %w", err)
 	}

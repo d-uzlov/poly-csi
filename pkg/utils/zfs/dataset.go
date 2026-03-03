@@ -22,7 +22,7 @@ func (s *Snippets) CreateDataset(ctx context.Context, path string, config Datase
 		"-o", fmt.Sprintf("reservation=%d", config.Reservation),
 		"-o", fmt.Sprintf("refreservation=%d", config.RefReservation),
 	)
-	recovered, err := transport.RelaxedRun(ctx, cmd, "dataset already exists")
+	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -38,7 +38,7 @@ func (s *Snippets) ConfigureDataset(ctx context.Context, path string, config Dat
 		fmt.Sprintf("refreservation=%d", config.RefReservation),
 		path,
 	)
-	err := transport.CheckedRun(ctx, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -47,7 +47,7 @@ func (s *Snippets) ConfigureDataset(ctx context.Context, path string, config Dat
 
 func (s *Snippets) SetShareNfs(ctx context.Context, path string, nfsOptions string) error {
 	cmd := append(s.zfsCmd, "set", "sharenfs="+nfsOptions, path)
-	err := transport.CheckedRun(ctx, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}

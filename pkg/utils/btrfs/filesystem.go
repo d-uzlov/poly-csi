@@ -16,7 +16,7 @@ type FilesystemDfEntry struct {
 
 func (s *Snippets) FilesystemUsage(ctx context.Context, path string) error {
 	cmd := append(s.btrfsCmd, "--format=json", "filesystem", "df", path)
-	err := transport.CheckedRun(ctx, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}

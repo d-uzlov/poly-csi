@@ -13,7 +13,7 @@ type NvmePublicInfo struct {
 }
 
 func (m *nvmeConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	info, err := nvmeGetNodeInfo(ctx)
+	info, err := nvmeGetNodeInfo(ctx, m.tr)
 	if err != nil {
 		return nil, err
 	}

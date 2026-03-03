@@ -3,8 +3,6 @@ package nvmet
 import (
 	"encoding/json"
 	"fmt"
-
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 type Ns struct {
@@ -57,16 +55,13 @@ func CheckNamespaceEquivalent(requested Ns, existing Ns) bool {
 }
 
 func (s Snippets) ListNamespaces(nqn string) ([]string, error) {
-	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces", nqn)
-	return tr.Cmds().Ls(s.ctx, path)
+	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
 func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s", nqn, nsid)
-	stat, err := tr.Cmds().Stat(s.ctx, path)
+	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("check if folder '%s' exists: %w", path, err)
 	}
@@ -79,25 +74,25 @@ func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
 	}
 
 	attrPath := fmt.Sprintf("%s/device_path", path)
-	devicePath, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	devicePath, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read '%s': %w", attrPath, err)
 	}
 
 	attrPath = fmt.Sprintf("%s/device_uuid", path)
-	deviceUuid, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	deviceUuid, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read '%s': %w", attrPath, err)
 	}
 
 	attrPath = fmt.Sprintf("%s/device_nguid", path)
-	deviceGuid, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	deviceGuid, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read '%s': %w", attrPath, err)
 	}
 
 	attrPath = fmt.Sprintf("%s/enable", path)
-	enabledStdout, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	enabledStdout, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read '%s': %w", attrPath, err)
 	}
@@ -124,7 +119,6 @@ func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
 
 // SetNamespaceEnabled takes full namespace description, but ignores parameters, except for Enabled
 func (s Snippets) SetNamespaceEnabled(c Ns) (err error) {
-	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s", c.Nqn, c.Nsid)
 
 	enable := "0"
@@ -134,7 +128,7 @@ func (s Snippets) SetNamespaceEnabled(c Ns) (err error) {
 
 	attrPath := fmt.Sprintf("%s/enable", path)
 	// we are in defer, we can just set err
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
 	if err != nil {
 		err = fmt.Errorf("write %s to '%s/enable': %w", enable, path, err)
 	}
@@ -143,8 +137,6 @@ func (s Snippets) SetNamespaceEnabled(c Ns) (err error) {
 }
 
 func (s Snippets) ConfigureNamespace(c Ns) (err error) {
-	tr := transport.FromContext(s.ctx)
-
 	existingNs, err := s.ReadNamespace(c.Nqn, c.Nsid)
 	if err != nil {
 		return fmt.Errorf("read nvme ns: %w", err)
@@ -153,7 +145,7 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s", c.Nqn, c.Nsid)
 
 	if existingNs == nil {
-		err := tr.SudoCmds().Mkdir(s.ctx, path, false)
+		err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 		if err != nil {
 			return fmt.Errorf("mkdir '%s': %w", path, err)
 		}
@@ -180,7 +172,7 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 		}
 		attrPath := fmt.Sprintf("%s/enable", path)
 		// we are in defer, we can just set err
-		err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
+		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
 		if err != nil {
 			err = fmt.Errorf("write %s to '%s/enable': %w", enable, path, err)
 		}
@@ -196,7 +188,7 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 	// need to disable NS before configuring it
 	if existingNs.Enabled {
 		attrPath := fmt.Sprintf("%s/enable", path)
-		err = tr.SudoCmds().Write(s.ctx, attrPath, []byte("0"))
+		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte("0"))
 		if err != nil {
 			return fmt.Errorf("write 0 to '%s/enable': %w", path, err)
 		}
@@ -204,20 +196,20 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 	}
 
 	attrPath := fmt.Sprintf("%s/device_path", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DevicePath))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DevicePath))
 	if err != nil {
 		return fmt.Errorf("write '%s' to '%s': %w", c.DevicePath, attrPath, err)
 	}
 	if c.DeviceUuid != "" {
 		attrPath = fmt.Sprintf("%s/device_uuid", path)
-		err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceUuid))
+		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceUuid))
 		if err != nil {
 			return fmt.Errorf("write '%s' to '%s': %w", c.DeviceUuid, attrPath, err)
 		}
 	}
 	if c.DeviceGuid != "" {
 		attrPath = fmt.Sprintf("%s/device_nguid", path)
-		err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceGuid))
+		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceGuid))
 		if err != nil {
 			return fmt.Errorf("write '%s' to '%s': %w", c.DeviceGuid, attrPath, err)
 		}
@@ -226,10 +218,8 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 }
 
 func (s Snippets) DeleteNamespace(nqn string, nsid string) error {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s/", nqn, nsid)
-	err := tr.SudoCmds().RmDir(s.ctx, path)
+	err := s.tr.SudoCmds().RmDir(s.ctx, path)
 	if err != nil {
 		return fmt.Errorf("remove %s: %w", path, err)
 	}

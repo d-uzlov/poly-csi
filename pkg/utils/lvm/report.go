@@ -61,7 +61,7 @@ func (s *Snippets) ListVgs(ctx context.Context, name string) ([]VgReport, error)
 	if name != "" {
 		cmd = append(cmd, name)
 	}
-	stdout, err := transport.CheckedRunStdout(ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -85,7 +85,7 @@ func (s *Snippets) ListLvs(ctx context.Context, vgName string, lvName string) ([
 			cmd = append(cmd, vgName)
 		}
 	}
-	stdout, err := transport.CheckedRunStdout(ctx, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)
 	}

@@ -14,8 +14,7 @@ func (s *Snippets) Send(ctx context.Context, sourceSnapshot string, targetFile s
 		"--large-block",
 		sourceSnapshot,
 	)
-	tr := transport.FromContext(ctx)
-	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}
@@ -30,8 +29,7 @@ func (s *Snippets) Receive(ctx context.Context, targetSnapshot string, sourceFil
 		"receive",
 		targetSnapshot,
 	)
-	tr := transport.FromContext(ctx)
-	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
 	}

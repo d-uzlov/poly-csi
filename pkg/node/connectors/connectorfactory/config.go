@@ -6,6 +6,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type MountConfig struct {
@@ -17,7 +18,7 @@ type MountConfig struct {
 
 type ParsedConnector struct {
 	Valid   bool
-	Inflate func() connectors.Connector
+	Inflate func(tr transport.Transport) connectors.Connector
 	Conf    *MountConfig
 }
 

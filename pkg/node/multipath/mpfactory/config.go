@@ -6,6 +6,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/multipath"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type MultipathConfig struct {
@@ -17,7 +18,7 @@ type MultipathConfig struct {
 
 type ParsedMultipath struct {
 	Valid   bool
-	Inflate func() multipath.Multipath
+	Inflate func(tr transport.Transport) multipath.Multipath
 	Conf    *MultipathConfig
 }
 

@@ -11,12 +11,14 @@ import (
 )
 
 type iscsiadmConnector struct {
+	tr        transport.Transport
 	config    Config
 	devFolder string
 }
 
-func New(config Config, devFolder string) connectors.Connector {
+func New(tr transport.Transport, config Config, devFolder string) connectors.Connector {
 	return &iscsiadmConnector{
+		tr:        tr,
 		config:    config,
 		devFolder: devFolder,
 	}
@@ -52,9 +54,7 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 		return nil, fmt.Errorf("unknown chap type: '%s'", pc.Chap)
 	}
 
-	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
-
-	tr := transport.FromContext(ctx)
+	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
 
 	var combinedError string
 	successCount := 0
@@ -94,7 +94,7 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 		deviceLink := fmt.Sprintf(m.devFolder+"/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
 		// iscsi creates links in background, need to wait for it to appear
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-			stat, err := tr.Cmds().Stat(ctx, deviceLink)
+			stat, err := m.tr.Cmds().Stat(ctx, deviceLink)
 			if err != nil {
 				// runtime errors should be self-explanatory
 				return err
@@ -133,7 +133,7 @@ func (m *iscsiadmConnector) Disconnect(ctx context.Context, serializedConnectorD
 		return fmt.Errorf("parse serialized connector data: %w", err)
 	}
 
-	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
+	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
 
 	is, err := snip.findSessions(vd.Iqn)
 	if err != nil {
@@ -149,7 +149,7 @@ func (m *iscsiadmConnector) Disconnect(ctx context.Context, serializedConnectorD
 }
 
 func (m *iscsiadmConnector) Expand(ctx context.Context, serializedConnectorData string) error {
-	snip := newIscsiSnippets(ctx, m.config.IscsiadmCmd)
+	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
 	// TODO rescan only target devices?
 	err := snip.rescanAll()
 	if err != nil {

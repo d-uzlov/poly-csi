@@ -6,14 +6,16 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
+	tr   transport.Transport
 	cmds commands
 	gp   globalParams
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	cmds, err := parseCommands(commands)
 	if err != nil {
 		return nil, fmt.Errorf("parse commands: %w", err)
@@ -23,6 +25,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
 	return &share{
+		tr:   tr,
 		cmds: cmds,
 		gp:   gp,
 	}, nil
@@ -42,14 +45,14 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("parse params: %w", err)
 	}
 
-	snip := newNfsSnippets(ctx, sh.cmds)
+	snip := newNfsSnippets(sh.tr, sh.cmds)
 
 	mountPath, err := req.Volume.GetLocalPath(ctx)
 	if err != nil {
 		return "", fmt.Errorf("get local path: %w", err)
 	}
 
-	token, err := snip.configureNfsShare(nfsShareConfig{
+	token, err := snip.configureNfsShare(ctx, nfsShareConfig{
 		name:        req.ShareId,
 		path:        mountPath,
 		globalFlags: p.shareOptions,
@@ -73,7 +76,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newNfsSnippets(ctx, sh.cmds)
+	snip := newNfsSnippets(sh.tr, sh.cmds)
 
-	return snip.removeNfsShare(c.ExportsFile)
+	return snip.removeNfsShare(ctx, c.ExportsFile)
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"meoe.io/poly-csi/pkg/nvmetkeeper"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -40,14 +39,13 @@ model and serial can be arbitrary strings. When left empty, Linux kernel will se
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		var c nvmet.Subsys
 		err = json.Unmarshal([]byte(args[0]), &c)
 		if err != nil {
@@ -75,14 +73,13 @@ var subsysDeleteCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		name := args[0]
 		err = k.DeleteSubsys(ctx, name)
 		if err != nil {
@@ -102,14 +99,13 @@ var subsysAttachCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
 		name := args[0]
 		port := args[1]
@@ -132,14 +128,13 @@ var subsysDetachCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
 		name := args[0]
 		port := args[1]
@@ -162,14 +157,13 @@ var subsysAllowHostCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
 		name := args[0]
 		hostNqn := args[1]
@@ -192,14 +186,13 @@ var subsysDisallowHostCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(ctx)
+		localExec, err := localexec.New()
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
-		ctx = transport.MakeContext(ctx, localExec)
 
 		saveState := true
-		k := nvmetkeeper.New(configFolder, useSudo, saveState)
+		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
 		name := args[0]
 		hostNqn := args[1]

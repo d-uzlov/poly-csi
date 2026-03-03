@@ -3,8 +3,6 @@ package nvmet
 import (
 	"fmt"
 	"strconv"
-
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 type Port struct {
@@ -36,16 +34,13 @@ func (c Port) Validate() error {
 }
 
 func (s Snippets) ListPorts() ([]string, error) {
-	tr := transport.FromContext(s.ctx)
 	path := "/sys/kernel/config/nvmet/ports/"
-	return tr.Cmds().Ls(s.ctx, path)
+	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
 func (s Snippets) ReadPort(name string) (*Port, error) {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", name)
-	stat, err := tr.Cmds().Stat(s.ctx, path)
+	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("stat '%s': %w", path, err)
 	}
@@ -58,22 +53,22 @@ func (s Snippets) ReadPort(name string) (*Port, error) {
 	}
 
 	attrPath := fmt.Sprintf("%s/addr_adrfam", path)
-	addrFam, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	addrFam, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_traddr", path)
-	listenAddr, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	listenAddr, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_trsvcid", path)
-	listenPortRaw, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	listenPortRaw, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_trtype", path)
-	transportType, err := tr.Cmds().Read(s.ctx, attrPath, true)
+	transportType, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
@@ -93,31 +88,29 @@ func (s Snippets) ReadPort(name string) (*Port, error) {
 }
 
 func (s Snippets) ConfigurePort(c Port) error {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", c.Name)
-	err := tr.SudoCmds().Mkdir(s.ctx, path, false)
+	err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
 	}
 
 	attrPath := fmt.Sprintf("%s/addr_adrfam", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.AddressFamily))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.AddressFamily))
 	if err != nil {
 		return fmt.Errorf("write '%s' to %s/addr_adrfam: %w", c.AddressFamily, path, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_traddr", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ListenAddr))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ListenAddr))
 	if err != nil {
 		return fmt.Errorf("write '%s' to %s/addr_traddr (listening address): %w", c.ListenAddr, path, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_trsvcid", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(strconv.FormatInt(int64(c.ListenPort), 10)))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(strconv.FormatInt(int64(c.ListenPort), 10)))
 	if err != nil {
 		return fmt.Errorf("write %d to %s/addr_trsvcid (listening port): %w", c.ListenPort, path, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_trtype", path)
-	err = tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.Type))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.Type))
 	if err != nil {
 		return fmt.Errorf("write '%s' to %s/addr_trtype: %w", c.Type, path, err)
 	}
@@ -125,23 +118,19 @@ func (s Snippets) ConfigurePort(c Port) error {
 }
 
 func (s Snippets) DeletePort(name string) error {
-	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", name)
-	return tr.SudoCmds().RmDir(s.ctx, path)
+	return s.tr.SudoCmds().RmDir(s.ctx, path)
 }
 
 func (s Snippets) ListPortAttachments(port string) ([]string, error) {
-	tr := transport.FromContext(s.ctx)
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/", port)
-	return tr.Cmds().Ls(s.ctx, path)
+	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
 func (s Snippets) AttachNqnToPort(nqn string, nvmePort string) error {
-	tr := transport.FromContext(s.ctx)
-
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", nqn)
 	link := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", nvmePort, nqn)
-	stat, err := tr.Cmds().Stat(s.ctx, link)
+	stat, err := s.tr.Cmds().Stat(s.ctx, link)
 	if err != nil {
 		return fmt.Errorf("stat '%s' (checking if nqn is already configured on port): %w", link, err)
 	}
@@ -156,7 +145,7 @@ func (s Snippets) AttachNqnToPort(nqn string, nvmePort string) error {
 		return nil
 	}
 	// link does not exist, need to create it
-	err = tr.SudoCmds().CreateSymlink(s.ctx, link, path)
+	err = s.tr.SudoCmds().CreateSymlink(s.ctx, link, path)
 	if err != nil {
 		return fmt.Errorf("create link '%s' pointing to '%s': %w", path, link, err)
 	}
@@ -164,7 +153,6 @@ func (s Snippets) AttachNqnToPort(nqn string, nvmePort string) error {
 }
 
 func (s Snippets) DetachNqnFromPort(nqn string, nvmePort string) error {
-	tr := transport.FromContext(s.ctx)
 	portsLink := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", nvmePort, nqn)
-	return tr.SudoCmds().RmFile(s.ctx, portsLink)
+	return s.tr.SudoCmds().RmFile(s.ctx, portsLink)
 }

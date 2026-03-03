@@ -13,9 +13,7 @@ import (
 func (ec *ExecCommands) CreateLock(ctx context.Context, lockFile string, maxDuration time.Duration) (func(ctx context.Context) error, error) {
 	lockId := uuid.NewString()
 
-	tr := transport.FromContext(ctx)
-
-	res, err := tr.RunCommand(ctx, []string{
+	res, err := ec.tr.RunCommand(ctx, []string{
 		"flock",
 		lockFile,
 		"sh",
@@ -39,9 +37,7 @@ func (ec *ExecCommands) CreateLock(ctx context.Context, lockFile string, maxDura
 }
 
 func (ec *ExecCommands) ReleaseLock(ctx context.Context, lockFile string, lockId string) error {
-	tr := transport.FromContext(ctx)
-
-	res, err := tr.RunCommand(ctx, []string{
+	res, err := ec.tr.RunCommand(ctx, []string{
 		"flock",
 		lockFile,
 		"sh",

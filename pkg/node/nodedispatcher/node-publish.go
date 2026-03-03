@@ -33,7 +33,9 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	if nvi.FolderPath == "" {
 		return nil, fmt.Errorf("node volume info: FolderPath is empty")
 	}
-	err = fsutils.EnsureBindMount(nvi.FolderPath, req.TargetPath)
+
+	fsnip := fsutils.New(n.tr)
+	err = fsnip.EnsureBindMount(nvi.FolderPath, req.TargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureBindMount: %w", err)
 	}
@@ -47,7 +49,9 @@ func (n *Node) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVo
 	if req.TargetPath == "" {
 		return nil, status.Error(codes.InvalidArgument, "target path is empty")
 	}
-	err := fsutils.Unmount(ctx, req.TargetPath)
+
+	fsnip := fsutils.New(n.tr)
+	err := fsnip.Unmount(ctx, req.TargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("Unmount: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type NodeVolumeInfo struct {
@@ -134,7 +135,7 @@ func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connec
 	return nil
 }
 
-func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume) error {
+func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Transport, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume) error {
 	if v.FolderPath != "" {
 		return nil
 	}
@@ -150,7 +151,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, mp multipath.Mult
 	}
 
 	mountPath := v.parentFolder + managedMountPath
-	err = ensureFolderPath(ctx, device, v, mountRequest, mountPath)
+	err = ensureFolderPath(ctx, tr, device, v, mountRequest, mountPath)
 	if err != nil {
 		return fmt.Errorf("ensureFolderPath: %w", err)
 	}

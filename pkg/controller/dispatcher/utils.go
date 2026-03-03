@@ -49,7 +49,6 @@ func (d *Dispatcher) getVolumeInfo(ctx context.Context, volumeId string) (*volum
 		return nil, fmt.Errorf("server[id=%s]: %w", srvId, err)
 	}
 
-	ctx = transport.MakeContext(ctx, srv.trInstance)
 	dbEntry, err := srv.dbInstance.FindEntry(ctx, volumeName)
 	if err != nil {
 		return nil, fmt.Errorf("server[id=%s].db: get entry: %w", srvId, err)
@@ -112,7 +111,6 @@ func (d *Dispatcher) getSnapshotHandle(ctx context.Context, snapshotId string) (
 		return nil, fmt.Errorf("server[id=%s]: %w", srvId, err)
 	}
 
-	ctx = transport.MakeContext(ctx, srv.trInstance)
 	dbEntry, err := srv.dbInstance.FindEntry(ctx, volumeName)
 	if err != nil {
 		return nil, fmt.Errorf("server[id=%s].db: get entry: %w", srvId, err)
@@ -136,9 +134,7 @@ func (d *Dispatcher) getSnapshotHandle(ctx context.Context, snapshotId string) (
 	}, nil
 }
 
-func checkFile(ctx context.Context, expectedType string, path string) error {
-
-	tr := transport.FromContext(ctx)
+func checkFile(ctx context.Context, tr transport.Transport, expectedType string, path string) error {
 	var stat transport.StatResult
 	var err error
 

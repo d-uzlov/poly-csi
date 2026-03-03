@@ -85,9 +85,7 @@ func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, t
 	}, nil
 }
 
-func sendTar(ctx context.Context, sourceDir string, targetFile string, timeout time.Duration) error {
-	tr := transport.FromContext(ctx)
-
+func sendTar(ctx context.Context, tr transport.Transport, sourceDir string, targetFile string, timeout time.Duration) error {
 	// tar will `cd` into sourceDir and create archive from . (current folder)
 	cmd := []string{"sudo", "tar", "--create", "--file=-", "--directory", sourceDir, "."}
 	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
@@ -100,9 +98,7 @@ func sendTar(ctx context.Context, sourceDir string, targetFile string, timeout t
 	return nil
 }
 
-func receiveTar(ctx context.Context, sourceFile string, targetDir string, timeout time.Duration) error {
-	tr := transport.FromContext(ctx)
-
+func receiveTar(ctx context.Context, tr transport.Transport, sourceFile string, targetDir string, timeout time.Duration) error {
 	cmd := []string{"sudo", "tar", "--extract", "--file=-", "--directory", targetDir}
 	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithoutStdout(), transport.WithTimeout(timeout))
 	if err != nil {
@@ -114,9 +110,7 @@ func receiveTar(ctx context.Context, sourceFile string, targetDir string, timeou
 	return nil
 }
 
-func sendFile(ctx context.Context, sourceFile string, targetFile string, timeout time.Duration) error {
-	tr := transport.FromContext(ctx)
-
+func sendFile(ctx context.Context, tr transport.Transport, sourceFile string, targetFile string, timeout time.Duration) error {
 	cmd := []string{"sudo", "dd", "bs=1M", fmt.Sprintf("if=%s", sourceFile)}
 	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
 	if err != nil {
@@ -128,9 +122,7 @@ func sendFile(ctx context.Context, sourceFile string, targetFile string, timeout
 	return nil
 }
 
-func receiveFile(ctx context.Context, sourceFile string, targetFile string, timeout time.Duration) error {
-	tr := transport.FromContext(ctx)
-
+func receiveFile(ctx context.Context, tr transport.Transport, sourceFile string, targetFile string, timeout time.Duration) error {
 	cmd := []string{"sudo", "dd", "bs=1M", fmt.Sprintf("of=%s", targetFile)}
 	runResult, err := tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithoutStdout(), transport.WithTimeout(timeout))
 	if err != nil {

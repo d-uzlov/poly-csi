@@ -20,7 +20,7 @@ type localExecWrapper struct {
 	isRoot bool
 }
 
-func New(ctx context.Context) (transport.Transport, error) {
+func New() (transport.Transport, error) {
 	uid := os.Getuid()
 	isRoot := uid == 0
 	result := &localExecWrapper{

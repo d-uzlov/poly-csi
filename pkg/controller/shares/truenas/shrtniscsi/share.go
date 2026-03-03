@@ -9,14 +9,16 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares/truenas"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/strzfszvol"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
+	tr   transport.Transport
 	gp   globalParams
 	cmds truenas.Commands
 }
 
-func New(commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
@@ -26,6 +28,7 @@ func New(commands map[string][]string, globalParams map[string]string) (shares.S
 		return nil, fmt.Errorf("parse commands: %w", err)
 	}
 	return &share{
+		tr:   tr,
 		gp:   gp,
 		cmds: cmds,
 	}, nil
@@ -53,9 +56,9 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	iqn := fmt.Sprintf("%s:%s", sh.gp.iqnBase, req.ShareId)
 
-	snip := newSnippets(ctx, sh.cmds.Midclt)
+	snip := newSnippets(sh.tr, sh.cmds.Midclt)
 
-	err = snip.setupTarget(tnIscsiRequest{
+	err = snip.setupTarget(ctx, tnIscsiRequest{
 		extentName: uuid.New().String(),
 		iqn:        iqn,
 		zvol:       zfsVol.Path,
@@ -82,13 +85,13 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newSnippets(ctx, sh.cmds.Midclt)
+	snip := newSnippets(sh.tr, sh.cmds.Midclt)
 
-	err = snip.removeIscsiTarget(c.Iqn)
+	err = snip.removeIscsiTarget(ctx, c.Iqn)
 	if err != nil {
 		return err
 	}
-	err = snip.removeIscsiExtents(c.Zvol)
+	err = snip.removeIscsiExtents(ctx, c.Zvol)
 	if err != nil {
 		return err
 	}
