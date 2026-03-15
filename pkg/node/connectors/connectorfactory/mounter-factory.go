@@ -7,6 +7,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrcifs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
@@ -16,6 +17,7 @@ import (
 
 const (
 	ConnectorTypeNfs      = "nfs"
+	ConnectorTypeCifs     = "cifs"
 	ConnectorTypeNvme     = "nvme"
 	ConnectorTypeIscsiadm = "iscsiadm"
 )
@@ -23,6 +25,9 @@ const (
 var builtinTypes = map[string]func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error){
 	ConnectorTypeNfs: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
 		return func(tr transport.Transport) connectors.Connector { return cntrnfs.New(tr) }, nil
+	},
+	ConnectorTypeCifs: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
+		return func(tr transport.Transport) connectors.Connector { return cntrcifs.New(tr) }, nil
 	},
 	ConnectorTypeNvme: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
 		var cfg cntrnvme.Config

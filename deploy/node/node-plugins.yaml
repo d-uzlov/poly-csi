@@ -29,7 +29,7 @@ spec:
       # hostPID: false
       containers:
       - name: iscsi-connector
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.57
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.59
         args:
         - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -71,7 +71,7 @@ spec:
           subPath: etc/iscsi/
 
       - name: multipath
-        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.57
+        image: harbor.k8s.lan/local-test/poly-csi-multipath-plugin:v0.2.59
         args:
         - --plugin-type=multipath
         - --node-config=/poly-csi/multipath-config/config.yaml

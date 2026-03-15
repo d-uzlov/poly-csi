@@ -1,0 +1,24 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: poly-csi-smb
+provisioner: io.meoe.poly-csi
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+parameters:
+  dispatch.serverName: rose
+  dispatch.storageType: zfs-dataset
+  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  dispatch.shareType: samba
+  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  dispatch.connectorId: smb
+  dispatch.addressNames: storage
+  zfs.parentDataset: rose/test
+  fsType: cifs
+
+# mountOptions:
+# - noatime
+# - discard

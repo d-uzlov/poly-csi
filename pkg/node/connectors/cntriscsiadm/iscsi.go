@@ -142,7 +142,7 @@ func (m *iscsiadmConnector) Disconnect(ctx context.Context, serializedConnectorD
 	for _, v := range is {
 		err = snip.disconnect(vd.Iqn, v.address)
 		if err != nil {
-			return fmt.Errorf("nvmeDisconnect: %w", err)
+			return fmt.Errorf("iscsi disconnect from %s: %w", v.address, err)
 		}
 	}
 	return nil

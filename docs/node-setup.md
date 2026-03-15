@@ -20,7 +20,7 @@ TODO is this true? Do you still need `nfs-common` for NFS kernel modules?
 ## Samba / SMB
 
 ```bash
-sudo apt-get install -y smbclient cifs-utils
+sudo apt-get install -y cifs-utils keyutils
 ```
 
 ## iSCSI via iscsiadm

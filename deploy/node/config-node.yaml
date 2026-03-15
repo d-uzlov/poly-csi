@@ -21,6 +21,9 @@ connectors:
 - id: nfs
   type: builtin
   subtype: nfs
+- id: smb
+  type: builtin
+  subtype: cifs
 - id: nvme
   type: builtin
   subtype: nvme

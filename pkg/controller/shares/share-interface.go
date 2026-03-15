@@ -31,8 +31,8 @@ type PublishContext struct {
 	Public map[string]string
 	// Secret map is similar to Public, but it's encrypted
 	Secret map[string]string
-	// Serialized is an arbitrary string created in ShareManager.Publish.
-	// It's the main source of info for ShareManager.Unpublish
+	// Data is an arbitrary storage for internal information for ShareManager.Publish and ShareManager.Unpublish.
+	// Can be empty/nil if ShareManager.Unpublish is a no-op.
 	Data PublishData
 }
 

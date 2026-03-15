@@ -26,12 +26,12 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.2.42
+        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.2.64
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
         - --config=/config/config.yaml
-        # - --log-level=debug
+        - --log-level=debug
         resources:
           limits:
             memory: 30Mi
