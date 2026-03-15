@@ -10,21 +10,28 @@ import (
 	"syscall"
 	"time"
 
+	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/executils"
 )
 
 const defaultTimeout = time.Second
 
-type localExecWrapper struct {
-	isRoot bool
+type Config struct {
+	InsecureEchoCommands bool `yaml:"insecureEchoCommands"`
 }
 
-func New() (transport.Transport, error) {
+type localExecWrapper struct {
+	isRoot bool
+	config Config
+}
+
+func New(config Config) (transport.Transport, error) {
 	uid := os.Getuid()
 	isRoot := uid == 0
 	result := &localExecWrapper{
 		isRoot: isRoot,
+		config: config,
 	}
 
 	return result, nil
@@ -33,12 +40,12 @@ func New() (transport.Transport, error) {
 func (s *localExecWrapper) Cleanup() {}
 
 func (s *localExecWrapper) Cmds() transport.Commands {
-	return &nativeCommands{tr: s}
+	return newNativeCommands(s, s.config.InsecureEchoCommands)
 }
 
 func (s *localExecWrapper) SudoCmds() transport.Commands {
 	if s.isRoot {
-		return &nativeCommands{tr: s}
+		return newNativeCommands(s, s.config.InsecureEchoCommands)
 	}
 	// if we are running as generic user but need sudo privileged,
 	// fall back to shell commands with sudo prefix
@@ -63,6 +70,10 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
+
+	if s.config.InsecureEchoCommands {
+		slogctx.FromCtx(ctx).Debug("local exec: running command", "cmd", cmd)
+	}
 
 	ec := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 

@@ -13,6 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
+	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
@@ -29,6 +30,7 @@ type parsedConfig struct {
 	Multipath  mpfactory.ParsedMultipath
 	Mounts     []*connectorfactory.ParsedConnector
 	Networks   []nodeconfig.NodeNetworkConfig
+	ExecConfig localexec.Config
 }
 
 func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
@@ -43,6 +45,8 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config: yaml decode failed: %w", err)
 	}
+
+	slogctx.FromCtx(ctx).Info("parsing config", "new-config", config)
 
 	nodeKey, err := loadOrGenerateKey(config.Encrypt.NodeKey.Path)
 	if err != nil {
@@ -95,6 +99,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		Multipath:  *mp,
 		Mounts:     ml,
 		Networks:   config.Networks,
+		ExecConfig: config.ExecConfig,
 	}, nil
 }
 

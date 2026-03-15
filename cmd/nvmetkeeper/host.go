@@ -49,7 +49,7 @@ When need_auth=true, all host_key, controller_key, hash_type, dh_group must be s
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}

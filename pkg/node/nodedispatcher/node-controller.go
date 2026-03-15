@@ -19,17 +19,11 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func CreateNode(logger *slog.Logger, name string, version string, nodeId string) (*Node, error) {
-	tr, err := localexec.New()
-	if err != nil {
-		panic(err.Error())
-	}
-
+func New(logger *slog.Logger, name string, version string, nodeId string) (*Node, error) {
 	return &Node{
 		name:    name,
 		version: version,
 		nodeId:  nodeId,
-		tr:      tr,
 	}, nil
 }
 
@@ -40,21 +34,19 @@ type Node struct {
 	name    string
 	version string
 	nodeId  string
-	tr      transport.Transport
 
 	confMutex sync.RWMutex
 	conf      parsedConfig
+	tr        transport.Transport
 
 	nodeInfoCancel func()
 	nodeInfoCh     <-chan struct{}
 }
 
 func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
-	if n.nodeInfoCh != nil && n.nodeInfoCancel != nil {
-		n.nodeInfoCancel()
-		<-n.nodeInfoCh
-		n.nodeInfoCancel = nil
-		n.nodeInfoCh = nil
+	tr, err := localexec.New(newConf.ExecConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec object: %w", err)
 	}
 
 	mounts := map[string]connectors.Connector{}
@@ -62,7 +54,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		if !v.Valid {
 			continue
 		}
-		m := v.Inflate(n.tr)
+		m := v.Inflate(tr)
 		if m == nil {
 			continue
 		}
@@ -70,31 +62,48 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 	}
 	var mp multipath.Multipath
 	if newConf.Multipath.Valid {
-		mp = newConf.Multipath.Inflate(n.tr)
+		mp = newConf.Multipath.Inflate(tr)
 	} else {
 		slogctx.FromCtx(ctx).Error("multipath config is not valid, disabling multipath")
 	}
 
 	aesSecret := make([]byte, 32)
-	_, err := rand.Read(aesSecret)
+	// TODO move this to startup
+	_, err = rand.Read(aesSecret)
 	if err != nil {
 		return fmt.Errorf("generate random bytes for aes: %w", err)
+	}
+
+	n.confMutex.Lock()
+	defer n.confMutex.Unlock()
+
+	if n.nodeInfoCh != nil && n.nodeInfoCancel != nil {
+		slogctx.FromCtx(ctx).Debug("cancelling node info push")
+		n.nodeInfoCancel()
+		<-n.nodeInfoCh
+		n.nodeInfoCancel = nil
+		n.nodeInfoCh = nil
 	}
 
 	pushCtx, pushCancel := context.WithCancel(ctx)
 	pushCh := make(chan struct{})
 
-	nodeinfo.SetupPush(pushCtx, newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval, func() (regnodeinfo.RegNodeInfo, error) {
+	slogctx.FromCtx(ctx).Debug("requesting to setup node info push")
+	_ = nodeinfo.SetupPush(pushCtx, newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval, func() (regnodeinfo.RegNodeInfo, error) {
 		return nodeinfo.GatherNodeInfo(pushCtx, n.nodeId, newConf.Encrypt.NodeKey, mounts, aesSecret, newConf.Encrypt.ControllerKey, mp, newConf.Networks)
-	}, func() {})
+	}, func() {
+		pushCh <- struct{}{}
+	})
 
 	n.nodeInfoCancel = pushCancel
 	n.nodeInfoCh = pushCh
 
-	n.confMutex.Lock()
-	defer n.confMutex.Unlock()
-
 	n.conf = newConf
+	if n.tr != nil {
+		n.tr.Cleanup()
+	}
+	n.tr = tr
+
 	return nil
 }
 
@@ -127,4 +136,11 @@ func (n *Node) getPrivateKey() encrypt.RsaPrivateKey {
 	defer n.confMutex.RUnlock()
 
 	return n.conf.Encrypt.NodeKey
+}
+
+func (n *Node) getTransport() transport.Transport {
+	n.confMutex.RLock()
+	defer n.confMutex.RUnlock()
+
+	return n.tr
 }

@@ -21,8 +21,12 @@ type Inflate func(ctx context.Context) (transport.Transport, error)
 func TransportFromType(transportType string, byteConfig []byte) (Inflate, config.ValidatableConfig, error) {
 	switch transportType {
 	case TransportTypeLocal:
+		var cfg localexec.Config
+		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
+			return nil, nil, fmt.Errorf("parse %s config: %w", transportType, err)
+		}
 		return func(ctx context.Context) (transport.Transport, error) {
-			return localexec.New()
+			return localexec.New(cfg)
 		}, nil, nil
 	case TransportTypeSsh:
 		var cfg ssh_wrapper.SshConfig

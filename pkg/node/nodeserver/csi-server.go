@@ -13,23 +13,15 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"google.golang.org/grpc"
 	"meoe.io/poly-csi/pkg/node/nodedispatcher"
-	"meoe.io/poly-csi/pkg/transport"
-	"meoe.io/poly-csi/pkg/transport/localexec"
 )
 
 type Server struct {
 	logger *slog.Logger
-	tr     transport.Transport
 }
 
 func NewNodeServer(ctx context.Context, logger *slog.Logger) *Server {
-	tr, err := localexec.New()
-	if err != nil {
-		panic(err)
-	}
 	return &Server{
 		logger: logger,
-		tr:     tr,
 	}
 }
 

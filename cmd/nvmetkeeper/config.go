@@ -30,7 +30,7 @@ var configSaveMergeCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -55,7 +55,7 @@ var configRestoreMergeCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}

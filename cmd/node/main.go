@@ -40,16 +40,22 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = nodedispatcher.ParseConfig(ctx, configContent)
+	initialNodeConfig, err := nodedispatcher.ParseConfig(ctx, configContent)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	nodeInstance, err := nodedispatcher.CreateNode(logger, appConfig.CsiName, config.GetVersion(), appConfig.CsiNodeId)
+	nodeInstance, err := nodedispatcher.New(logger, appConfig.CsiName, config.GetVersion(), appConfig.CsiNodeId)
 	if err != nil {
 		logger.Error("could not create node controller", "error", err)
 		panic(err)
 	}
+
+	err = nodeInstance.ReloadConfig(ctx, *initialNodeConfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	go configwatcher.WatchConfigChanges(ctx, appConfig.ConfigPath, func() {
 		logger.Info("config reload request")
 		configContent, err := os.ReadFile(appConfig.ConfigPath)

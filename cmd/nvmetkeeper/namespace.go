@@ -40,7 +40,7 @@ nvmet_keeper namespace create '{"nqn":"nqn.2014-08.org.com.example:subsys","nsid
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}

@@ -39,7 +39,7 @@ model and serial can be arbitrary strings. When left empty, Linux kernel will se
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -73,7 +73,7 @@ var subsysDeleteCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -99,7 +99,7 @@ var subsysAttachCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -128,7 +128,7 @@ var subsysDetachCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -157,7 +157,7 @@ var subsysAllowHostCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -186,7 +186,7 @@ var subsysDisallowHostCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}

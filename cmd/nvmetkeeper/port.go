@@ -40,7 +40,7 @@ type can theoretically be any NVMe transport type value supported by Linux, but 
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}
@@ -74,7 +74,7 @@ var portDeleteCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New()
+		localExec, err := localexec.New(localexec.Config{})
 		if err != nil {
 			return fmt.Errorf("create local exec: %w", err)
 		}

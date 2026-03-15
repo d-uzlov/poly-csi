@@ -10,6 +10,9 @@ encrypt:
 
 devFolder: /host/dev
 
+execConfig:
+  insecureEchoCommands: true
+
 multipath:
   id: multipath
   type: plugin

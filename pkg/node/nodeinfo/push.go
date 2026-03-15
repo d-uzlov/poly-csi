@@ -15,6 +15,7 @@ func SetupPush(ctx context.Context, address string, interval time.Duration, getI
 		defer doneCallback()
 		reg := nodremotereg.NewNodeRemoteRegistry(address)
 
+		slogctx.FromCtx(ctx).Info("starting node info push")
 		for ctx.Err() == nil {
 			nodeInfo, err := getInfo()
 			if err != nil {
@@ -23,6 +24,8 @@ func SetupPush(ctx context.Context, address string, interval time.Duration, getI
 				err = reg.Set(nodeInfo)
 				if err != nil {
 					slogctx.FromCtx(ctx).Error("failed to push node info to registry", "error", err)
+				} else {
+					slogctx.FromCtx(ctx).Debug("successfully pushed node info")
 				}
 			}
 
@@ -31,6 +34,7 @@ func SetupPush(ctx context.Context, address string, interval time.Duration, getI
 			case <-time.Tick(interval):
 			}
 		}
+		slogctx.FromCtx(ctx).Info("stopped node info push")
 	}()
 
 	return nil
