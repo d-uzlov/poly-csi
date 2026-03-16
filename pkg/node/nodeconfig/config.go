@@ -21,7 +21,9 @@ type NodeConfig struct {
 }
 
 type Logs struct {
-	Rpc map[string]logs.Config `yaml:"nodeRpc" json:"nodeRpc"`
+	Default  logs.Config            `yaml:"default" json:"default"`
+	Rpc      map[string]logs.Config `yaml:"rpc" json:"rpc"`
+	NodeInfo logs.Config            `yaml:"nodeInfo" json:"nodeInfo"`
 }
 
 type NodeInfoDbConfig struct {

@@ -49,12 +49,18 @@ networks:
   - fe80::/10
 
 logs:
-  nodeRpc:
-    default:
-      logLevel: debug
-      echoCommands: false
-      confirmMicroOps: false
-      skipOnSuccess: false
+  default:
+    logLevel: debug
+    echoCommands: false
+    confirmMicroOps: false
+    skipOnSuccess: false
+
+  nodeInfo:
+    echoCommands: false
+    confirmMicroOps: false
+    skipOnSuccess: false
+
+  rpc:
 
     /csi.v1.Identity/GetPluginInfo:
       skipOnSuccess: true

@@ -89,18 +89,20 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 	pushCtx, pushCancel := context.WithCancel(ctx)
 	pushCh := make(chan struct{})
 
-	slogctx.FromCtx(ctx).Debug("requesting to setup node info push")
-	_ = nodeinfo.SetupPush(pushCtx, newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval, func() (regnodeinfo.RegNodeInfo, error) {
-		return nodeinfo.GatherNodeInfo(pushCtx, n.nodeId, newConf.Encrypt.NodeKey, mounts, aesSecret, newConf.Encrypt.ControllerKey, mp, newConf.Networks)
-	}, func() {
-		pushCh <- struct{}{}
-	})
+	go nodeinfo.PeriodicInfoPush(pushCtx, n.conf.getNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
+		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
+			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, aesSecret, newConf.Encrypt.ControllerKey, mp, newConf.Networks)
+		}, func() {
+			pushCh <- struct{}{}
+		},
+	)
 
 	n.nodeInfoCancel = pushCancel
 	n.nodeInfoCh = pushCh
 
 	n.conf = newConf
 	if n.tr != nil {
+		// TODO this is unsafe, we need to use extra RW-lock for n.tr
 		n.tr.Cleanup()
 	}
 	n.tr = tr
@@ -150,21 +152,5 @@ func (n *Node) GetRpcLogConfig(rpcPath string) logs.Config {
 	n.confMutex.RLock()
 	defer n.confMutex.RUnlock()
 
-	result := logs.Config{
-		LogLevel:     "info",
-		EchoCommands: false,
-		ExtraFields: map[string]string{
-			"method": rpcPath,
-		},
-	}
-	const defaultLogConfigKey = "default"
-	config, ok := n.conf.Logs.Rpc[defaultLogConfigKey]
-	if ok {
-		result = result.Combine(config)
-	}
-	config, ok = n.conf.Logs.Rpc[rpcPath]
-	if ok {
-		result = result.Combine(config)
-	}
-	return result
+	return n.conf.getRpcLogConfig(rpcPath)
 }

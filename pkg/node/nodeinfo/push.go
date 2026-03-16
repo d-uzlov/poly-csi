@@ -4,38 +4,50 @@ import (
 	"context"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
 )
 
-func SetupPush(ctx context.Context, address string, interval time.Duration, getInfo func() (regnodeinfo.RegNodeInfo, error), doneCallback func()) error {
+func PeriodicInfoPush(ctx context.Context, logConfig logs.Config, address string, interval time.Duration, getInfo func(ctx context.Context) (regnodeinfo.RegNodeInfo, error), doneCallback func()) {
+	defer doneCallback()
+	reg := nodremotereg.NewNodeRemoteRegistry(address)
 
-	go func() {
-		defer doneCallback()
-		reg := nodremotereg.NewNodeRemoteRegistry(address)
+	startLogger := logConfig.MakeInstance()
 
-		slogctx.FromCtx(ctx).Info("starting node info push")
-		for ctx.Err() == nil {
-			nodeInfo, err := getInfo()
-			if err != nil {
-				slogctx.FromCtx(ctx).Error("failed to gather node info", "error", err)
-			} else {
-				err = reg.Set(nodeInfo)
-				if err != nil {
-					slogctx.FromCtx(ctx).Error("failed to push node info to registry", "error", err)
-				} else {
-					slogctx.FromCtx(ctx).Debug("successfully pushed node info")
-				}
-			}
+	// skipOnSuccess should not apply to this logger
+	startLogger.Commit(false)
 
-			select {
-			case <-ctx.Done():
-			case <-time.Tick(interval):
-			}
+	startLogger.MicroOp("starting node info push")
+	for ctx.Err() == nil {
+		pushInfo(ctx, logConfig, reg, getInfo)
+
+		select {
+		case <-ctx.Done():
+		case <-time.Tick(interval):
 		}
-		slogctx.FromCtx(ctx).Info("stopped node info push")
-	}()
+	}
+	startLogger.MicroOp("stopped node info push")
+}
 
-	return nil
+func pushInfo(ctx context.Context, logConfig logs.Config, reg nodremotereg.NodeRemoveRegistry, getInfo func(ctx context.Context) (regnodeinfo.RegNodeInfo, error)) {
+	logger := logConfig.MakeInstance()
+	ctx = logs.NewCtx(ctx, logger)
+
+	nodeInfo, err := getInfo(ctx)
+	if err != nil {
+		logger.Error("failed to gather node info", "error", err)
+		logger.Commit(false)
+		return
+	}
+
+	err = reg.Set(nodeInfo)
+	if err != nil {
+		logger.Error("failed to push node info to registry", "error", err)
+		logger.Commit(false)
+		return
+	}
+
+	logger.MicroOp("successfully pushed node info")
+	logger.Commit(true)
 }

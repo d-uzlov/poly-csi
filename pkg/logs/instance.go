@@ -76,7 +76,7 @@ func (c *Instance) logByAction(action requestType, msg string, args ...any) {
 	}
 }
 
-func (c *Instance) MicroOpSuccess(msg string, args ...any) {
+func (c *Instance) MicroOp(msg string, args ...any) {
 	if !c.config.ConfirmMicroOps {
 		return
 	}

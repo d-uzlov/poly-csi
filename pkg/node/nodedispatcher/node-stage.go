@@ -90,7 +90,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
 	}
-	logger.MicroOpSuccess("connector.Connect: success")
+	logger.MicroOp("connector.Connect: success")
 
 	mountRequest := req.VolumeCapability.GetMount()
 	if mountRequest == nil {
@@ -101,7 +101,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", connectorId, err)
 	}
-	logger.MicroOpSuccess("ensure folder path: success")
+	logger.MicroOp("ensure folder path: success")
 
 	// nvi.Initialized = true
 	err = nvi.writeMetadataToDisk()

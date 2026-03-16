@@ -11,7 +11,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/google/uuid"
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/controller/storage"
@@ -469,7 +468,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 }
 
 func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {

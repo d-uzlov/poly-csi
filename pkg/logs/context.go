@@ -23,13 +23,13 @@ func FromCtx(ctx context.Context) *Instance {
 
 	v := ctx.Value(contextKey{})
 	if v == nil {
-		return nil
+		return DefaultInstance()
 	}
 
 	switch v := v.(type) {
 	case *Instance:
 		return v
 	default:
-		return DefaultInstance()
+		panic("unexpected object type in context at logs.contextKey")
 	}
 }

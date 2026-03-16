@@ -10,6 +10,7 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
@@ -132,4 +133,34 @@ func (c *parsedConfig) findConnectorById(id string) *connectorfactory.ParsedConn
 	}
 
 	return nil
+}
+
+func (c *parsedConfig) getRpcLogConfig(rpcPath string) logs.Config {
+	result := logs.Config{
+		LogLevel:     "info",
+		EchoCommands: false,
+		ExtraFields: map[string]string{
+			"scope":  "method",
+			"method": rpcPath,
+		},
+	}
+	result = result.Combine(c.Logs.Default)
+	config, ok := c.Logs.Rpc[rpcPath]
+	if ok {
+		result = result.Combine(config)
+	}
+	return result
+}
+
+func (c *parsedConfig) getNodeInfoLogConfig() logs.Config {
+	result := logs.Config{
+		LogLevel:     "info",
+		EchoCommands: false,
+		ExtraFields: map[string]string{
+			"scope": "node-info",
+		},
+	}
+	result = result.Combine(c.Logs.Default)
+	result = result.Combine(c.Logs.NodeInfo)
+	return result
 }
