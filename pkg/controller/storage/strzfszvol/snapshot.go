@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
@@ -52,7 +52,7 @@ func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(
 	release = func() {
 		err = s.snip.PropInherit(ctx, s.parentName, "snapdev")
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to configure 'inherit snapdev' on cleanup")
+			logs.FromCtx(ctx).Error("failed to configure 'inherit snapdev' on cleanup")
 		}
 	}
 	return path, release, nil

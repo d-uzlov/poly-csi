@@ -73,10 +73,10 @@ func main() {
 		}
 		logger.Info("config reload success")
 	})
-	server := nodeserver.NewNodeServer(ctx, logger)
+	server := nodeserver.NewNodeServer(ctx, nodeInstance)
 	serverDoneCh := make(chan struct{})
 
-	err = server.GoListenAndServe(ctx, appConfig.ListenAddress, nodeInstance, func() { close(serverDoneCh) })
+	err = server.GoListenAndServe(ctx, appConfig.ListenAddress, func() { close(serverDoneCh) })
 	if err != nil {
 		panic(err.Error())
 	}

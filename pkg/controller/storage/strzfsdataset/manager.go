@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
@@ -138,9 +138,9 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 		}
 		_, err := m.snip.DestroyDataset(ctx, datasetPath)
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to delete received dataset", "error", err)
+			logs.FromCtx(ctx).Error("failed to delete received dataset", "error", err)
 		} else {
-			slogctx.FromCtx(ctx).Info("deleted received dataset")
+			logs.FromCtx(ctx).Info("deleted received dataset")
 		}
 	}()
 

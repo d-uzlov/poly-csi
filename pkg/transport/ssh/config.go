@@ -11,7 +11,6 @@ type SshConfig struct {
 	Username              string        `yaml:"username"`
 	DialTimeout           time.Duration `yaml:"dialTimeout"`
 	DefaultCommandTimeout time.Duration `yaml:"defaultCommandTimeout"`
-	InsecureEchoCommands  bool          `yaml:"insecureEchoCommands"`
 	Auth                  []struct {
 		Name          string `yaml:"name"`
 		Type          string `yaml:"type"`

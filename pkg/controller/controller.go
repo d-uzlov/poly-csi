@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"meoe.io/poly-csi/pkg/controller/dispatcher"
+	"meoe.io/poly-csi/pkg/logs"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
@@ -251,4 +252,8 @@ func (c *Controller) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 	}
 
 	return c.dispatcher.DeleteSnapshot(ctx, req)
+}
+
+func (c *Controller) GetRpcLogConfig(rpcPath string) logs.Config {
+	return c.dispatcher.GetRpcLogConfig(rpcPath)
 }

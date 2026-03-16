@@ -3,12 +3,15 @@ package dispatcher
 import (
 	"fmt"
 	"regexp"
+
+	"meoe.io/poly-csi/pkg/logs"
 )
 
 type Config struct {
 	Encrypt    *EncryptConfig        `yaml:"encrypt"`
 	NodeInfoDb NodeInfoStorageConfig `yaml:"nodeInfoDb"`
 	Servers    []*ServerConfig       `yaml:"servers"`
+	Logs       Logs                  `yaml:"logs" json:"logs"`
 }
 
 type EncryptConfig struct {
@@ -17,6 +20,10 @@ type EncryptConfig struct {
 
 type KeyInfoConfig struct {
 	Path string `yaml:"path"`
+}
+
+type Logs struct {
+	Rpc map[string]logs.Config `yaml:"nodeRpc" json:"nodeRpc"`
 }
 
 func (c *Config) Validate() (errorList []string, warningList []string) {

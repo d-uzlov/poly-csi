@@ -3,6 +3,7 @@ package nodeconfig
 import (
 	"time"
 
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
@@ -16,6 +17,11 @@ type NodeConfig struct {
 	Networks   []NodeNetworkConfig             `yaml:"networks" json:"networks"`
 	DevFolder  string                          `yaml:"devFolder" json:"devFolder"`
 	ExecConfig localexec.Config                `yaml:"execConfig" json:"execConfig"`
+	Logs       Logs                            `yaml:"logs" json:"logs"`
+}
+
+type Logs struct {
+	Rpc map[string]logs.Config `yaml:"nodeRpc" json:"nodeRpc"`
 }
 
 type NodeInfoDbConfig struct {

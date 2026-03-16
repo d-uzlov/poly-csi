@@ -7,6 +7,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/logs"
 )
 
 type Dispatcher struct {
@@ -32,8 +33,8 @@ func (d *Dispatcher) Cleanup() {
 		d.confMutex.Lock()
 		defer d.confMutex.Unlock()
 
-		servers = d.conf.servers
-		d.conf.servers = nil
+		servers = d.conf.Servers
+		d.conf.Servers = nil
 	}()
 
 	for _, v := range servers {
@@ -72,12 +73,12 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 	d.confMutex.RLock()
 	defer d.confMutex.RUnlock()
 
-	for _, v := range d.conf.servers {
+	for _, v := range d.conf.Servers {
 		func() {
 			v.mutex.Lock()
 			defer v.mutex.Unlock()
 
-			oldSrv := oldConf.FindServerById(v.conf.StableId)
+			oldSrv := oldConf.FindServerById(v.Conf.StableId)
 			if oldSrv != nil {
 				oldSrv.mutex.Lock()
 				defer oldSrv.mutex.Unlock()
@@ -85,25 +86,25 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 				v.Reuse(oldSrv)
 			}
 
-			logPrefix := fmt.Sprintf("server[name=%s].", v.conf.Name)
+			logPrefix := fmt.Sprintf("server[name=%s].", v.Conf.Name)
 
 			err := v.InitTransport(ctx, logPrefix)
 			if err != nil {
-				logger.Error("failed to init server", "server-name", v.conf.Name, "server-id", v.conf.StableId, "error", fmt.Errorf("init exec transport: %w", err))
+				logger.Error("failed to init server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId, "error", fmt.Errorf("init exec transport: %w", err))
 				return
 			}
 
 			err = v.InitDatabase(ctx, logPrefix)
 			if err != nil {
-				logger.Error("failed to init server", "server-name", v.conf.Name, "server-id", v.conf.StableId, "error", fmt.Errorf("init database: %w", err))
+				logger.Error("failed to init server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId, "error", fmt.Errorf("init database: %w", err))
 				return
 			}
 
-			logger.Info("successfully initialized server", "server-name", v.conf.Name, "server-id", v.conf.StableId)
+			logger.Info("successfully initialized server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId)
 		}()
 	}
 
-	for _, v := range oldConf.servers {
+	for _, v := range oldConf.Servers {
 		func() {
 			v.mutex.Lock()
 			defer v.mutex.Unlock()
@@ -135,4 +136,27 @@ func (d *Dispatcher) FindServerById(id string) (result *parsedServer, err error)
 	}
 
 	return result, nil
+}
+
+func (d *Dispatcher) GetRpcLogConfig(rpcPath string) logs.Config {
+	d.confMutex.RLock()
+	defer d.confMutex.RUnlock()
+
+	result := logs.Config{
+		LogLevel:     "info",
+		EchoCommands: false,
+		ExtraFields: map[string]string{
+			"method": rpcPath,
+		},
+	}
+	const defaultLogConfigKey = "default"
+	config, ok := d.conf.Logs.Rpc[defaultLogConfigKey]
+	if ok {
+		result = result.Combine(config)
+	}
+	config, ok = d.conf.Logs.Rpc[rpcPath]
+	if ok {
+		result = result.Combine(config)
+	}
+	return result
 }

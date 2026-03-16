@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/btrfs"
 )
@@ -109,9 +109,9 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 		}
 		err = vol.Delete(ctx)
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to delete created subvol", "error", err)
+			logs.FromCtx(ctx).Error("failed to delete created subvol", "error", err)
 		} else {
-			slogctx.FromCtx(ctx).Info("deleted created subvol")
+			logs.FromCtx(ctx).Info("deleted created subvol")
 		}
 	}()
 
@@ -151,16 +151,16 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 		}
 		err = vol.Delete(ctx)
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to delete received subvol", "error", err)
+			logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err)
 		} else {
-			slogctx.FromCtx(ctx).Info("deleted received subvol")
+			logs.FromCtx(ctx).Info("deleted received subvol")
 		}
 		if containerPath+"/"+volumeName != vol.getMainVolume() {
 			_, err := m.snip.SubvolumeDelete(ctx, containerPath+"/"+volumeName)
 			if err != nil {
-				slogctx.FromCtx(ctx).Error("failed to delete received subvol", "error", err)
+				logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err)
 			} else {
-				slogctx.FromCtx(ctx).Info("deleted received subvol")
+				logs.FromCtx(ctx).Info("deleted received subvol")
 			}
 		}
 	}()

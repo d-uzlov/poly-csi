@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
+	"meoe.io/poly-csi/pkg/logs"
 )
 
 // ==== misc ====
@@ -29,7 +29,7 @@ func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityReques
 		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.serverName, err)
 	}
 
-	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.conf.Commands, srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 // }
 
 func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {
@@ -132,7 +132,7 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}

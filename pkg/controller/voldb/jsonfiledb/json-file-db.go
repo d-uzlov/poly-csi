@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/voldb"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -50,7 +50,7 @@ func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string, uuid st
 	defer func() {
 		releaseErr := release(ctx)
 		if releaseErr != nil {
-			slogctx.FromCtx(ctx).Error("failed to release lock", "error", releaseErr)
+			logs.FromCtx(ctx).Error("failed to release lock", "error", releaseErr)
 		}
 	}()
 

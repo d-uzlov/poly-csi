@@ -3,11 +3,11 @@ package nodeserver
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
-	"slices"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/logs"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
@@ -16,12 +16,12 @@ import (
 )
 
 type Server struct {
-	logger *slog.Logger
+	node *nodedispatcher.Node
 }
 
-func NewNodeServer(ctx context.Context, logger *slog.Logger) *Server {
+func NewNodeServer(ctx context.Context, node *nodedispatcher.Node) *Server {
 	return &Server{
-		logger: logger,
+		node: node,
 	}
 }
 
@@ -50,7 +50,7 @@ func Listen(ctx context.Context, address string) (net.Listener, func(), error) {
 	}
 }
 
-func (s *Server) GoListenAndServe(ctx context.Context, address string, node *nodedispatcher.Node, doneCallback func()) error {
+func (s *Server) GoListenAndServe(ctx context.Context, address string, doneCallback func()) error {
 	listener, cleanup, err := Listen(ctx, address)
 	if err != nil {
 		// s.logger.Error("Failed to listen", "error", err)
@@ -62,8 +62,8 @@ func (s *Server) GoListenAndServe(ctx context.Context, address string, node *nod
 	}
 	server := grpc.NewServer(opts...)
 
-	csi.RegisterIdentityServer(server, node)
-	csi.RegisterNodeServer(server, node)
+	csi.RegisterIdentityServer(server, s.node)
+	csi.RegisterNodeServer(server, s.node)
 
 	// s.logger.Info("Listening for connections", "address", listener.Addr())
 
@@ -89,35 +89,22 @@ func (s *Server) GoListenAndServe(ctx context.Context, address string, node *nod
 	return nil
 }
 
-func (s *Server) logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	logger := s.logger.With("method", info.FullMethod)
-	logMethod := logger.Info
-	debugLogsByMethod := []string{
-		"/csi.v1.Identity/Probe",
-		"/csi.v1.Identity/GetPluginInfo",
-		"/csi.v1.Node/NodeGetInfo",
-		"/csi.v1.Node/NodeGetCapabilities",
-		"/csi.v1.Node/NodeGetVolumeStats",
-	}
-	if slices.Contains(debugLogsByMethod, info.FullMethod) {
-		logMethod = logger.Debug
-	}
+func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	logConfig := s.node.GetRpcLogConfig(info.FullMethod)
+	logger := logConfig.MakeInstance()
+	ctx = logs.NewCtx(ctx, logger)
 
-	logMethod("GRPC request", "request", req)
-	// protosanitizer doesn't seem to work with slog handlers
-	// logMethod("GRPC request", "request", protosanitizer.StripSecrets(req))
-
-	ctx = slogctx.NewCtx(ctx, logger)
+	logger.Info("GRPC request", "request", req)
 
 	resp, err := handler(ctx, req)
 	if err != nil {
 		logger.Error("GRPC error", "error", err)
+		logger.Commit(false)
 		return nil, fmt.Errorf("%s: %w", info.FullMethod, err)
 	}
 
-	logMethod("GRPC success", "response", resp)
-	// protosanitizer doesn't seem to work with slog handlers
-	// logMethod("GRPC response", "response", protosanitizer.StripSecrets(resp).String())
+	logger.Info("GRPC success", "response", resp)
+	logger.Commit(true)
 
 	return resp, nil
 }

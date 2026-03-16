@@ -10,8 +10,7 @@ encrypt:
 
 devFolder: /host/dev
 
-execConfig:
-  insecureEchoCommands: true
+execConfig: {}
 
 multipath:
   id: multipath
@@ -48,3 +47,37 @@ networks:
   - 169.254.0.0/16
   - ::1/128
   - fe80::/10
+
+logs:
+  nodeRpc:
+    default:
+      logLevel: debug
+      echoCommands: false
+      confirmMicroOps: false
+      skipOnSuccess: false
+
+    /csi.v1.Identity/GetPluginInfo:
+      skipOnSuccess: true
+    /csi.v1.Identity/GetPluginCapabilities:
+      skipOnSuccess: true
+    /csi.v1.Identity/Probe:
+      skipOnSuccess: true
+    /csi.v1.Node/NodeGetCapabilities:
+      skipOnSuccess: true
+    /csi.v1.Node/NodeGetInfo:
+      skipOnSuccess: true
+
+    /csi.v1.Node/NodeStageVolume:
+      echoCommands: true
+    /csi.v1.Node/NodeUnstageVolume:
+      echoCommands: true
+    /csi.v1.Node/NodePublishVolume:
+      echoCommands: true
+    /csi.v1.Node/NodeUnpublishVolume:
+      echoCommands: true
+    /csi.v1.Node/NodeExpandVolume:
+      echoCommands: true
+
+    /csi.v1.Node/NodeGetVolumeStats:
+      echoCommands: true
+      skipOnSuccess: true

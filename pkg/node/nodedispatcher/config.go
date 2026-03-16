@@ -31,6 +31,7 @@ type parsedConfig struct {
 	Mounts     []*connectorfactory.ParsedConnector
 	Networks   []nodeconfig.NodeNetworkConfig
 	ExecConfig localexec.Config
+	Logs       nodeconfig.Logs
 }
 
 func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
@@ -46,7 +47,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return nil, fmt.Errorf("config: yaml decode failed: %w", err)
 	}
 
-	slogctx.FromCtx(ctx).Info("parsing config", "new-config", config)
+	logger.Info("parsing config", "new-config", config)
 
 	nodeKey, err := loadOrGenerateKey(config.Encrypt.NodeKey.Path)
 	if err != nil {
@@ -100,6 +101,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		Mounts:     ml,
 		Networks:   config.Networks,
 		ExecConfig: config.ExecConfig,
+		Logs:       config.Logs,
 	}, nil
 }
 

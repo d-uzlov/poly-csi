@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/euank/go-kmsg-parser/kmsgparser"
-	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -80,7 +80,8 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 			return fmt.Errorf("failed to init kmsgparser: %w", err)
 		}
 		defer func() {
-			logger := slogctx.FromCtx(ctx)
+			// TODO this can repeat messages when requests are parallel
+			logger := logs.FromCtx(ctx)
 			for _, v := range getMessages() {
 				logger.Info("new kernel message", "msg", v)
 			}
@@ -213,7 +214,7 @@ func (snip *NvmeSnippets) ListSubsys(ctx context.Context) ([]nvmeInfo, error) {
 	}
 	err = json.Unmarshal([]byte(stdout), &result)
 	if err != nil {
-		slogctx.FromCtx(ctx).Error("failed to parse 'nvme list' output as json", "raw", stdout)
+		logs.FromCtx(ctx).Error("failed to parse 'nvme list' output as json", "raw", stdout)
 		return nil, fmt.Errorf("parse 'nvme list' output as json (see logs for full stdout reference): %w", err)
 	}
 	return result.Devices, nil
@@ -235,7 +236,7 @@ func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
 		err = transport.CheckedRun(ctx, snip.tr, cmd)
 		if err != nil {
 			err = fmt.Errorf("nvme ns-rescan '%s': %w", devPath, err)
-			slogctx.FromCtx(ctx).Error("nvme ns-rescan failed", "error", err)
+			logs.FromCtx(ctx).Error("nvme ns-rescan failed", "error", err)
 			continue
 		}
 		anySuccess = true

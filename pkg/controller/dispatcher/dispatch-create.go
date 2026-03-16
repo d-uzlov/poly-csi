@@ -17,6 +17,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
@@ -47,7 +48,7 @@ func generateId(tmplName string, tmpl string, requestName string, id string, sta
 }
 
 func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (resp *csi.CreateVolumeResponse, finalErr error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	dispatchParams, err := parseDispatchParams(nil, req.Parameters, req.MutableParameters)
 	if err != nil {
@@ -66,12 +67,12 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.serverName, err)
 	}
 
-	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.conf.Commands, srv.conf.GlobalParams)
+	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.shareType, srv.conf.Commands, srv.conf.GlobalParams)
+	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.shareType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +95,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	var addressOptions []AddressOption
 	for name := range strings.SplitSeq(dispatchParams.addressNames, ",") {
 		found := false
-		for _, v := range srv.conf.AddressList {
+		for _, v := range srv.Conf.AddressList {
 			if v.Name == name {
 				addressOptions = append(addressOptions, v)
 				found = true
@@ -109,7 +110,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	if strings.Contains(req.Name, "/") {
 		return nil, fmt.Errorf("volume name must not contain '/' symbol")
 	}
-	volumeId := createVolumeId(srv.conf.StableId, req.Name)
+	volumeId := createVolumeId(srv.Conf.StableId, req.Name)
 
 	existingDbEntry, err := srv.dbInstance.FindEntry(ctx, req.Name)
 	if err != nil {
@@ -158,10 +159,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return
 		}
 		logger.Info("deleting storage volume on failure")
-		slogctx.FromCtx(ctx).Debug("running storage cleanup")
+		logs.FromCtx(ctx).Info("running storage cleanup")
 		err = vol.Delete(ctx)
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to run storage cleanup", "error", err)
+			logs.FromCtx(ctx).Error("failed to run storage cleanup", "error", err)
 			return
 		}
 	}()
@@ -189,7 +190,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 			sourceServer = sh.srv
 
-			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
+			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.Conf.Commands, sh.srv.Conf.GlobalParams)
 			if err != nil {
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
@@ -214,7 +215,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 			sourceServer = sh.srv
 
-			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.conf.Commands, sh.srv.conf.GlobalParams)
+			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.Conf.Commands, sh.srv.Conf.GlobalParams)
 			if err != nil {
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
@@ -414,10 +415,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return
 		}
 		logger.Info("deleting share on failure")
-		slogctx.FromCtx(ctx).Debug("running share cleanup")
+		logs.FromCtx(ctx).Info("running share cleanup")
 		err = shr.DeleteShare(ctx, shareData)
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to run share cleanup", "error", err)
+			logs.FromCtx(ctx).Error("failed to run share cleanup", "error", err)
 			return
 		}
 	}()
@@ -444,7 +445,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	// TODO save req.VolumeContentSource
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
 		ConnectorId:   dispatchParams.connectorId,
-		TransportId:   srv.conf.StableId,
+		TransportId:   srv.Conf.StableId,
 		VolumeContext: volumeContext,
 		AddressIds:    addressIds,
 		StorageType:   dispatchParams.storageType,
@@ -479,12 +480,12 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}

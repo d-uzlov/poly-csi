@@ -8,15 +8,15 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {
@@ -27,7 +27,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
@@ -35,7 +35,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 	var addressOptions []AddressOption
 	for _, id := range mh.vi.AddressIds {
 		found := false
-		for _, v := range mh.srv.conf.AddressList {
+		for _, v := range mh.srv.Conf.AddressList {
 			if v.StableId == id {
 				addressOptions = append(addressOptions, v)
 				found = true
@@ -47,7 +47,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		}
 	}
 
-	nodeReg := nodremotereg.NewNodeRemoteRegistry(d.conf.nodeInfoDb.Address)
+	nodeReg := nodremotereg.NewNodeRemoteRegistry(d.conf.NodeInfoDb.Address)
 	rawNodeInfo, err := nodeReg.Get(req.NodeId)
 	if err != nil {
 		return nil, fmt.Errorf("node_info: failed to get: %w", err)
@@ -56,7 +56,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: node id not found")
 	}
 
-	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo.Data, d.conf.encrypt.key)
+	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo.Data, d.conf.Encrypt.Key)
 	if err != nil {
 		return nil, fmt.Errorf("node_info: parse: %w", err)
 	}
@@ -124,7 +124,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 }
 
 func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {
@@ -135,7 +135,7 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}

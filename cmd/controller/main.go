@@ -69,10 +69,10 @@ func main() {
 		logger.Error("could not create controller", "error", err)
 		panic(err)
 	}
-	server := controllerserver.NewControllerServer(logger)
+	server := controllerserver.NewControllerServer(con)
 	doneCh := make(chan struct{})
 
-	err = server.ListenAndServe(ctx, appConfig.ListenAddress, con, func() {
+	err = server.ListenAndServe(ctx, appConfig.ListenAddress, func() {
 		close(doneCh)
 	})
 	if err != nil {

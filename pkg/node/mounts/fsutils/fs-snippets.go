@@ -8,8 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	slogctx "github.com/veqryn/slog-context"
 	"k8s.io/mount-utils"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -34,7 +34,7 @@ func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, 
 	cmd := []string{"blkid", devicePath}
 	runResult, err := s.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("command failed: %w", err)
+		return nil, fmt.Errorf("blkid failed: %w", err)
 	}
 	// on debian blkid gives exit code 2 when device is not formatted
 	if runResult.ExitCode == 2 {
@@ -146,7 +146,7 @@ func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string) error {
 		return err
 	}
 
-	slogctx.FromCtx(ctx).Info("ExpandFs", "mi.FsType", mi.FsType)
+	logs.FromCtx(ctx).Info("ExpandFs", "mi.FsType", mi.FsType)
 	switch mi.FsType {
 	case "ext4":
 		cmd := []string{"resize2fs", mi.Source}

@@ -10,10 +10,10 @@ import (
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	slogctx "github.com/veqryn/slog-context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
@@ -21,7 +21,7 @@ import (
 
 // TODO add cleanup on fail
 func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (res *csi.NodeStageVolumeResponse, err error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
@@ -90,7 +90,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
 	}
-	logger.Info("connector.Connect: success")
+	logger.MicroOpSuccess("connector.Connect: success")
 
 	mountRequest := req.VolumeCapability.GetMount()
 	if mountRequest == nil {
@@ -101,6 +101,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", connectorId, err)
 	}
+	logger.MicroOpSuccess("ensure folder path: success")
 
 	// nvi.Initialized = true
 	err = nvi.writeMetadataToDisk()
@@ -150,7 +151,7 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	dirEntries, err := os.ReadDir(req.StagingTargetPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			slogctx.FromCtx(ctx).Warn("staging path unexpectedly disappeared")
+			logs.FromCtx(ctx).Warn("staging path unexpectedly disappeared")
 			return &csi.NodeUnstageVolumeResponse{}, nil
 		}
 		return nil, fmt.Errorf("check remaining files in staging path: %w", err)

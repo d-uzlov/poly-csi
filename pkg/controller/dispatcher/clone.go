@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -15,7 +15,7 @@ type sendFuncType func(ctx context.Context, targetFile string, timeout time.Dura
 type receiveFuncType func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error)
 
 func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, targetSrv *parsedServer, timeout time.Duration) (send string, receive string, release func(), err error) {
-	if sourceSrv.conf.StableId == targetSrv.conf.StableId {
+	if sourceSrv.Conf.StableId == targetSrv.Conf.StableId {
 		fifo := fmt.Sprintf("/tmp/clone-local-%s", id)
 		_, err = sourceSrv.trInstance.Cmds().MkFifo(ctx, fifo)
 		if err != nil {
@@ -48,7 +48,7 @@ func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, t
 	}
 
 	// TODO better address selection
-	targetAddress := targetSrv.conf.AddressList[0].Address
+	targetAddress := targetSrv.Conf.AddressList[0].Address
 	// select random port between 40k and 50k
 	port := rand.Intn(10000) + 40000
 	portString := fmt.Sprintf("%d", port)
@@ -63,17 +63,17 @@ func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, t
 	go func() {
 		runResult, err := sourceSrv.trInstance.RunCommand(sendCtx, sendCmd, transport.WithStdinFile(send), transport.WithoutStdout(), transport.WithTimeout(timeout))
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("ncat send failed", "error", err)
+			logs.FromCtx(ctx).Error("ncat send failed", "error", err)
 		} else if runResult.ExitCode != 0 {
-			slogctx.FromCtx(ctx).Error("ncat send failed", "error", transport.FormatRunError(runResult))
+			logs.FromCtx(ctx).Error("ncat send failed", "error", transport.FormatRunError(runResult))
 		}
 	}()
 	go func() {
 		runResult, err := targetSrv.trInstance.RunCommand(receiveCtx, receiveCmd, transport.WithStdoutFile(receive), transport.WithTimeout(timeout))
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("ncat receive failed", "error", err)
+			logs.FromCtx(ctx).Error("ncat receive failed", "error", err)
 		} else if runResult.ExitCode != 0 {
-			slogctx.FromCtx(ctx).Error("ncat receive failed", "error", transport.FormatRunError(runResult))
+			logs.FromCtx(ctx).Error("ncat receive failed", "error", transport.FormatRunError(runResult))
 		}
 	}()
 

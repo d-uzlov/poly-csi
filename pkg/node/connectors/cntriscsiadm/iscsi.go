@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -66,7 +66,7 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 				return nil, fmt.Errorf("iscsi: configureTarget: %w", err)
 			}
 
-			slogctx.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err)
+			logs.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err)
 			combinedError += fmt.Sprintf("failed to configure connection to %s: %s ; ", addr, err.Error())
 			continue
 		}
@@ -76,7 +76,7 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 				return nil, fmt.Errorf("iscsi: connect: %w", err)
 			}
 
-			slogctx.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err)
+			logs.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err)
 			combinedError += fmt.Sprintf("failed to connect to %s: %s ; ", addr, err.Error())
 			continue
 		}
@@ -107,7 +107,7 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 		})
 		if err != nil {
 			combinedError += fmt.Sprintf("failed to get iscsi device file link at %s: %s ; ", deviceLink, err.Error())
-			slogctx.FromCtx(ctx).Error("failed to get iscsi device file link", "address", v.address, "path", deviceLink, "error", err)
+			logs.FromCtx(ctx).Error("failed to get iscsi device file link", "address", v.address, "path", deviceLink, "error", err)
 		}
 	}
 	if len(devices) == 0 {

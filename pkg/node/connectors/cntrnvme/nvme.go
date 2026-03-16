@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -59,7 +59,7 @@ func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectReque
 				return nil, fmt.Errorf("nvmeConnect: %w", err)
 			}
 
-			slogctx.FromCtx(ctx).Error("nvmeConnect failed", "address", v, "error", err)
+			logs.FromCtx(ctx).Error("nvmeConnect failed", "address", v, "error", err)
 			continue
 		}
 		successCount++
@@ -81,7 +81,7 @@ func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectReque
 			deviceFound = true
 			break
 		}
-		slogctx.FromCtx(ctx).Warn("waiting for nvme device to show up", "device", namespaceDevicePath)
+		logs.FromCtx(ctx).Warn("waiting for nvme device to show up", "device", namespaceDevicePath)
 		if errors.Is(err, fs.ErrNotExist) {
 			time.Sleep(time.Millisecond * 100)
 		} else {

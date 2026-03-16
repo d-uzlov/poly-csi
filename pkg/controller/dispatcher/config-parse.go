@@ -19,35 +19,36 @@ import (
 )
 
 type DispatcherConf struct {
-	encrypt    parsedEncrypt
-	nodeInfoDb NodeInfoStorageConfig
-	servers    []*parsedServer
+	Encrypt    parsedEncrypt
+	NodeInfoDb NodeInfoStorageConfig
+	Servers    []*parsedServer
+	Logs       Logs
 }
 
 type parsedEncrypt struct {
-	key  encrypt.RsaPrivateKey
-	conf *EncryptConfig
+	Key  encrypt.RsaPrivateKey
+	Conf *EncryptConfig
 }
 
 func (c *DispatcherConf) Validate() (errorList []string, warningList []string) {
-	if c.nodeInfoDb.Address == "" {
+	if c.NodeInfoDb.Address == "" {
 		errorList = append(errorList, "nodeInfo.address: field is empty")
 	}
-	for i, v := range c.servers {
+	for i, v := range c.Servers {
 		er, wl := v.Validate()
 		for _, iss := range er {
-			errorList = append(errorList, fmt.Sprintf("servers[i=%d/name=%s].%s", i, v.conf.Name, iss))
+			errorList = append(errorList, fmt.Sprintf("servers[i=%d/name=%s].%s", i, v.Conf.Name, iss))
 		}
 		for _, iss := range wl {
-			warningList = append(warningList, fmt.Sprintf("servers[i=%d/name=%s].%s", i, v.conf.Name, iss))
+			warningList = append(warningList, fmt.Sprintf("servers[i=%d/name=%s].%s", i, v.Conf.Name, iss))
 		}
 	}
 	return
 }
 
 func (c *DispatcherConf) FindServerByName(name string) *parsedServer {
-	for _, v := range c.servers {
-		if v.conf.Name == name {
+	for _, v := range c.Servers {
+		if v.Conf.Name == name {
 			return v
 		}
 	}
@@ -55,8 +56,8 @@ func (c *DispatcherConf) FindServerByName(name string) *parsedServer {
 }
 
 func (c *DispatcherConf) FindServerById(id string) *parsedServer {
-	for _, v := range c.servers {
-		if v.conf.StableId == id {
+	for _, v := range c.Servers {
+		if v.Conf.StableId == id {
 			return v
 		}
 	}
@@ -66,7 +67,7 @@ func (c *DispatcherConf) FindServerById(id string) *parsedServer {
 type parsedServer struct {
 	mutex sync.RWMutex
 	valid bool
-	conf  *ServerConfig
+	Conf  *ServerConfig
 
 	trInstance transport.Transport
 	trConfig   config.ValidatableConfig
@@ -76,7 +77,7 @@ type parsedServer struct {
 }
 
 func (c *parsedServer) Validate() (errorList []string, warningList []string) {
-	el, wl := c.conf.Validate()
+	el, wl := c.Conf.Validate()
 	errorList = slices.Concat(errorList, el)
 	warningList = slices.Concat(warningList, wl)
 	el, wl = c.trConfig.Validate()
@@ -104,13 +105,13 @@ func (c *parsedServer) Check() error {
 // try to transfer objects without reinitialization
 func (c *parsedServer) Reuse(old *parsedServer) {
 	if old.trInstance != nil {
-		if old.conf.ExecType == c.conf.ExecType && reflect.DeepEqual(c.conf.ExecConfig, old.conf.ExecConfig) {
+		if old.Conf.ExecType == c.Conf.ExecType && reflect.DeepEqual(c.Conf.ExecConfig, old.Conf.ExecConfig) {
 			c.trInstance = old.trInstance
 			old.trInstance = nil
 		}
 	}
 	if old.dbInstance != nil {
-		if old.conf.DbType == c.conf.DbType && reflect.DeepEqual(c.conf.DbConfig, old.conf.DbConfig) {
+		if old.Conf.DbType == c.Conf.DbType && reflect.DeepEqual(c.Conf.DbConfig, old.Conf.DbConfig) {
 			c.dbInstance = old.dbInstance
 			old.dbInstance = nil
 		}
@@ -133,16 +134,16 @@ func (c *parsedServer) InitTransport(ctx context.Context, logPrefix string) erro
 		return nil
 	}
 
-	if c.conf.ExecType == "" {
+	if c.Conf.ExecType == "" {
 		return fmt.Errorf("type is empty")
 	}
 
-	byteConfig, err := yaml.Marshal(c.conf.ExecConfig)
+	byteConfig, err := yaml.Marshal(c.Conf.ExecConfig)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	inflater, cfg, err := transportfactory.TransportFromType(c.conf.ExecType, byteConfig)
+	inflater, cfg, err := transportfactory.TransportFromType(c.Conf.ExecType, byteConfig)
 	if err != nil {
 		return fmt.Errorf("TransportFromType: %w", err)
 	}
@@ -180,12 +181,12 @@ func (c *parsedServer) InitDatabase(ctx context.Context, logPrefix string) error
 		return nil
 	}
 
-	byteConfig, err := yaml.Marshal(c.conf.DbConfig)
+	byteConfig, err := yaml.Marshal(c.Conf.DbConfig)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	inflater, cfg, err := voldbfactory.VolumeDatabaseFromType(c.conf.DbType, byteConfig)
+	inflater, cfg, err := voldbfactory.VolumeDatabaseFromType(c.Conf.DbType, byteConfig)
 	if err != nil {
 		return fmt.Errorf("VolumeDatabaseFromType: %w", err)
 	}
@@ -236,7 +237,7 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 		srv := parsedServer{
 			// TODO remove valid?
 			valid: true,
-			conf:  v,
+			Conf:  v,
 		}
 
 		sl = append(sl, &srv)
@@ -254,18 +255,19 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 		// }
 
 		if srv.valid {
-			logger.Info(fmt.Sprintf("successfully parsed server '%s'", srv.conf.Name))
+			logger.Info(fmt.Sprintf("successfully parsed server '%s'", srv.Conf.Name))
 		} else {
-			logger.Error(fmt.Sprintf("parsing server '%s' failed", srv.conf.Name))
+			logger.Error(fmt.Sprintf("parsing server '%s' failed", srv.Conf.Name))
 		}
 	}
 
 	return &DispatcherConf{
-		encrypt: parsedEncrypt{
-			key:  *rsa,
-			conf: config.Encrypt,
+		Encrypt: parsedEncrypt{
+			Key:  *rsa,
+			Conf: config.Encrypt,
 		},
-		nodeInfoDb: config.NodeInfoDb,
-		servers:    sl,
+		NodeInfoDb: config.NodeInfoDb,
+		Servers:    sl,
+		Logs:       config.Logs,
 	}, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
@@ -143,4 +144,27 @@ func (n *Node) getTransport() transport.Transport {
 	defer n.confMutex.RUnlock()
 
 	return n.tr
+}
+
+func (n *Node) GetRpcLogConfig(rpcPath string) logs.Config {
+	n.confMutex.RLock()
+	defer n.confMutex.RUnlock()
+
+	result := logs.Config{
+		LogLevel:     "info",
+		EchoCommands: false,
+		ExtraFields: map[string]string{
+			"method": rpcPath,
+		},
+	}
+	const defaultLogConfigKey = "default"
+	config, ok := n.conf.Logs.Rpc[defaultLogConfigKey]
+	if ok {
+		result = result.Combine(config)
+	}
+	config, ok = n.conf.Logs.Rpc[rpcPath]
+	if ok {
+		result = result.Combine(config)
+	}
+	return result
 }

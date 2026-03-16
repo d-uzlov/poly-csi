@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	slogctx "github.com/veqryn/slog-context"
 	"golang.org/x/crypto/ssh"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/executils"
 
@@ -42,9 +42,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 	defer cancel()
 
 	cmdString := shellescape.QuoteCommand(cmd)
-	if s.config.InsecureEchoCommands {
-		slogctx.FromCtx(ctx).Debug("ssh: running command", "cmd", cmdString, "ssh-target", s.sshLogId)
-	}
+	logs.FromCtx(ctx).Command("ssh: running command", "cmd", cmdString, "ssh-target", s.sshLogId)
 
 	client := s.GetClient()
 	if client == nil {

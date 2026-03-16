@@ -19,9 +19,9 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 		return nil, fmt.Errorf("source volume not found")
 	}
 
-	snapshotId := createSnapshotId(mh.srv.conf.StableId, mh.volumeName, req.Name)
+	snapshotId := createSnapshotId(mh.srv.Conf.StableId, mh.volumeName, req.Name)
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (d *Dispatcher) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 		return nil, fmt.Errorf("snapshot not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.si.StorageType, mh.srv.conf.Commands, mh.srv.conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.si.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
