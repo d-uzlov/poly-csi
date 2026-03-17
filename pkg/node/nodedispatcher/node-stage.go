@@ -64,6 +64,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	nvi := newVolumeHandle(req.StagingTargetPath)
 	defer func() {
 		if err != nil {
+			logger.Warn("detected failure, running cleanup")
 			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), connector)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
@@ -89,6 +90,21 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	})
 	if err != nil {
 		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
+	}
+	if len(nvi.intermediateDeviceList) != 0 {
+		tr := n.getTransport()
+		for _, v := range nvi.intermediateDeviceList {
+			sr, err := tr.Cmds().Stat(ctx, v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check device path at %s: %w", v, err)
+			}
+			if !sr.FileExists {
+				return nil, fmt.Errorf("checking device path at %s: file does not exist", v)
+			}
+			if !sr.IsBlock() {
+				return nil, fmt.Errorf("checking device path at %s: file is not a block device", v)
+			}
+		}
 	}
 	logger.MicroOp("connector.Connect: success")
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/mount-utils"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
@@ -26,6 +27,7 @@ func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string
 		return "", fmt.Errorf("multipath instance is nil")
 	}
 
+	logs.FromCtx(ctx).MicroOp("multipath.Setup: request", "devices", devices)
 	mc, err := mp.Setup(ctx, devices)
 	if err != nil {
 		return "", fmt.Errorf("multipath.Setup: %w", err)
@@ -34,6 +36,7 @@ func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string
 		// we later determine if device is using multipath based on SerializedMultipathData
 		return "", fmt.Errorf("multipath did not set data")
 	}
+	logs.FromCtx(ctx).MicroOp("multipath.Setup: success")
 	nvi.SerializedMultipathData = mc.SerializedData
 	return mc.Device, nil
 }
@@ -51,6 +54,7 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devicePath st
 	}
 
 	if fsInfo == nil {
+		logs.FromCtx(ctx).MicroOp("run fs format on block device", "device", devicePath)
 		err = fsnip.FormatFs(ctx, devicePath, requestMount.FsType, nil)
 		if err != nil {
 			return fmt.Errorf("format: %w", err)
@@ -58,6 +62,7 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devicePath st
 	}
 
 	nvi.FolderPath = targetPath
+	logs.FromCtx(ctx).MicroOp("mount device: request", "device", devicePath)
 	mi, err := fsnip.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
@@ -69,6 +74,7 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devicePath st
 	// if mi.FsType != requestMount.FsType {
 	// 	return nil, fmt.Errorf("fs is already mounted with different fs type: %s != %s, at mountpoint %s", mi.FsType, requestMount.FsType, mi.MountPoint)
 	// }
+	logs.FromCtx(ctx).MicroOp("mount device: success", "device", devicePath)
 
 	return nil
 }
@@ -100,10 +106,12 @@ func ensureMultipathDisabled(ctx context.Context, nvi *NodeVolumeInfo, mp multip
 	if mp == nil {
 		return fmt.Errorf("multipath instance is nil")
 	}
+	logs.FromCtx(ctx).MicroOp("multipath.Destroy: request")
 	err := mp.Destroy(ctx, nvi.SerializedMultipathData)
 	if err != nil {
 		return err
 	}
+	logs.FromCtx(ctx).MicroOp("multipath.Destroy: success")
 
 	return nil
 }

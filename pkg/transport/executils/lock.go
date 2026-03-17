@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	slogctx "github.com/veqryn/slog-context"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -28,7 +28,7 @@ func (ec *ExecCommands) CreateLock(ctx context.Context, lockFile string, maxDura
 		return nil, fmt.Errorf("acquire lock: %w", err)
 	}
 	if res.ExitCode != 0 {
-		slogctx.FromCtx(ctx).Error("acquire lock failed", "stdout", string(res.Stdout), "stderr", string(res.Stderr), "exit-code", res.ExitCode)
+		logs.FromCtx(ctx).Error("acquire lock failed", "stdout", string(res.Stdout), "stderr", string(res.Stderr), "exit-code", res.ExitCode)
 		return nil, fmt.Errorf("acquire lock: %w", transport.FormatRunError(res))
 	}
 	return func(ctx context.Context) error {
@@ -51,7 +51,7 @@ func (ec *ExecCommands) ReleaseLock(ctx context.Context, lockFile string, lockId
 		return fmt.Errorf("release lock: %w", err)
 	}
 	if res.ExitCode != 0 {
-		slogctx.FromCtx(ctx).Error("release lock failed", "stdout", string(res.Stdout), "stderr", string(res.Stderr), "exit-code", res.ExitCode)
+		logs.FromCtx(ctx).Error("release lock failed", "stdout", string(res.Stdout), "stderr", string(res.Stderr), "exit-code", res.ExitCode)
 		return fmt.Errorf("release lock: %w", transport.FormatRunError(res))
 	}
 	return nil

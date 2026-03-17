@@ -113,6 +113,9 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 	if len(devices) == 0 {
 		return nil, fmt.Errorf("iscsi device is not found: %s", combinedError)
 	}
+	if len(devices) < len(req.AddressOptions) {
+		logs.FromCtx(ctx).Warn("iscsi: some addresses failed to connect, returning partial list")
+	}
 	return &connectors.ConnectResult{
 		FolderPath: "",
 		Devices:    devices,

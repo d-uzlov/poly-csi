@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"al.essio.dev/pkg/shellescape"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/executils"
@@ -70,7 +71,8 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
 
-	logs.FromCtx(ctx).Command("local exec: running command", "cmd", cmd)
+	cmdString := shellescape.QuoteCommand(cmd)
+	logs.FromCtx(ctx).Command("local exec: running command", "cmd", cmdString)
 
 	ec := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 

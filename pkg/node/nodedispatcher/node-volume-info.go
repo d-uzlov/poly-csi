@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
@@ -101,6 +102,7 @@ func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connec
 		return fmt.Errorf("create folder for connector staging: %w", err)
 	}
 
+	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: request", connectorId))
 	cr, err := connector.Connect(ctx, req)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
@@ -108,6 +110,7 @@ func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connec
 	if cr == nil {
 		return fmt.Errorf("connect: nil result")
 	}
+	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: success", connectorId), "devices", cr.Devices, "folder", cr.FolderPath)
 
 	v.ManagedOps = cr.ManagedOps
 
@@ -144,10 +147,22 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 		return fmt.Errorf("connector did not set FolderPath and did not request automatic mount")
 	}
 
+	logger := logs.FromCtx(ctx)
+
 	// ensureDevicePath will setup multipath if needed
 	device, err := ensureDevicePath(ctx, v, v.intermediateDeviceList, mp)
 	if err != nil {
 		return fmt.Errorf("ensureDevicePath: %w", err)
+	}
+	sr, err := tr.Cmds().Stat(ctx, device)
+	if err != nil {
+		return fmt.Errorf("failed to check device path at %s: %w", device, err)
+	}
+	if !sr.FileExists {
+		return fmt.Errorf("checking device path at %s: file does not exist", device)
+	}
+	if !sr.IsBlock() {
+		return fmt.Errorf("checking device path at %s: file is not a block device", device)
 	}
 
 	mountPath := v.parentFolder + managedMountPath
@@ -155,7 +170,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 	if err != nil {
 		return fmt.Errorf("ensureFolderPath: %w", err)
 	}
-	// logger.Info("ManagedOps: mounted /fs_mount")
+	logger.MicroOp("ManagedOps: mounted fs at " + managedMountPath)
 
 	v.FolderPath = mountPath
 
@@ -164,26 +179,27 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 
 func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, connector connectors.Connector) error {
 	var err error
+	logger := logs.FromCtx(ctx)
 
 	if v.ManagedOps.UnmountFs {
 		err = ensureFolderUnmounted(v)
 		if err != nil {
 			return fmt.Errorf("ensureFolderUnmounted: %w", err)
 		}
-		// logger.Info("ManagedOps: successfully unmounted folder")
+		logger.MicroOp("ManagedOps: successfully unmounted folder")
 	}
 
 	err = ensureMultipathDisabled(ctx, v, mp)
 	if err != nil {
 		return fmt.Errorf("ensureMultipathDisabled: %w", err)
 	}
-	// logger.Info("ManagedOps: multipath disabled OK")
+	logger.MicroOp("ManagedOps: multipath disabled OK")
 
 	err = connector.Disconnect(ctx, v.SerializedConnectorData)
 	if err != nil {
 		return fmt.Errorf("connector.Disconnect: %w", err)
 	}
-	// logger.Info("connector.Disconnect: success")
+	logger.MicroOp("connector.Disconnect: success")
 	if v.FolderPath != "" {
 		err = os.Remove(v.FolderPath)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -196,6 +212,7 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, co
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("remove connector staging dir: %w", err)
 	}
+	logger.MicroOp("remove connector staging dir: success")
 
 	return nil
 }
