@@ -166,28 +166,33 @@ func (s targetcliSnippets) readClientAcl(ctx context.Context, targetIqn string, 
 	if err != nil {
 		return nil, err
 	}
+	if user == "" {
+		return nil, nil
+	}
 	pass, err := s.readAttribute(ctx, path, "auth", "password")
 	if err != nil {
 		return nil, err
 	}
-	if user == "" || pass == "" {
+	if pass == "" {
 		return nil, nil
 	}
 	client := cntriscsiadm.Chap{User: user, Pass: pass}
 
-	path = fmt.Sprintf("/iscsi/%s/tpg1", targetIqn)
-	user, err = s.readAttribute(ctx, path, "auth", "mutual_userid")
+	mutualUser, err := s.readAttribute(ctx, path, "auth", "mutual_userid")
 	if err != nil {
 		return nil, err
 	}
-	pass, err = s.readAttribute(ctx, path, "auth", "mutual_password")
-	if err != nil {
-		return nil, err
-	}
-	if user == "" || pass == "" {
+	if mutualUser == "" {
 		return nil, nil
 	}
-	controller := cntriscsiadm.Chap{User: user, Pass: pass}
+	mutualPass, err := s.readAttribute(ctx, path, "auth", "mutual_password")
+	if err != nil {
+		return nil, err
+	}
+	if mutualPass == "" {
+		return nil, nil
+	}
+	controller := cntriscsiadm.Chap{User: mutualUser, Pass: mutualPass}
 
 	return &chapAcl{
 		client:     client,

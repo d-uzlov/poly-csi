@@ -7,6 +7,7 @@ import (
 
 	"github.com/thanhpk/randstr"
 	"meoe.io/poly-csi/pkg/controller/shares"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 )
@@ -114,6 +115,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("read client auth: %w", err)
 	}
 	if acl == nil {
+		logs.FromCtx(ctx).MicroOp("acl is not found, generating a new one", "share-iqn", c.Iqn, "host-iqn", iscsiInfo.HostIqn)
 		acl = &chapAcl{
 			client:     cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
 			controller: cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
