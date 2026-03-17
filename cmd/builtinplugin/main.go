@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"meoe.io/poly-csi/cmd/builtinplugin/config"
-	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/connectorpluginconfig"
+	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/node/multipath/mpplugin/mppluginconfig"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
@@ -63,7 +63,7 @@ func main() {
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {
-				logger.Error("server finished with error", "error", err)
+				logger.Error("server finished with error", "error", err.Error())
 			} else {
 				logger.Info("server finished without error")
 			}
@@ -87,7 +87,7 @@ func main() {
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {
-				logger.Error("server finished with error", "error", err)
+				logger.Error("server finished with error", "error", err.Error())
 			} else {
 				logger.Info("server finished without error")
 			}

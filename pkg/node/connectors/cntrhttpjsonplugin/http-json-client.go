@@ -1,4 +1,4 @@
-package mounthttp
+package cntrhttpjsonplugin
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
@@ -20,8 +21,7 @@ type client struct {
 }
 
 type ClientConfig struct {
-	Socket  string `yaml:"socket"`
-	DevPath string `yaml:"devPath"`
+	Socket string `yaml:"socket"`
 }
 
 func (c *ClientConfig) FillDefaults() {
@@ -30,12 +30,6 @@ func (c *ClientConfig) FillDefaults() {
 func (c *ClientConfig) Validate() error {
 	if len(c.Socket) == 0 {
 		return fmt.Errorf("socket missing")
-	}
-	if c.DevPath == "" {
-		return fmt.Errorf("devPath missing")
-	}
-	if c.DevPath[len(c.DevPath)-1] == '/' {
-		return fmt.Errorf("dev path must not end with /")
 	}
 	return nil
 }
@@ -66,7 +60,7 @@ func (m *client) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, er
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status code %d: %s", resp.StatusCode, body)
 	}
 
@@ -75,8 +69,14 @@ func (m *client) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, er
 	if err != nil {
 		return nil, err
 	}
+
+	if len(pr.Logs) != 0 {
+		logs.FromCtx(ctx).MicroOp("printing logs from remote connector")
+		logs.FromCtx(ctx).ConsumeCopy(pr.Logs)
+	}
+
 	switch pr.Status {
-	case responseStatusOk:
+	case ResponseStatusOk:
 		var mni connectors.ConnectorNodeInfo
 		err = json.Unmarshal([]byte(pr.Result), &mni)
 		if err != nil {
@@ -84,11 +84,11 @@ func (m *client) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, er
 		}
 
 		return &mni, nil
-	case responseStatusError:
+	case ResponseStatusError:
 		return nil, fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+	default:
+		return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
 	}
-	return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
-
 }
 
 func (m *client) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
@@ -107,7 +107,7 @@ func (m *client) Connect(ctx context.Context, req connectors.ConnectRequest) (*c
 	if err != nil {
 		return nil, fmt.Errorf("http-json-client: read body: %w", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status code %d: %s", resp.StatusCode, body)
 	}
 
@@ -116,8 +116,14 @@ func (m *client) Connect(ctx context.Context, req connectors.ConnectRequest) (*c
 	if err != nil {
 		return nil, fmt.Errorf("http-json-client: unmarshal response: %w", err)
 	}
+
+	if len(pr.Logs) != 0 {
+		logs.FromCtx(ctx).MicroOp("printing logs from remote connector")
+		logs.FromCtx(ctx).ConsumeCopy(pr.Logs)
+	}
+
 	switch pr.Status {
-	case responseStatusOk:
+	case ResponseStatusOk:
 		var mc connectors.ConnectResult
 		err = json.Unmarshal([]byte(pr.Result), &mc)
 		if err != nil {
@@ -129,25 +135,18 @@ func (m *client) Connect(ctx context.Context, req connectors.ConnectRequest) (*c
 			if v[0] != '/' {
 				v = "/" + v
 			}
-			mc.Devices[k] = m.config.DevPath + v
+			mc.Devices[k] = m.devFolder + v
 		}
 
 		return &mc, nil
-	case responseStatusError:
+	case ResponseStatusError:
 		return nil, fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+	default:
+		return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
 	}
-	return nil, fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
 }
 
 func (m *client) Disconnect(ctx context.Context, serializedConnectorData string) error {
-	// for k, v := range info.Devices {
-	// 	v, ok := strings.CutPrefix(v, m.config.DevPath)
-	// 	if !ok {
-	// 		return fmt.Errorf("device ")
-	// 	}
-	// 	info.Devices[k] = v
-	// }
-
 	resp, err := m.hc.Post("http://unix/disconnect", "application/text", strings.NewReader(serializedConnectorData))
 	if err != nil {
 		return fmt.Errorf("http-json-client: post /disconnect: %w", err)
@@ -158,7 +157,7 @@ func (m *client) Disconnect(ctx context.Context, serializedConnectorData string)
 	if err != nil {
 		return fmt.Errorf("http-json-client: read body: %w", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("http-json-client: status code %d: %s", resp.StatusCode, body)
 	}
 
@@ -167,13 +166,20 @@ func (m *client) Disconnect(ctx context.Context, serializedConnectorData string)
 	if err != nil {
 		return fmt.Errorf("http-json-client: unmarshal response: %w", err)
 	}
-	switch pr.Status {
-	case responseStatusOk:
-		return nil
-	case responseStatusError:
-		return fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+
+	if len(pr.Logs) != 0 {
+		logs.FromCtx(ctx).MicroOp("printing logs from remote connector")
+		logs.FromCtx(ctx).ConsumeCopy(pr.Logs)
 	}
-	return fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
+
+	switch pr.Status {
+	case ResponseStatusOk:
+		return nil
+	case ResponseStatusError:
+		return fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+	default:
+		return fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
+	}
 }
 
 func (m *client) Expand(ctx context.Context, serializedConnectorData string) error {
@@ -187,7 +193,7 @@ func (m *client) Expand(ctx context.Context, serializedConnectorData string) err
 	if err != nil {
 		return fmt.Errorf("http-json-client: read body: %w", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("http-json-client: status code %d: %s", resp.StatusCode, body)
 	}
 
@@ -196,11 +202,18 @@ func (m *client) Expand(ctx context.Context, serializedConnectorData string) err
 	if err != nil {
 		return fmt.Errorf("http-json-client: unmarshal response: %w", err)
 	}
-	switch pr.Status {
-	case responseStatusOk:
-		return nil
-	case responseStatusError:
-		return fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+
+	if len(pr.Logs) != 0 {
+		logs.FromCtx(ctx).MicroOp("printing logs from remote connector")
+		logs.FromCtx(ctx).ConsumeCopy(pr.Logs)
 	}
-	return fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
+
+	switch pr.Status {
+	case ResponseStatusOk:
+		return nil
+	case ResponseStatusError:
+		return fmt.Errorf("http-json-client: remote error: %s", pr.Err)
+	default:
+		return fmt.Errorf("http-json-client: unknown response type: %s", pr.Status)
+	}
 }

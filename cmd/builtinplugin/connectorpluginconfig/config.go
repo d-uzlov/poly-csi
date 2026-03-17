@@ -4,22 +4,32 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
+	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginserver"
+	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
-	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/mountpluginfactory"
 )
+
+type ConnectorPlugin interface {
+	StartServe(ctx context.Context, shutdownTimeout time.Duration, doneCallback func(error))
+}
 
 type Config struct {
 	ServerType   string                        `yaml:"serverType"`
 	ServerConfig map[string]any                `yaml:"serverConfig"`
 	Connector    *connectorfactory.MountConfig `yaml:"connector"`
 	DevFolder    string                        `yaml:"devFolder"`
+	Logs         logs.Config                   `yaml:"logs"`
 }
 
+type Inflate func(ctx context.Context, connector connectors.Connector) ConnectorPlugin
+
 type parsedConfig struct {
-	InflateServer mountpluginfactory.Inflate
+	InflateServer Inflate
 	Connector     *connectorfactory.ParsedConnector
 }
 
@@ -33,7 +43,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	err := dec.Decode(&config)
 	// err := yaml.UnmarshalStrict(raw, &result)
 	if err != nil {
-		logger.Error("config: initial parsing failed", "error", err)
+		logger.Error("config: initial parsing failed", "error", err.Error())
 		return nil, err
 	}
 
@@ -42,9 +52,12 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return nil, fmt.Errorf("marshal server config: %w", err)
 	}
 
-	inflateServer, err := mountpluginfactory.PluginServerFromType(config.ServerType, serverByteConfig, config.DevFolder)
-	if err != nil {
-		return nil, fmt.Errorf("mountpluginfactory.PluginServerFromType: %w", err)
+	var cfg connectorpluginserver.ServerConfig
+	if err := yaml.Unmarshal(serverByteConfig, &cfg); err != nil {
+		return nil, fmt.Errorf("parse %s config: %w", config.ServerType, err)
+	}
+	inflateServer := func(ctx context.Context, connector connectors.Connector) ConnectorPlugin {
+		return connectorpluginserver.NewServer(ctx, cfg, connector, config.DevFolder, config.Logs)
 	}
 
 	pm := connectorfactory.ParseMount(ctx, config.Connector, config.DevFolder)

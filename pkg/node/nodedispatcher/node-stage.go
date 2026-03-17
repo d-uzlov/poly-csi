@@ -68,7 +68,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), connector)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
-				logger.Error("failed to cleanup partially initialized volume", "error", err)
+				logger.Error("failed to cleanup partially initialized volume", "error", cleanupErr.Error())
 			}
 		}
 	}()

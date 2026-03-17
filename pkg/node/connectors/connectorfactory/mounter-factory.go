@@ -8,10 +8,10 @@ import (
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrcifs"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
 	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
-	"meoe.io/poly-csi/pkg/node/mounts/mountplugins/mounthttp"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -66,12 +66,12 @@ func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string
 	if mtype == "plugin" {
 		switch subtype {
 		case "http.json.dev":
-			var cfg mounthttp.ClientConfig
+			var cfg cntrhttpjsonplugin.ClientConfig
 			if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
 				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
 			}
 			return func(tr transport.Transport) connectors.Connector {
-				return mounthttp.NewHttpJsonConnectorPlugin(cfg, devFolder)
+				return cntrhttpjsonplugin.NewHttpJsonConnectorPlugin(cfg, devFolder)
 			}, nil
 		}
 		return nil, fmt.Errorf("unknown connector subtype: '%s/%s', must be one of: http.json.dev", mtype, subtype)

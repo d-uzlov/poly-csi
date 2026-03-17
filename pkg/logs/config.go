@@ -50,13 +50,32 @@ func (c Config) Combine(another Config) Config {
 
 	if result.ExtraFields == nil {
 		result.ExtraFields = map[string]string{}
+	} else {
+		result.ExtraFields = maps.Clone(c.ExtraFields)
 	}
 	maps.Copy(result.ExtraFields, another.ExtraFields)
 
 	return result
 }
 
+func (c Config) WithFields(fields ...string) Config {
+	result := c
+	if result.ExtraFields == nil {
+		result.ExtraFields = map[string]string{}
+	} else {
+		result.ExtraFields = maps.Clone(c.ExtraFields)
+	}
+	for i := 0; i < len(fields)/2; i++ {
+		result.ExtraFields[fields[i*2]] = fields[i*2+1]
+	}
+	return result
+}
+
 func (c Config) MakeInstance() *Instance {
+	return c.MakeInstanceWithCopy(false)
+}
+
+func (c Config) MakeInstanceWithCopy(enableCopy bool) *Instance {
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: c.getLogLevel(),
 	})
@@ -66,8 +85,8 @@ func (c Config) MakeInstance() *Instance {
 	}
 	logger := slog.New(logHandler).With(fields...)
 	return &Instance{
-		config:    c,
-		logger:    logger,
-		finalized: false,
+		config:   c,
+		logger:   logger,
+		keepCopy: enableCopy,
 	}
 }
