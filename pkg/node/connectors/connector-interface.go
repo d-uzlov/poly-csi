@@ -21,14 +21,15 @@ type Connector interface {
 // ConnectRequest is mostly equivalent to csi.NodeStageVolumeRequest
 // except this struct can be (de)serialized without errors
 type ConnectRequest struct {
-	AddressOptions       []addropt.AddressOption           `json:"address_options"`
-	VolumeContext        map[string]string                 `json:"volume_context"`
-	PublishContext       map[string]string                 `json:"publish_context"`
-	StagingTargetPath    string                            `json:"staging_target_path"`
-	AccessBlock          *csi.VolumeCapability_BlockVolume `json:"access_block"`
-	AccessMount          *csi.VolumeCapability_MountVolume `json:"access_mount"`
-	Secrets              map[string]string                 `json:"secrets"`
-	PublishContextSecret map[string]string                 `json:"publish_context_secret"`
+	AddressOptions          []addropt.AddressOption           `json:"address_options"`
+	VolumeContext           map[string]string                 `json:"volume_context"`
+	PublishContext          map[string]string                 `json:"publish_context"`
+	StagingTargetPath       string                            `json:"staging_target_path"`
+	AccessBlock             *csi.VolumeCapability_BlockVolume `json:"access_block"`
+	AccessMount             *csi.VolumeCapability_MountVolume `json:"access_mount"`
+	Secrets                 map[string]string                 `json:"secrets"`
+	PublishContextSecret    map[string]string                 `json:"publish_context_secret"`
+	DisableCleanupOnFailure bool                              `json:"disableCleanupOnFailure"`
 }
 
 type ConnectResult struct {

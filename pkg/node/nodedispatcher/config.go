@@ -26,13 +26,14 @@ type ParsedEncrypt struct {
 
 // TODO add cleanup policy for debugging
 type parsedConfig struct {
-	Encrypt    ParsedEncrypt
-	NodeInfoDb nodeconfig.NodeInfoDbConfig
-	Multipath  mpfactory.ParsedMultipath
-	Mounts     []*connectorfactory.ParsedConnector
-	Networks   []nodeconfig.NodeNetworkConfig
-	ExecConfig localexec.Config
-	Logs       nodeconfig.Logs
+	Encrypt                 ParsedEncrypt
+	NodeInfoDb              nodeconfig.NodeInfoDbConfig
+	Multipath               mpfactory.ParsedMultipath
+	Mounts                  []*connectorfactory.ParsedConnector
+	Networks                []nodeconfig.NodeNetworkConfig
+	ExecConfig              localexec.Config
+	Logs                    nodeconfig.Logs
+	DisableCleanupOnFailure bool
 }
 
 func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
@@ -97,12 +98,13 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 			ControllerKey: *controllerKey,
 			Conf:          config.Encrypt,
 		},
-		NodeInfoDb: config.NodeInfoDb,
-		Multipath:  *mp,
-		Mounts:     ml,
-		Networks:   config.Networks,
-		ExecConfig: config.ExecConfig,
-		Logs:       config.Logs,
+		NodeInfoDb:              config.NodeInfoDb,
+		Multipath:               *mp,
+		Mounts:                  ml,
+		Networks:                config.Networks,
+		ExecConfig:              config.ExecConfig,
+		Logs:                    config.Logs,
+		DisableCleanupOnFailure: config.DisableCleanupOnFailure,
 	}, nil
 }
 

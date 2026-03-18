@@ -35,6 +35,9 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 	// setting up cleanup before even attempting to connect
 	// because failure could be caused by invalid state, that should be forcefully disconnected.
 	defer func() {
+		if req.DisableCleanupOnFailure {
+			return
+		}
 		if err == nil {
 			return
 		}

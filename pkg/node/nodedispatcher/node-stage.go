@@ -61,8 +61,14 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("connector with id '%s' is not found", connectorId)
 	}
 
+	// TODO protect with mutex
+	disableCleanup := n.conf.DisableCleanupOnFailure
+
 	nvi := newVolumeHandle(req.StagingTargetPath)
 	defer func() {
+		if disableCleanup {
+			return
+		}
 		if err != nil {
 			logger.Warn("detected failure, running cleanup")
 			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), connector)
@@ -83,10 +89,11 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		VolumeContext:  req.VolumeContext,
 		PublishContext: req.PublishContext,
 		// StagingTargetPath:    "", // StagingTargetPath is set automatically
-		AccessBlock:          req.VolumeCapability.GetBlock(),
-		AccessMount:          req.VolumeCapability.GetMount(),
-		Secrets:              req.Secrets,
-		PublishContextSecret: pcSecret,
+		AccessBlock:             req.VolumeCapability.GetBlock(),
+		AccessMount:             req.VolumeCapability.GetMount(),
+		Secrets:                 req.Secrets,
+		PublishContextSecret:    pcSecret,
+		DisableCleanupOnFailure: disableCleanup,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
