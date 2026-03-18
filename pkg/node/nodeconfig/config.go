@@ -34,7 +34,6 @@ type NodeInfoDbConfig struct {
 
 type NodeEncryptConfig struct {
 	NodeKey             KeyInfoConfig `yaml:"nodeKey" json:"nodeKey"`
-	ControllerPublicKey KeyInfoConfig `yaml:"controllerPublicKey" json:"controllerPublicKey"`
 }
 
 type NodeNetworkConfig struct {

@@ -29,7 +29,6 @@ func (m *iscsiadmConnector) GetInfo(ctx context.Context) (*connectors.ConnectorN
 
 	return &connectors.ConnectorNodeInfo{
 		Public: string(public),
-		Secret: "",
 	}, nil
 }
 

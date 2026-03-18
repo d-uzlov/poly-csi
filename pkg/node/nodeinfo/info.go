@@ -26,7 +26,7 @@ func (ni *NodeInfo) Validate() error {
 	return nil
 }
 
-func (ni *NodeInfo) Serialize(remotePubKey encrypt.RsaPublicKey, aesSecret []byte) (map[string]string, error) {
+func (ni *NodeInfo) Serialize() (map[string]string, error) {
 	result := map[string]string{
 		"id":              ni.Id,
 		"node_public_key": string(ni.PublicKey.SerializePem()),
@@ -37,7 +37,7 @@ func (ni *NodeInfo) Serialize(remotePubKey encrypt.RsaPublicKey, aesSecret []byt
 		result["has_multipath"] = "1"
 	}
 	for k, v := range ni.Connectors {
-		serialized, err := v.Serialize(aesSecret)
+		serialized, err := v.Serialize()
 		if err != nil {
 			return nil, fmt.Errorf("connector %s: serialize failed: %w", k, err)
 		}
@@ -45,17 +45,10 @@ func (ni *NodeInfo) Serialize(remotePubKey encrypt.RsaPublicKey, aesSecret []byt
 		result[key] = serialized
 	}
 
-	encrypt.InjectAesSecret(result, remotePubKey, aesSecret)
-
 	return result, nil
 }
 
-func ParseNodeInfo(src map[string]string, privateKey encrypt.RsaPrivateKey) (*NodeInfo, error) {
-	aesSecret, err := encrypt.ExtractAesSecret(src, privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("extract aes secret: %w", err)
-	}
-
+func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
 	result := NodeInfo{
 		Connectors: map[string]connectors.ConnectorNodeInfo{},
 	}
@@ -81,7 +74,7 @@ func ParseNodeInfo(src map[string]string, privateKey encrypt.RsaPrivateKey) (*No
 		}
 		connectorId, foundConnector := strings.CutPrefix(k, "connector.")
 		if foundConnector {
-			mountInfo, err := connectors.DeserializeConnectorNodeInfo(v, aesSecret)
+			mountInfo, err := connectors.DeserializeConnectorNodeInfo(v)
 			if err != nil {
 				return nil, fmt.Errorf("deserialize connector %s info: %w", connectorId, err)
 			}

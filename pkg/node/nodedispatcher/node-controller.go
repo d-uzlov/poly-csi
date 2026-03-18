@@ -91,7 +91,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 
 	go nodeinfo.PeriodicInfoPush(pushCtx, n.conf.getNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
 		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
-			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, aesSecret, newConf.Encrypt.ControllerKey, mp, newConf.Networks)
+			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, mp, newConf.Networks)
 		}, func() {
 			pushCh <- struct{}{}
 		},

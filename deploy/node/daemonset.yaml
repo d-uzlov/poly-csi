@@ -26,7 +26,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.118
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.120
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -62,8 +62,6 @@ spec:
           name: dev-dir
         - mountPath: /poly-csi/node
           name: poly-csi-config
-        - mountPath: /poly-csi/controller
-          name: controller-public-key
         - mountPath: /poly-csi/config
           name: node-config
         - mountPath: /run/io.meoe.poly-csi/plugins
@@ -103,7 +101,7 @@ spec:
           name: kubelet-dir
 
       - name: iscsi-connector
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.114
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.120
         args:
         - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -171,9 +169,6 @@ spec:
         hostPath:
           path: /run/io.meoe.poly-csi/plugins
           type: DirectoryOrCreate
-      - name: controller-public-key
-        secret:
-          secretName: controller-public-key
       - name: node-config
         configMap:
           name: node-config

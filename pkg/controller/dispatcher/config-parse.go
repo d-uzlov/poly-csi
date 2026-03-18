@@ -15,19 +15,12 @@ import (
 	"meoe.io/poly-csi/pkg/controller/voldb/voldbfactory"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/transportfactory"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 type DispatcherConf struct {
-	Encrypt    parsedEncrypt
 	NodeInfoDb NodeInfoStorageConfig
 	Servers    []*parsedServer
 	Logs       Logs
-}
-
-type parsedEncrypt struct {
-	Key  encrypt.RsaPrivateKey
-	Conf *EncryptConfig
 }
 
 func (c *DispatcherConf) Validate() (errorList []string, warningList []string) {
@@ -227,11 +220,6 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 		return nil, fmt.Errorf("json decode: %w", err)
 	}
 
-	rsa, err := encrypt.LoadPrivateKey(config.Encrypt.ControllerKey.Path)
-	if err != nil {
-		return nil, fmt.Errorf("load private key: %w", err)
-	}
-
 	sl := []*parsedServer{}
 	for _, v := range config.Servers {
 		srv := parsedServer{
@@ -262,10 +250,6 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 	}
 
 	return &DispatcherConf{
-		Encrypt: parsedEncrypt{
-			Key:  *rsa,
-			Conf: config.Encrypt,
-		},
 		NodeInfoDb: config.NodeInfoDb,
 		Servers:    sl,
 		Logs:       config.Logs,

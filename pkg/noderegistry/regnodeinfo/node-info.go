@@ -11,11 +11,11 @@ type RegNodeInfo struct {
 	Data map[string]string `json:"data"`
 }
 
-func (ni *RegNodeInfo) SetConnectorInfo(id string, info connectors.ConnectorNodeInfo, aesSecret []byte) error {
+func (ni *RegNodeInfo) SetConnectorInfo(id string, info connectors.ConnectorNodeInfo) error {
 	if id == "" {
 		return fmt.Errorf("connector info: id is empty")
 	}
-	serialized, err := info.Serialize(aesSecret)
+	serialized, err := info.Serialize()
 	if err != nil {
 		return fmt.Errorf("connector %s: serialize failed: %w", id, err)
 	}
@@ -24,13 +24,13 @@ func (ni *RegNodeInfo) SetConnectorInfo(id string, info connectors.ConnectorNode
 	return nil
 }
 
-func (ni *RegNodeInfo) GetConnectorInfo(connectorId string, aesSecret []byte) (*connectors.ConnectorNodeInfo, error) {
+func (ni *RegNodeInfo) GetConnectorInfo(connectorId string) (*connectors.ConnectorNodeInfo, error) {
 	connectorInfoKey := "connector." + connectorId
 	mountInfoRaw := ni.Data[connectorInfoKey]
 	if mountInfoRaw == "" {
 		return nil, fmt.Errorf("node_info: key '%s' missing", connectorInfoKey)
 	}
-	mountInfo, err := connectors.DeserializeConnectorNodeInfo(mountInfoRaw, aesSecret)
+	mountInfo, err := connectors.DeserializeConnectorNodeInfo(mountInfoRaw)
 	if err != nil {
 		return nil, err
 	}

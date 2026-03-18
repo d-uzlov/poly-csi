@@ -20,7 +20,6 @@ import (
 
 type ParsedEncrypt struct {
 	NodeKey       encrypt.RsaPrivateKey
-	ControllerKey encrypt.RsaPublicKey
 	Conf          nodeconfig.NodeEncryptConfig
 }
 
@@ -54,11 +53,6 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	nodeKey, err := loadOrGenerateKey(config.Encrypt.NodeKey.Path)
 	if err != nil {
 		return nil, fmt.Errorf("load node private key: %w", err)
-	}
-
-	controllerKey, err := encrypt.LoadPublicKey(config.Encrypt.ControllerPublicKey.Path)
-	if err != nil {
-		return nil, fmt.Errorf("load controller public key: %w", err)
 	}
 
 	ml := []*connectorfactory.ParsedConnector{}
@@ -95,7 +89,6 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	return &parsedConfig{
 		Encrypt: ParsedEncrypt{
 			NodeKey:       *nodeKey,
-			ControllerKey: *controllerKey,
 			Conf:          config.Encrypt,
 		},
 		NodeInfoDb:              config.NodeInfoDb,

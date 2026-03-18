@@ -8,14 +8,9 @@ import (
 )
 
 type Config struct {
-	Encrypt    *EncryptConfig        `yaml:"encrypt"`
 	NodeInfoDb NodeInfoStorageConfig `yaml:"nodeInfoDb"`
 	Servers    []*ServerConfig       `yaml:"servers"`
 	Logs       Logs                  `yaml:"logs" json:"logs"`
-}
-
-type EncryptConfig struct {
-	ControllerKey KeyInfoConfig `yaml:"controllerKey"`
 }
 
 type KeyInfoConfig struct {

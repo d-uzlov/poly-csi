@@ -26,7 +26,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.2.119
+        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.2.120
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -45,8 +45,6 @@ spec:
           name: config
         - mountPath: /poly-csi/ssh-keys
           name: ssh-keys
-        - mountPath: /poly-csi/controller-private-key
-          name: controller-private-key
       # https://github.com/kubernetes-csi/external-attacher
       - name: external-attacher
         image: registry.k8s.io/sig-storage/csi-attacher:v4.10.0
@@ -168,9 +166,6 @@ spec:
       - name: ssh-keys
         secret:
           secretName: ssh-keys
-      - name: controller-private-key
-        secret:
-          secretName: controller-private-key
 ---
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver

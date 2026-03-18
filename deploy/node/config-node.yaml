@@ -5,8 +5,6 @@ nodeInfoDb:
 encrypt:
   nodeKey:
     path: /poly-csi/node/node_key.pem
-  controllerPublicKey:
-    path: /poly-csi/controller/controller_key.pub.pem
 
 devFolder: /host/dev
 

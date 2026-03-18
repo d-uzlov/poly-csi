@@ -13,7 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, aesSecret []byte, remotePubKey encrypt.RsaPublicKey, mp multipath.Multipath, networks []nodeconfig.NodeNetworkConfig) (regnodeinfo.RegNodeInfo, error) {
+func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, mp multipath.Multipath, networks []nodeconfig.NodeNetworkConfig) (regnodeinfo.RegNodeInfo, error) {
 	nodePublicKey := pk.GetPublicKey()
 	info := NodeInfo{
 		Id:         nodeId,
@@ -87,7 +87,7 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 		return regnodeinfo.RegNodeInfo{}, fmt.Errorf("validate: %w", err)
 	}
 
-	serialized, err := info.Serialize(remotePubKey, aesSecret)
+	serialized, err := info.Serialize()
 	if err != nil {
 		return regnodeinfo.RegNodeInfo{}, fmt.Errorf("serialize: %w", err)
 	}

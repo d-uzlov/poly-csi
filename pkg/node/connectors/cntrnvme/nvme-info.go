@@ -28,7 +28,6 @@ func (m *nvmeConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeI
 
 	return &connectors.ConnectorNodeInfo{
 		Public: string(public),
-		Secret: "",
 	}, nil
 }
 

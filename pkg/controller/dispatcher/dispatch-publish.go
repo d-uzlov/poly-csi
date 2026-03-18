@@ -56,7 +56,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: node id not found")
 	}
 
-	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo.Data, d.conf.Encrypt.Key)
+	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo.Data)
 	if err != nil {
 		return nil, fmt.Errorf("node_info: parse: %w", err)
 	}
