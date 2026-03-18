@@ -63,7 +63,7 @@ func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, t
 	go func() {
 		runResult, err := sourceSrv.trInstance.RunCommand(sendCtx, sendCmd, transport.WithStdinFile(send), transport.WithoutStdout(), transport.WithTimeout(timeout))
 		if err != nil {
-			logs.FromCtx(ctx).Error("ncat send failed", "error", err)
+			logs.FromCtx(ctx).Error("ncat send failed", "error", err.Error())
 		} else if runResult.ExitCode != 0 {
 			logs.FromCtx(ctx).Error("ncat send failed", "error", transport.FormatRunError(runResult))
 		}
@@ -71,7 +71,7 @@ func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, t
 	go func() {
 		runResult, err := targetSrv.trInstance.RunCommand(receiveCtx, receiveCmd, transport.WithStdoutFile(receive), transport.WithTimeout(timeout))
 		if err != nil {
-			logs.FromCtx(ctx).Error("ncat receive failed", "error", err)
+			logs.FromCtx(ctx).Error("ncat receive failed", "error", err.Error())
 		} else if runResult.ExitCode != 0 {
 			logs.FromCtx(ctx).Error("ncat receive failed", "error", transport.FormatRunError(runResult))
 		}

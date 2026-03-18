@@ -109,7 +109,7 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 		}
 		err = vol.Delete(ctx)
 		if err != nil {
-			logs.FromCtx(ctx).Error("failed to delete created subvol", "error", err)
+			logs.FromCtx(ctx).Error("failed to delete created subvol", "error", err.Error())
 		} else {
 			logs.FromCtx(ctx).Info("deleted created subvol")
 		}
@@ -151,14 +151,14 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 		}
 		err = vol.Delete(ctx)
 		if err != nil {
-			logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err)
+			logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
 		} else {
 			logs.FromCtx(ctx).Info("deleted received subvol")
 		}
 		if containerPath+"/"+volumeName != vol.getMainVolume() {
 			_, err := m.snip.SubvolumeDelete(ctx, containerPath+"/"+volumeName)
 			if err != nil {
-				logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err)
+				logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
 			} else {
 				logs.FromCtx(ctx).Info("deleted received subvol")
 			}

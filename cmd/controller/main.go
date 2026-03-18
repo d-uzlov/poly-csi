@@ -53,12 +53,12 @@ func main() {
 		logger.Info("reading new config file")
 		newContent, err := os.ReadFile(appConfig.ConfigPath)
 		if err != nil {
-			logger.Error("reading config file failed", "error", err)
+			logger.Error("reading config file failed", "error", err.Error())
 			return
 		}
 		newConfig, err := dispatcher.ParseDispatcherConfig(ctx, newContent)
 		if err != nil {
-			logger.Error("parsing config file failed", "error", err)
+			logger.Error("parsing config file failed", "error", err.Error())
 			return
 		}
 		d.ReloadConfig(ctx, newConfig)
@@ -66,7 +66,7 @@ func main() {
 
 	con, err := controller.CreateController(logger, d, appConfig.CsiName, config.GetVersion())
 	if err != nil {
-		logger.Error("could not create controller", "error", err)
+		logger.Error("could not create controller", "error", err.Error())
 		panic(err)
 	}
 	server := controllerserver.NewControllerServer(con)

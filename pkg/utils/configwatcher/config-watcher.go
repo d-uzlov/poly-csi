@@ -24,7 +24,7 @@ func WatchConfigChanges(ctx context.Context, path string, action func()) {
 		}
 		err = watcher.Add(path)
 		if err != nil {
-			logger.Error("could not watch for file changes", "path", path, "error", err)
+			logger.Error("could not watch for file changes", "path", path, "error", err.Error())
 			select {
 			case <-ctx.Done():
 				logger.Error("config watcher thread finished (context done)")
@@ -61,7 +61,7 @@ func WatchConfigChanges(ctx context.Context, path string, action func()) {
 					logger.Error("config watcher thread finished (error channel closed)")
 					return
 				}
-				logger.Error("config watcher received error", "error", err)
+				logger.Error("config watcher received error", "error", err.Error())
 			}
 		}
 	}

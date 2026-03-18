@@ -161,7 +161,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		logs.FromCtx(ctx).Info("running storage cleanup")
 		err = vol.Delete(ctx)
 		if err != nil {
-			logs.FromCtx(ctx).Error("failed to run storage cleanup", "error", err)
+			logs.FromCtx(ctx).Error("failed to run storage cleanup", "error", err.Error())
 			return
 		}
 	}()
@@ -417,7 +417,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		logs.FromCtx(ctx).Info("running share cleanup")
 		err = shr.DeleteShare(ctx, shareData)
 		if err != nil {
-			logs.FromCtx(ctx).Error("failed to run share cleanup", "error", err)
+			logs.FromCtx(ctx).Error("failed to run share cleanup", "error", err.Error())
 			return
 		}
 	}()

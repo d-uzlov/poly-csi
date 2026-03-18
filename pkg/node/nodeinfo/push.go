@@ -36,14 +36,14 @@ func pushInfo(ctx context.Context, logConfig logs.Config, reg nodremotereg.NodeR
 
 	nodeInfo, err := getInfo(ctx)
 	if err != nil {
-		logger.Error("failed to gather node info", "error", err)
+		logger.Error("failed to gather node info", "error", err.Error())
 		logger.Commit(false)
 		return
 	}
 
 	err = reg.Set(nodeInfo)
 	if err != nil {
-		logger.Error("failed to push node info to registry", "error", err)
+		logger.Error("failed to push node info to registry", "error", err.Error())
 		logger.Commit(false)
 		return
 	}

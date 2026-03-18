@@ -40,7 +40,7 @@ func main() {
 	reg := noderegsrv.NewNodeRegistry()
 	reg.StartNodeRegistry(ctx, time.Second, func(err error) {
 		if err != nil {
-			logger.Error("error on shutdown", "error", err)
+			logger.Error("error on shutdown", "error", err.Error())
 		}
 		close(doneCh)
 	})

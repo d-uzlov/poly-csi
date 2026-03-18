@@ -28,7 +28,7 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 	for k, v := range connectorList {
 		mi, err := v.GetInfo(ctx)
 		if err != nil {
-			slogctx.FromCtx(ctx).Error("connector.GetInfo failed", "error", err)
+			slogctx.FromCtx(ctx).Error("connector.GetInfo failed", "error", err.Error())
 			continue
 		}
 		info.Connectors[k] = *mi

@@ -55,7 +55,7 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		if a.ValueFromFile != "" {
 			bytes, err := os.ReadFile(a.ValueFromFile)
 			if err != nil {
-				result.logger.Error(fmt.Sprintf("auth[i=%d/name=%s]: could not read file", i, a.Name), "file", a.ValueFromFile, "error", err)
+				result.logger.Error(fmt.Sprintf("auth[i=%d/name=%s]: could not read file", i, a.Name), "file", a.ValueFromFile, "error", err.Error())
 				continue
 			}
 			resolvedValue = string(bytes)
@@ -70,7 +70,7 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		case "key":
 			signer, err := ssh.ParsePrivateKey([]byte(resolvedValue))
 			if err != nil {
-				result.logger.Error(fmt.Sprintf("auth[i=%d/name=%s]: unable to parse private key", i, a.Name), "error", err)
+				result.logger.Error(fmt.Sprintf("auth[i=%d/name=%s]: unable to parse private key", i, a.Name), "error", err.Error())
 				continue
 			}
 			authMethods = append(authMethods, ssh.PublicKeys(signer))
@@ -101,7 +101,7 @@ func (s *sshWrapper) watchClient(ctx context.Context) {
 		client := s.GetClient()
 		if client != nil {
 			err := client.Conn.Wait()
-			s.logger.Info("client connection closed", "error", err)
+			s.logger.Info("client connection closed", "error", err.Error())
 		}
 		if ctx.Err() != nil {
 			break
@@ -109,7 +109,7 @@ func (s *sshWrapper) watchClient(ctx context.Context) {
 		// at this point client is either nil or already closed
 		err := s.UpdateClient(client)
 		if err != nil {
-			s.logger.Error("SshWrapper.watchClient: UpdateClient failed", "error", err)
+			s.logger.Error("SshWrapper.watchClient: UpdateClient failed", "error", err.Error())
 			// TODO add backoff? or remove repeated attempts from logs?
 			time.Sleep(time.Second)
 			continue

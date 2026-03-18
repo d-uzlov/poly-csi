@@ -14,7 +14,7 @@ import (
 )
 
 type nvmeConnector struct {
-	tr transport.Transport
+	tr        transport.Transport
 	snip      NvmeSnippets
 	config    Config
 	devFolder string
@@ -22,7 +22,7 @@ type nvmeConnector struct {
 
 func New(tr transport.Transport, config Config, devFolder string) connectors.Connector {
 	return &nvmeConnector{
-		tr: tr,
+		tr:        tr,
 		snip:      newNvmeSnippets(tr, config.NvmeCmd, devFolder, config.ParseKernelLog),
 		config:    config,
 		devFolder: devFolder,
@@ -59,7 +59,7 @@ func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectReque
 				return nil, fmt.Errorf("nvmeConnect: %w", err)
 			}
 
-			logs.FromCtx(ctx).Error("nvmeConnect failed", "address", v, "error", err)
+			logs.FromCtx(ctx).Error("nvmeConnect failed", "address", v, "error", err.Error())
 			continue
 		}
 		successCount++

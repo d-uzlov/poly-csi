@@ -47,7 +47,7 @@ func main() {
 
 	nodeInstance, err := nodedispatcher.New(logger, appConfig.CsiName, config.GetVersion(), appConfig.CsiNodeId)
 	if err != nil {
-		logger.Error("could not create node controller", "error", err)
+		logger.Error("could not create node controller", "error", err.Error())
 		panic(err)
 	}
 
@@ -68,7 +68,7 @@ func main() {
 		}
 		err = nodeInstance.ReloadConfig(ctx, *nodeConfig)
 		if err != nil {
-			logger.Error("config reload failed", "error", err)
+			logger.Error("config reload failed", "error", err.Error())
 			return
 		}
 		logger.Info("config reload success")

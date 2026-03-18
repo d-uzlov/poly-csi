@@ -53,7 +53,7 @@ func Listen(ctx context.Context, address string) (net.Listener, func(), error) {
 func (s *Server) GoListenAndServe(ctx context.Context, address string, doneCallback func()) error {
 	listener, cleanup, err := Listen(ctx, address)
 	if err != nil {
-		// s.logger.Error("Failed to listen", "error", err)
+		// s.logger.Error("Failed to listen", "error", err.Error())
 		return fmt.Errorf("failed to listen: %v", err)
 	}
 
@@ -98,7 +98,7 @@ func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInf
 
 	resp, err := handler(ctx, req)
 	if err != nil {
-		logger.Error("GRPC error", "error", err)
+		logger.Error("GRPC error", "error", err.Error())
 		logger.Commit(false)
 		return nil, fmt.Errorf("%s: %w", info.FullMethod, err)
 	}

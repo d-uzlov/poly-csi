@@ -236,7 +236,7 @@ func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
 		err = transport.CheckedRun(ctx, snip.tr, cmd)
 		if err != nil {
 			err = fmt.Errorf("nvme ns-rescan '%s': %w", devPath, err)
-			logs.FromCtx(ctx).Error("nvme ns-rescan failed", "error", err)
+			logs.FromCtx(ctx).Error("nvme ns-rescan failed", "error", err.Error())
 			continue
 		}
 		anySuccess = true

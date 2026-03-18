@@ -148,7 +148,7 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 		}
 		_, err := m.snip.DestroyDataset(ctx, datasetPath)
 		if err != nil {
-			logs.FromCtx(ctx).Error("failed to delete received dataset", "error", err)
+			logs.FromCtx(ctx).Error("failed to delete received dataset", "error", err.Error())
 		} else {
 			logs.FromCtx(ctx).Info("deleted received dataset")
 		}

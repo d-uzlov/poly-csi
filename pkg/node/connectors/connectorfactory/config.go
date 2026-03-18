@@ -35,7 +35,7 @@ func ParseMount(ctx context.Context, c *MountConfig, devFolder string) *ParsedCo
 
 	byteConfig, err := yaml.Marshal(c.Config)
 	if err != nil {
-		logger.Error("mount_config: marshal config", "id", c.Id, "error", err)
+		logger.Error("mount_config: marshal config", "id", c.Id, "error", err.Error())
 		return &ParsedConnector{
 			Valid: false,
 			Conf:  c,
@@ -44,7 +44,7 @@ func ParseMount(ctx context.Context, c *MountConfig, devFolder string) *ParsedCo
 
 	inflater, err := GetByType(c.Type, c.Subtype, byteConfig, devFolder)
 	if err != nil {
-		logger.Error("mount_config: could not create", "id", c.Id, "error", err)
+		logger.Error("mount_config: could not create", "id", c.Id, "error", err.Error())
 		return &ParsedConnector{
 			Valid: false,
 			Conf:  c,
