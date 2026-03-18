@@ -107,7 +107,7 @@ func (l *localMp) enableMultipath(ctx context.Context, devices []string) (string
 	for v := range strings.Lines(stdout) {
 		device, name, ok := strings.Cut(strings.TrimSpace(v), "/")
 		if !ok {
-			logs.FromCtx(ctx).Warn("invalid multipath show paths line format: %s", v)
+			logs.FromCtx(ctx).Warn("show paths: invalid line format: %s", v)
 		}
 		if device == devices[0] {
 			if strings.Contains(name, "/") {
@@ -151,5 +151,20 @@ func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
 	// if err != nil {
 	// 	return fmt.Errorf("add device to multipath: %w", err)
 	// }
+	return nil
+}
+
+func (l *localMp) Expand(ctx context.Context, serializedData string) error {
+	data, err := parseData(serializedData)
+	if err != nil {
+		return fmt.Errorf("parse serialized data: %w", err)
+	}
+
+	cmd := l.mpCommand(fmt.Sprintf("resize map %s", data.MapName))
+	err = transport.CheckedRun(ctx, l.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("request resize: %w", err)
+	}
+
 	return nil
 }

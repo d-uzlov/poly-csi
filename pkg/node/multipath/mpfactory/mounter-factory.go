@@ -7,7 +7,6 @@ import (
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mplocal"
 	"meoe.io/poly-csi/pkg/node/multipath/mpnone"
-	"meoe.io/poly-csi/pkg/node/multipath/mpplugin/mphttp"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -36,19 +35,6 @@ func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string
 			}, nil
 		}
 		return nil, fmt.Errorf("unknown multipath subtype: '%s/%s', must be one of: local", mtype, subtype)
-	}
-	if mtype == "plugin" {
-		switch subtype {
-		case "http.json.dev":
-			var cfg mphttp.ClientConfig
-			if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
-				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
-			}
-			return func(tr transport.Transport) multipath.Multipath {
-				return mphttp.NewHttpJsonMultipathPlugin(cfg, devFolder)
-			}, nil
-		}
-		return nil, fmt.Errorf("unknown multipath subtype: '%s/%s', must be one of: http.json.dev", mtype, subtype)
 	}
 	return nil, fmt.Errorf("unknown multipath type: '%s', must be one of: builtin, plugin", mtype)
 }

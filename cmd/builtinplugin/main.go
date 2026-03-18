@@ -10,7 +10,6 @@ import (
 
 	"meoe.io/poly-csi/cmd/builtinplugin/config"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
-	"meoe.io/poly-csi/pkg/node/multipath/mpplugin/mppluginconfig"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -59,30 +58,6 @@ func main() {
 		}
 
 		instance := conf.Connector.Inflate(tr)
-		serverInstance := conf.InflateServer(ctx, instance)
-
-		serverInstance.StartServe(ctx, time.Second, func(err error) {
-			if err != nil {
-				logger.Error("server finished with error", "error", err.Error())
-			} else {
-				logger.Info("server finished without error")
-			}
-			close(serverDoneCh)
-		})
-	case "multipath":
-		configContent, err := os.ReadFile(appConfig.ConfigPath)
-		if err != nil {
-			panic(err.Error())
-		}
-		conf, err := mppluginconfig.ParseConfig(ctx, configContent)
-		if err != nil {
-			panic(err.Error())
-		}
-
-		if !conf.Multipath.Valid {
-			panic("multipath config is not valid")
-		}
-		instance := conf.Multipath.Inflate(tr)
 		serverInstance := conf.InflateServer(ctx, instance)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {

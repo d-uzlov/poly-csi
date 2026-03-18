@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 )
 
@@ -67,7 +68,15 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	}
 	err = connector.Expand(ctx, nvi.SerializedConnectorData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("connector.Expand: %w", err)
+	}
+	logs.FromCtx(ctx).MicroOp("connector.Expand: success")
+	if nvi.SerializedMultipathData != "" {
+		err = n.getMultipath().Expand(ctx, nvi.SerializedMultipathData)
+		if err != nil {
+			return nil, fmt.Errorf("multipath.Expand: %w", err)
+		}
+		logs.FromCtx(ctx).MicroOp("multipath.Expand: success")
 	}
 
 	fsnip := fsutils.New(n.getTransport())
@@ -77,6 +86,7 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 		if err != nil {
 			return nil, fmt.Errorf("ExpandFs: %w", err)
 		}
+		logs.FromCtx(ctx).MicroOp("ExpandFs: success")
 	}
 
 	stats, err := fsnip.GetMountStats(nvi.FolderPath)

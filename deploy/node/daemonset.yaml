@@ -26,7 +26,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.120
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.121
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock

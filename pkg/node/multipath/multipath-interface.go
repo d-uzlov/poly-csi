@@ -6,6 +6,7 @@ type Multipath interface {
 	Ready(ctx context.Context) bool
 	Setup(ctx context.Context, devices []string) (*MultipathContext, error)
 	Destroy(ctx context.Context, serializedData string) error
+	Expand(ctx context.Context, serializedData string) error
 }
 
 type MultipathContext struct {
