@@ -30,7 +30,7 @@ func parseVolume(encoded string, snip zfs.Snippets) (*Volume, error) {
 		return nil, fmt.Errorf("unmarshal json: %w", err)
 	}
 	if result.Path == "" {
-		return nil, fmt.Errorf("zfs dataset path is empty")
+		return nil, fmt.Errorf("path is empty")
 	}
 	result.snip = snip
 	return &result, nil
@@ -82,11 +82,8 @@ func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
 		return currentSize, nil
 	}
 
-	err = v.snip.ConfigureDataset(ctx, v.Path, zfs.DatasetConfig{
-		Quota:          newSize,
-		RefQuota:       newSize,
-		Reservation:    0,
-		RefReservation: 0,
+	err = v.snip.ConfigureZvol(ctx, v.Path, zfs.ZvolConfig{
+		Size: newSize,
 	})
 	if err != nil {
 		return 0, err
