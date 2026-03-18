@@ -150,7 +150,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 	logger := logs.FromCtx(ctx)
 
 	// ensureDevicePath will setup multipath if needed
-	device, err := ensureDevicePath(ctx, v, v.intermediateDeviceList, mp)
+	device, err := ensureDevicePath(ctx, tr, v, v.intermediateDeviceList, mp)
 	if err != nil {
 		return fmt.Errorf("ensureDevicePath: %w", err)
 	}

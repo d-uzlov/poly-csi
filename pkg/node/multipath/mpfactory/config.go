@@ -35,7 +35,7 @@ func ParseMultipath(ctx context.Context, c *MultipathConfig, devFolder string) *
 
 	byteConfig, err := yaml.Marshal(c.Config)
 	if err != nil {
-		logger.Error("mount_config: marshal config", "id", c.Id, "error", err)
+		logger.Error("mount_config: marshal config", "id", c.Id, "error", err.Error())
 		return &ParsedMultipath{
 			Valid: false,
 			Conf:  c,
@@ -44,7 +44,7 @@ func ParseMultipath(ctx context.Context, c *MultipathConfig, devFolder string) *
 
 	inflater, err := GetByType(c.Type, c.Subtype, byteConfig, devFolder)
 	if err != nil {
-		logger.Error("mount_config: could not create", "id", c.Id, "error", err)
+		logger.Error("mount_config: could not create", "id", c.Id, "error", err.Error())
 		return &ParsedMultipath{
 			Valid: false,
 			Conf:  c,

@@ -33,7 +33,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	err := dec.Decode(&config)
 	// err := yaml.UnmarshalStrict(raw, &result)
 	if err != nil {
-		logger.Error("config: initial parsing failed", "error", err)
+		logger.Error("config: initial parsing failed", "error", err.Error())
 		return nil, err
 	}
 

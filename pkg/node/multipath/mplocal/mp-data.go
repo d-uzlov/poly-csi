@@ -6,12 +6,12 @@ import (
 )
 
 type Data struct {
-	Wwid string `json:"wwid"`
+	MapName string `json:"map_name"`
 }
 
 func (d *Data) Validate() error {
-	if d.Wwid == "" {
-		return fmt.Errorf("missing wwid")
+	if d.MapName == "" {
+		return fmt.Errorf("missing map_name")
 	}
 	return nil
 }

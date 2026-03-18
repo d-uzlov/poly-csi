@@ -16,7 +16,7 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string, mp multipath.Multipath) (string, error) {
+func ensureDevicePath(ctx context.Context, tr transport.Transport, nvi *NodeVolumeInfo, devices []string, mp multipath.Multipath) (string, error) {
 	if len(devices) == 0 {
 		return "", fmt.Errorf("no devices in context")
 	}
@@ -37,6 +37,22 @@ func ensureDevicePath(ctx context.Context, nvi *NodeVolumeInfo, devices []string
 		return "", fmt.Errorf("multipath did not set data")
 	}
 	logs.FromCtx(ctx).MicroOp("multipath.Setup: success")
+
+	err = transport.Retry(time.Millisecond*100, time.Second, func() error {
+		stat, err := tr.Cmds().Stat(ctx, mc.Device)
+		if err != nil {
+			// runtime errors should be self-explanatory
+			return err
+		}
+		if !stat.FileExists {
+			return fmt.Errorf("file does not exist: %s", mc.Device)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to wait for device file: %w", err)
+	}
+
 	nvi.SerializedMultipathData = mc.SerializedData
 	return mc.Device, nil
 }

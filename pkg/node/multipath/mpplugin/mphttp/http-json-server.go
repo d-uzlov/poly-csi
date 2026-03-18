@@ -80,7 +80,7 @@ func (s *Server) handleRaw(w http.ResponseWriter, req *http.Request, h Handler) 
 	errType := http.StatusInternalServerError
 	defer func() {
 		if err != nil {
-			slogctx.FromCtx(s.callCtx).Error("request failed", "error", err)
+			slogctx.FromCtx(s.callCtx).Error("request failed", "error", err.Error())
 			http.Error(w, fmt.Sprintf(`{"status":"error", "error": "%s"}`, err.Error()), errType)
 			return
 		}
@@ -90,7 +90,7 @@ func (s *Server) handleRaw(w http.ResponseWriter, req *http.Request, h Handler) 
 		}
 		_, err = w.Write(respBytes)
 		if err != nil {
-			slogctx.FromCtx(s.callCtx).Error("failed to send response", "error", err, "response", string(respBytes))
+			slogctx.FromCtx(s.callCtx).Error("failed to send response", "error", err.Error(), "response", string(respBytes))
 		} else {
 			slogctx.FromCtx(s.callCtx).Info("sent response", "response", string(respBytes))
 		}

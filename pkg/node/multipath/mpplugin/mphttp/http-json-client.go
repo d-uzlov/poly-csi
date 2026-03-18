@@ -52,14 +52,14 @@ func (m *client) Ready(ctx context.Context) bool {
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slogctx.FromCtx(ctx).Error("multipath plugin: failed to read body", "error", err)
+		slogctx.FromCtx(ctx).Error("multipath plugin: failed to read body", "error", err.Error())
 		return false
 	}
 
 	var pr PluginResponse
 	err = json.Unmarshal(body, &pr)
 	if err != nil {
-		slogctx.FromCtx(ctx).Error("multipath plugin: unmarshal failed", "error", err)
+		slogctx.FromCtx(ctx).Error("multipath plugin: unmarshal failed", "error", err.Error())
 		return false
 	}
 	switch pr.Status {

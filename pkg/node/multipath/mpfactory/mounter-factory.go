@@ -28,7 +28,7 @@ func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string
 				return nil, fmt.Errorf("validate %s/%s config: %w", mtype, subtype, err)
 			}
 			return func(tr transport.Transport) multipath.Multipath {
-				return mplocal.NewLocalMp(tr, cfg)
+				return mplocal.NewLocalMp(tr, cfg, devFolder)
 			}, nil
 		case MultipathTypeNone:
 			return func(tr transport.Transport) multipath.Multipath {

@@ -11,3 +11,4 @@ multipath:
   subtype: local
   config:
     mapperFolder: /dev/mapper
+    multipathdCmd: [ multipathd ]
