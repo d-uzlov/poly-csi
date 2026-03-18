@@ -13,3 +13,9 @@ connector:
   config:
     iscsiadmCmd: [ "chroot", "/host", "iscsiadm" ]
     devFolder: /host/dev
+
+logs:
+  logLevel: debug
+  echoCommands: true
+  confirmMicroOps: true
+  skipOnSuccess: false

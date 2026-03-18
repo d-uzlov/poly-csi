@@ -21,12 +21,12 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       priorityClassName: system-node-critical
-      # hostNetwork is required to correctly report node IPs and communicate with multipathd
+      # hostNetwork is required to correctly report node IPs and communicate with multipathd and iscsiadm
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.79
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.118
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -56,8 +56,8 @@ spec:
         - mountPath: /var/lib/kubelet
           name: kubelet-dir
           mountPropagation: Bidirectional
-        - name: nvme-dir
-          mountPath: /etc/nvme
+        - mountPath: /etc/nvme
+          name: nvme-dir
         - mountPath: /host/dev
           name: dev-dir
         - mountPath: /poly-csi/node
@@ -102,6 +102,42 @@ spec:
         - mountPath: /var/lib/kubelet
           name: kubelet-dir
 
+      - name: iscsi-connector
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.114
+        args:
+        - --plugin-type=connector
+        - --node-config=/poly-csi/iscsi-config/config.yaml
+        resources:
+          limits:
+            memory: 150Mi
+          requests:
+            cpu: 10m
+            memory: 15Mi
+        securityContext:
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/lib/kubelet
+          name: kubelet-dir
+          mountPropagation: Bidirectional
+        - mountPath: /host
+          name: host-dir
+          mountPropagation: Bidirectional
+        # - mountPath: /sys
+        #   name: sys-dir
+        - mountPath: /poly-csi/iscsi-config
+          name: iscsi-config
+        - mountPath: /run/io.meoe.poly-csi/plugins/iscsi-container
+          name: poly-csi-plugins
+          mountPropagation: Bidirectional
+          subPath: iscsi-container
+        - mountPath: /etc/iscsi/
+          name: host-dir
+          readOnly: true
+          subPath: etc/iscsi/
+
       volumes:
       - name: socket-dir
         hostPath:
@@ -127,14 +163,6 @@ spec:
         hostPath:
           path: /dev
           type: Directory
-      # - name: host-dir
-      #   hostPath:
-      #     path: /
-      #     type: Directory
-      # - hostPath:
-      #     path: /etc/iscsi/
-      #     type: ""
-      #   name: etc-iscsi
       - name: poly-csi-config
         hostPath:
           path: /etc/io.meoe.poly-csi
@@ -149,6 +177,13 @@ spec:
       - name: node-config
         configMap:
           name: node-config
+      - name: host-dir
+        hostPath:
+          path: /
+          type: Directory
+      - name: iscsi-config
+        configMap:
+          name: node-plugin-iscsi-config
       tolerations:
       - effect: NoSchedule
         operator: Exists

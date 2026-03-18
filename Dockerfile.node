@@ -30,6 +30,7 @@ RUN apk add \
   e2fsprogs=1.47.2-r2 \
   e2fsprogs-extra=1.47.2-r2 \
   cifs-utils=7.3-r0 \
+  multipath-tools=0.11.1-r2 \
   --no-cache
 
 COPY --from=builder /app/node /node

@@ -1,5 +1,5 @@
 nodeInfoDb:
-  address: http://poly-csi-node-registry:8080
+  address: http://poly-csi-registry:8080
   interval: 15s
 
 encrypt:
@@ -14,10 +14,11 @@ execConfig: {}
 
 multipath:
   id: multipath
-  type: plugin
-  subtype: http.json.dev
+  type: builtin
+  subtype: local
   config:
-    socket: /run/io.meoe.poly-csi/plugins/multipath-container/multipath.sock
+    mapperFolder: /host/dev/mapper
+    multipathdCmd: [ multipathd ]
 
 connectors:
 - id: nfs
@@ -52,13 +53,13 @@ logs:
   default:
     logLevel: debug
     echoCommands: false
-    confirmMicroOps: false
+    confirmMicroOps: true
     skipOnSuccess: false
 
   nodeInfo:
     echoCommands: false
     confirmMicroOps: false
-    skipOnSuccess: false
+    skipOnSuccess: true
 
   rpc:
 
@@ -87,3 +88,5 @@ logs:
     /csi.v1.Node/NodeGetVolumeStats:
       echoCommands: true
       skipOnSuccess: true
+
+disableCleanupOnFailure: true
