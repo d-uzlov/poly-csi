@@ -195,11 +195,16 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, co
 	}
 	logger.MicroOp("ManagedOps: multipath disabled OK")
 
-	err = connector.Disconnect(ctx, v.SerializedConnectorData)
-	if err != nil {
-		return fmt.Errorf("connector.Disconnect: %w", err)
+	if v.SerializedConnectorData != "" {
+		err = connector.Disconnect(ctx, v.SerializedConnectorData)
+		if err != nil {
+			return fmt.Errorf("connector.Disconnect: %w", err)
+		}
+		logger.MicroOp("connector.Disconnect: success")
+	} else {
+		logger.MicroOp("connector.Disconnect: skipping because we don't have serialized connector data")
 	}
-	logger.MicroOp("connector.Disconnect: success")
+
 	if v.FolderPath != "" {
 		err = os.Remove(v.FolderPath)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {

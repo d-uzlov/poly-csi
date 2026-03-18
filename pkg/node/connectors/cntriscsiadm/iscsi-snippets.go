@@ -45,7 +45,7 @@ func (s iscsiSnippets) connect(iqn string, server string) error {
 	cmd := append(s.iscsiadmCmd, "--mode=node", "--targetname", iqn, "--portal", server, "--login")
 	_, err := transport.RelaxedRun(s.ctx, s.tr, cmd, "1 session requested, but 1 already present")
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsiadm login: %w", err)
 	}
 	return nil
 }
@@ -54,7 +54,7 @@ func (s iscsiSnippets) disconnect(iqn string, server string) error {
 	cmd := append(s.iscsiadmCmd, "--mode=node", "--targetname", iqn, "--portal", server, "--logout")
 	_, err := transport.RelaxedRun(s.ctx, s.tr, cmd, "No matching sessions found")
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsiadm logout: %w", err)
 	}
 	// do we need to also run `iscsiadm --op delete` ?
 	// it doesn't seems like it's necessary
@@ -87,7 +87,7 @@ func (s iscsiSnippets) listSessions() ([]iscsiSession, error) {
 	cmd := append(s.iscsiadmCmd, "--mode=session")
 	stdout, err := transport.CheckedRunStdout(s.ctx, s.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s (list sessions): %w", cmd, err)
+		return nil, fmt.Errorf("iscsiadm list sessions: %w", err)
 	}
 	var result []iscsiSession
 	for line := range strings.Lines(stdout) {
@@ -97,7 +97,10 @@ func (s iscsiSnippets) listSessions() ([]iscsiSession, error) {
 		}
 		s := iscsiSession{}
 		s.protocol = f[0]
+		s.protocol = strings.TrimSuffix(s.index, ":")
 		s.index = f[1]
+		s.index = strings.TrimPrefix(s.index, "[")
+		s.index = strings.TrimSuffix(s.index, "]")
 		addr := strings.Split(f[2], ",")
 		if len(addr) < 2 {
 			return nil, fmt.Errorf("parse session '%s': invalid address format: '%s'", line, f[2])
@@ -114,7 +117,7 @@ func (s iscsiSnippets) rescanAll() error {
 	cmd := append(s.iscsiadmCmd, "--mode=session", "--rescan")
 	err := transport.CheckedRun(s.ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsiadm rescan: %w", err)
 	}
 	return nil
 }
