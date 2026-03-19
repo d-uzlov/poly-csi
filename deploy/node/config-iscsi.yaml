@@ -12,7 +12,7 @@ connector:
   subtype: iscsiadm
   config:
     iscsiadmCmd: [ "chroot", "/host", "iscsiadm" ]
-    devFolder: /host/dev
+    initiatorNamePath: /host/etc/iscsi/initiatorname.iscsi
 
 logs:
   logLevel: debug

@@ -15,7 +15,7 @@ type IscsiPublicInfo struct {
 }
 
 func (m *iscsiadmConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	iqn, err := parseIqn(m.tr, ctx)
+	iqn, err := m.parseIqn(m.tr, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -41,10 +41,10 @@ func ParseIscsiInfo(src connectors.ConnectorNodeInfo) (IscsiPublicInfo, error) {
 	return result, nil
 }
 
-func parseIqn(tr transport.Transport, ctx context.Context) (string, error) {
-	initiatorInfo, err := tr.SudoCmds().Read(ctx, "/etc/iscsi/initiatorname.iscsi", false)
+func (m *iscsiadmConnector) parseIqn(tr transport.Transport, ctx context.Context) (string, error) {
+	initiatorInfo, err := tr.SudoCmds().Read(ctx, m.config.InitiatorNamePath, false)
 	if err != nil {
-		return "", fmt.Errorf("cat /etc/iscsi/initiatorname.iscsi: %w", err)
+		return "", fmt.Errorf("read initiatorname.iscsi: %w", err)
 	}
 	for v := range strings.Lines(string(initiatorInfo)) {
 		v = strings.TrimSpace(v)

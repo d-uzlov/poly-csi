@@ -13,8 +13,6 @@ kl -n pv-poly create configmap --dry-run=client -o yaml node-plugin-iscsi-config
 
 ssh_key=~/.ssh/id_ed25519
 kl -n pv-poly create secret --dry-run=client -o yaml generic ssh-keys               --from-file ssh_key_1=$ssh_key | kl apply -f -
-kl -n pv-poly create secret --dry-run=client -o yaml generic controller-public-key  --from-file controller_key.pub.pem=./.env/controller_key.pub.pem | kl apply -f -
-kl -n pv-poly create secret --dry-run=client -o yaml generic controller-private-key --from-file controller_key.pem=./.env/controller_key.pem | kl apply -f -
 
 kl apply -f ./deploy/node-registry/node-registry.yaml
 kl -n pv-poly get pod

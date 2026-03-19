@@ -4,6 +4,7 @@
     "addr_trtype",
     "addropt",
     "authmethod",
+    "automaxprocs",
     "backstore",
     "backstores",
     "blkid",

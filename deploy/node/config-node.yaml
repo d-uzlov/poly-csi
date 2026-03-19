@@ -4,7 +4,7 @@ nodeInfoDb:
 
 encrypt:
   nodeKey:
-    path: /poly-csi/node/node_key.pem
+    path: /var/lib/kubelet/plugins/io.meoe.poly-csi/node_key.pem
 
 devFolder: /host/dev
 
