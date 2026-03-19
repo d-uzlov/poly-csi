@@ -71,7 +71,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 		if err != nil {
 			logger.Warn("detected failure, running cleanup")
-			cleanupErr := nvi.cleanup(ctx, n.getMultipath(), connector)
+			cleanupErr := nvi.cleanup(ctx, n.getTransport(), n.getMultipath(), connector)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
 				logger.Error("failed to cleanup partially initialized volume", "error", cleanupErr.Error())
@@ -166,7 +166,7 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
 
-	err = nvi.cleanup(ctx, n.getMultipath(), connector)
+	err = nvi.cleanup(ctx, n.getTransport(), n.getMultipath(), connector)
 	if err != nil {
 		return nil, fmt.Errorf("cleanup: %w", err)
 	}

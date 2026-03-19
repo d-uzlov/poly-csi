@@ -177,12 +177,12 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 	return nil
 }
 
-func (v *NodeVolumeInfo) cleanup(ctx context.Context, mp multipath.Multipath, connector connectors.Connector) error {
+func (v *NodeVolumeInfo) cleanup(ctx context.Context, tr transport.Transport, mp multipath.Multipath, connector connectors.Connector) error {
 	var err error
 	logger := logs.FromCtx(ctx)
 
 	if v.ManagedOps.UnmountFs {
-		err = ensureFolderUnmounted(v)
+		err = ensureFolderUnmounted(ctx, v, tr)
 		if err != nil {
 			return fmt.Errorf("ensureFolderUnmounted: %w", err)
 		}

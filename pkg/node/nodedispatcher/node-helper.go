@@ -104,18 +104,29 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder str
 	return nil
 }
 
-func ensureFolderUnmounted(nvi *NodeVolumeInfo) error {
+func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transport.Transport) error {
 	if nvi.FolderPath == "" {
 		return nil
 	}
-	mh, ok := mount.NewWithoutSystemd("").(mount.MounterForceUnmounter)
-	if !ok {
-		panic("MounterForceUnmounter is not implemented on mount instance")
-	}
-	err := mh.UnmountWithForce(nvi.FolderPath, time.Second*1)
+
+	cmd := []string{"mountpoint", nvi.FolderPath}
+	runResult, err := tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return fmt.Errorf("unmount: %w", err)
+		return fmt.Errorf("check nvi.FolderPath: %w", err)
 	}
+	if runResult.ExitCode == 0 {
+		// nvi.FolderPath is a mount point, need to unmount
+		mh, ok := mount.NewWithoutSystemd("").(mount.MounterForceUnmounter)
+		if !ok {
+			panic("MounterForceUnmounter is not implemented on mount instance")
+		}
+		// TODO replace with manual invocation of umount, umount -f, umount -l
+		err = mh.UnmountWithForce(nvi.FolderPath, time.Second*1)
+		if err != nil {
+			return fmt.Errorf("unmount: %w", err)
+		}
+	}
+
 	err = os.Remove(nvi.FolderPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("remove mount path: %w", err)
