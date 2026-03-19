@@ -24,10 +24,10 @@ const (
 
 var builtinTypes = map[string]func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error){
 	ConnectorTypeNfs: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
-		return func(tr transport.Transport) connectors.Connector { return cntrnfs.New(tr) }, nil
+		return func(tr transport.Transport) connectors.Connector { return cntrnfs.New(tr, devFolder) }, nil
 	},
 	ConnectorTypeCifs: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
-		return func(tr transport.Transport) connectors.Connector { return cntrcifs.New(tr) }, nil
+		return func(tr transport.Transport) connectors.Connector { return cntrcifs.New(tr, devFolder) }, nil
 	},
 	ConnectorTypeNvme: func(byteConfig []byte, devFolder string) (func(tr transport.Transport) connectors.Connector, error) {
 		var cfg cntrnvme.Config

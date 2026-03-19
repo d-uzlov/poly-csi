@@ -138,7 +138,7 @@ func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connec
 	return nil
 }
 
-func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Transport, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume) error {
+func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder string, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume) error {
 	if v.FolderPath != "" {
 		return nil
 	}
@@ -166,7 +166,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 	}
 
 	mountPath := v.parentFolder + managedMountPath
-	err = ensureFolderPath(ctx, tr, device, v, mountRequest, mountPath)
+	err = ensureFolderPath(ctx, tr, devFolder, device, v, mountRequest, mountPath)
 	if err != nil {
 		return fmt.Errorf("ensureFolderPath: %w", err)
 	}

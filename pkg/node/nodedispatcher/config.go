@@ -19,14 +19,15 @@ import (
 )
 
 type ParsedEncrypt struct {
-	NodeKey       encrypt.RsaPrivateKey
-	Conf          nodeconfig.NodeEncryptConfig
+	NodeKey encrypt.RsaPrivateKey
+	Conf    nodeconfig.NodeEncryptConfig
 }
 
 // TODO add cleanup policy for debugging
 type parsedConfig struct {
 	Encrypt                 ParsedEncrypt
 	NodeInfoDb              nodeconfig.NodeInfoDbConfig
+	DevFolder               string
 	Multipath               mpfactory.ParsedMultipath
 	Mounts                  []*connectorfactory.ParsedConnector
 	Networks                []nodeconfig.NodeNetworkConfig
@@ -58,7 +59,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	ml := []*connectorfactory.ParsedConnector{}
 	logger.Info(fmt.Sprintf("connectors in config: %d", len(config.Connectors)))
 	for i, v := range config.Connectors {
-		parsed := connectorfactory.ParseMount(ctx, v, config.DevFolder)
+		parsed := connectorfactory.ParseConnector(ctx, v, config.DevFolder)
 		if parsed == nil {
 			logger.Info(fmt.Sprintf("parsing mount %d failed", i))
 			continue
@@ -88,10 +89,11 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 
 	return &parsedConfig{
 		Encrypt: ParsedEncrypt{
-			NodeKey:       *nodeKey,
-			Conf:          config.Encrypt,
+			NodeKey: *nodeKey,
+			Conf:    config.Encrypt,
 		},
 		NodeInfoDb:              config.NodeInfoDb,
+		DevFolder:               config.DevFolder,
 		Multipath:               *mp,
 		Mounts:                  ml,
 		Networks:                config.Networks,

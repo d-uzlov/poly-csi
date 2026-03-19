@@ -28,24 +28,31 @@ func ensureDevicePath(ctx context.Context, tr transport.Transport, nvi *NodeVolu
 	}
 
 	logs.FromCtx(ctx).MicroOp("multipath.Setup: request", "devices", devices)
-	mc, err := mp.Setup(ctx, devices)
+	serializedData, err := mp.Setup(ctx, devices)
 	if err != nil {
 		return "", fmt.Errorf("multipath.Setup: %w", err)
 	}
-	if mc.SerializedData == "" {
-		// we later determine if device is using multipath based on SerializedMultipathData
+	if serializedData == "" {
 		return "", fmt.Errorf("multipath did not set data")
 	}
 	logs.FromCtx(ctx).MicroOp("multipath.Setup: success")
 
+	device, err := mp.GetDevice(ctx, serializedData)
+	if err != nil {
+		return "", fmt.Errorf("multipath.GetDevice: %w", err)
+	}
+	if device == "" {
+		return "", fmt.Errorf("multipath did not set device")
+	}
+
 	err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-		stat, err := tr.Cmds().Stat(ctx, mc.Device)
+		stat, err := tr.Cmds().Stat(ctx, device)
 		if err != nil {
 			// runtime errors should be self-explanatory
 			return err
 		}
 		if !stat.FileExists {
-			return fmt.Errorf("file does not exist: %s", mc.Device)
+			return fmt.Errorf("file does not exist: %s", device)
 		}
 		return nil
 	})
@@ -53,16 +60,16 @@ func ensureDevicePath(ctx context.Context, tr transport.Transport, nvi *NodeVolu
 		return "", fmt.Errorf("failed to wait for device file: %w", err)
 	}
 
-	nvi.SerializedMultipathData = mc.SerializedData
-	return mc.Device, nil
+	nvi.SerializedMultipathData = serializedData
+	return device, nil
 }
 
-func ensureFolderPath(ctx context.Context, tr transport.Transport, devicePath string, nvi *NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
+func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder string, devicePath string, nvi *NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
 	if devicePath == "" {
 		return fmt.Errorf("device path is not set")
 	}
 
-	fsnip := fsutils.New(tr)
+	fsnip := fsutils.New(tr, devFolder)
 
 	fsInfo, err := fsnip.GetBlkid(ctx, devicePath)
 	if err != nil {
@@ -79,13 +86,15 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devicePath st
 
 	nvi.FolderPath = targetPath
 	logs.FromCtx(ctx).MicroOp("mount device: request", "device", devicePath)
-	mi, err := fsnip.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
+	_, err = fsnip.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}
-	if mi.Source != devicePath {
-		return fmt.Errorf("already mounted from different source: real %s != expected %s: mounted at %s", mi.Source, devicePath, mi.MountPoint)
-	}
+	// mi.Source is a commentary, it's not linked to a block device
+	// maybe we can instead compare maj:min pair
+	// if mi.Source != devicePath {
+	// 	return fmt.Errorf("already mounted from different source: real %s != expected %s: mounted at %s", mi.Source, devicePath, mi.MountPoint)
+	// }
 	// do we need to also check that mounted filesystem type matches requested?
 	// if mi.FsType != requestMount.FsType {
 	// 	return nil, fmt.Errorf("fs is already mounted with different fs type: %s != %s, at mountpoint %s", mi.FsType, requestMount.FsType, mi.MountPoint)

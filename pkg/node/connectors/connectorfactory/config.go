@@ -22,7 +22,7 @@ type ParsedConnector struct {
 	Conf    *MountConfig
 }
 
-func ParseMount(ctx context.Context, c *MountConfig, devFolder string) *ParsedConnector {
+func ParseConnector(ctx context.Context, c *MountConfig, devFolder string) *ParsedConnector {
 	logger := slogctx.FromCtx(ctx)
 
 	if c.Type == "" {

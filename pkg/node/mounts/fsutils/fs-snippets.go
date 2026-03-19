@@ -14,12 +14,14 @@ import (
 )
 
 type FsSnippets struct {
-	tr transport.Transport
+	tr        transport.Transport
+	devFolder string
 }
 
-func New(tr transport.Transport) *FsSnippets {
+func New(tr transport.Transport, devFolder string) *FsSnippets {
 	return &FsSnippets{
-		tr: tr,
+		tr:        tr,
+		devFolder: devFolder,
 	}
 }
 
@@ -140,16 +142,35 @@ func (s *FsSnippets) FormatFs(ctx context.Context, devicePath string, fsType str
 	return fmt.Errorf("filesystem %s is not supported", fsType)
 }
 
+func (s *FsSnippets) findBlockDevice(ctx context.Context, minMaj string) (string, error) {
+	link := fmt.Sprintf("/sys/dev/block/%s/", minMaj)
+	sr, err := s.tr.Cmds().Stat(ctx, link)
+	if err != nil {
+		return "", fmt.Errorf("failed to get device link: %w", err)
+	}
+	if !sr.FileExists {
+		return "", fmt.Errorf("requested device does not exist")
+	}
+	if !sr.IsDirectory() {
+		return "", fmt.Errorf("file is not a directory:  %v", sr.Type)
+	}
+	return filepath.Base(sr.Path), nil
+}
+
 func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string) error {
 	mi, err := s.findMount(mountedPath)
 	if err != nil {
 		return err
 	}
 
+	minMaj := fmt.Sprintf("%d:%d", mi.Major, mi.Minor)
+	deviceName, err := s.findBlockDevice(ctx, minMaj)
+	devicePath := fmt.Sprintf("%s/%s", s.devFolder, deviceName)
+
 	logs.FromCtx(ctx).Info("ExpandFs", "mi.FsType", mi.FsType)
 	switch mi.FsType {
 	case "ext4":
-		cmd := []string{"resize2fs", mi.Source}
+		cmd := []string{"resize2fs", devicePath}
 		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd, err)

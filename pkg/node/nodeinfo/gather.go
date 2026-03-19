@@ -7,22 +7,17 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, mp multipath.Multipath, networks []nodeconfig.NodeNetworkConfig) (regnodeinfo.RegNodeInfo, error) {
+func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, networks []nodeconfig.NodeNetworkConfig) (regnodeinfo.RegNodeInfo, error) {
 	nodePublicKey := pk.GetPublicKey()
 	info := NodeInfo{
 		Id:         nodeId,
 		PublicKey:  &nodePublicKey,
 		Connectors: map[string]connectors.ConnectorNodeInfo{},
-	}
-
-	if mp != nil {
-		info.HasMultipath = mp.Ready(ctx)
 	}
 
 	for k, v := range connectorList {

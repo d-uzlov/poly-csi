@@ -10,12 +10,14 @@ import (
 )
 
 type connector struct {
-	tr transport.Transport
+	tr        transport.Transport
+	devFolder string
 }
 
-func New(tr transport.Transport) connectors.Connector {
+func New(tr transport.Transport, devFolder string) connectors.Connector {
 	return &connector{
-		tr: tr,
+		tr:        tr,
+		devFolder: devFolder,
 	}
 }
 
@@ -56,7 +58,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	}
 	mountTarget := req.StagingTargetPath + mountSuffix
 	flags = append(req.AccessMount.MountFlags, fmt.Sprintf("credentials=%s", credFile))
-	mi, err := fsutils.New(c.tr).EnsureMounted(smbPath, mountTarget, req.AccessMount.FsType, flags)
+	mi, err := fsutils.New(c.tr, c.devFolder).EnsureMounted(smbPath, mountTarget, req.AccessMount.FsType, flags)
 	if err != nil {
 		return nil, err
 	}

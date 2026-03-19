@@ -17,7 +17,7 @@ func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeSta
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
 	}
 
-	fsnip := fsutils.New(n.getTransport())
+	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
 
 	// req.StagingTargetPath is empty in this call
 	stats, err := fsnip.GetMountStats(req.VolumePath)
@@ -79,7 +79,7 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 		logs.FromCtx(ctx).MicroOp("multipath.Expand: success")
 	}
 
-	fsnip := fsutils.New(n.getTransport())
+	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
 
 	if nvi.ManagedOps.ExpandFs {
 		err = fsnip.ExpandFs(ctx, nvi.FolderPath)

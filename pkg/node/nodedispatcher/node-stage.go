@@ -120,7 +120,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("block mounting is not implemented")
 	}
 
-	err = nvi.ensureFolderPath(ctx, n.getTransport(), n.getMultipath(), mountRequest)
+	err = nvi.ensureFolderPath(ctx, n.getTransport(), n.conf.DevFolder, n.getMultipath(), mountRequest)
 	if err != nil {
 		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", connectorId, err)
 	}

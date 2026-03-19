@@ -11,7 +11,6 @@ import (
 type NodeInfo struct {
 	Id           string                                  `json:"id"`
 	PublicKey    *encrypt.RsaPublicKey                   `json:"public_key"`
-	HasMultipath bool                                    `json:"has_multipath"`
 	Connectors   map[string]connectors.ConnectorNodeInfo `json:"connectors"`
 	Ips          []string                                `json:"ips"`
 }
@@ -32,9 +31,6 @@ func (ni *NodeInfo) Serialize() (map[string]string, error) {
 		"node_public_key": string(ni.PublicKey.SerializePem()),
 		"has_multipath":   "0",
 		"ips":             strings.Join(ni.Ips, " "),
-	}
-	if ni.HasMultipath {
-		result["has_multipath"] = "1"
 	}
 	for k, v := range ni.Connectors {
 		serialized, err := v.Serialize()
@@ -63,11 +59,6 @@ func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
 			result.PublicKey = pk
-			continue
-		case "has_multipath":
-			if v == "1" {
-				result.HasMultipath = true
-			}
 			continue
 		case "ips":
 			result.Ips = strings.Fields(v)

@@ -61,12 +61,6 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		}
 		mounts[v.Conf.Id] = m
 	}
-	var mp multipath.Multipath
-	if newConf.Multipath.Valid {
-		mp = newConf.Multipath.Inflate(tr)
-	} else {
-		slogctx.FromCtx(ctx).Error("multipath config is not valid, disabling multipath")
-	}
 
 	aesSecret := make([]byte, 32)
 	// TODO move this to startup
@@ -91,7 +85,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 
 	go nodeinfo.PeriodicInfoPush(pushCtx, n.conf.getNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
 		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
-			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, mp, newConf.Networks)
+			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, newConf.Networks)
 		}, func() {
 			pushCh <- struct{}{}
 		},

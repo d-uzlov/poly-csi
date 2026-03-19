@@ -60,7 +60,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		return connectorpluginserver.NewServer(ctx, cfg, connector, config.DevFolder, config.Logs)
 	}
 
-	pm := connectorfactory.ParseMount(ctx, config.Connector, config.DevFolder)
+	pm := connectorfactory.ParseConnector(ctx, config.Connector, config.DevFolder)
 	if pm == nil {
 		return nil, fmt.Errorf("connectorfactory.ParseMount failed")
 	}

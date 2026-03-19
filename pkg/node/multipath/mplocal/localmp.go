@@ -5,9 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
-	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -41,83 +40,55 @@ func NewLocalMp(tr transport.Transport, config Config, devFolder string) multipa
 	}
 }
 
-func (l *localMp) mpCommand(command string) []string {
-	// multipathd does not support "-k" and "command" as different arguments,
-	// it required that "command" is concatenated to "-k"
-	return append(l.config.MultipathdCmd, "-k"+command)
+func (l *localMp) Ready(ctx context.Context) error {
+	s := newSnippets(l.tr, l.config.MultipathdCmd)
+	return s.status(ctx)
 }
 
-func (l *localMp) Ready(ctx context.Context) bool {
-	cmd := l.mpCommand("show status")
-	recovered, err := transport.RelaxedRun(ctx, l.tr, cmd, "failed to connect to multipathd")
-	if err != nil {
-		err = fmt.Errorf("multipathd -k'show status': %w", err)
-		slogctx.FromCtx(ctx).Error("multipath Status check failed", "error", err.Error())
-		return false
+func (l *localMp) Setup(ctx context.Context, devices []string) (serializedData string, err error) {
+	if len(devices) == 0 {
+		return "", fmt.Errorf("no devices as input")
 	}
-	if recovered {
-		return false
-	}
-	return true
-}
 
-func (l *localMp) Setup(ctx context.Context, devices []string) (*multipath.MultipathContext, error) {
 	var shortDevices []string
 	for _, v := range devices {
 		shortDevices = append(shortDevices, strings.TrimPrefix(strings.TrimPrefix(v, l.devFolder), "/"))
 	}
-	name, err := l.enableMultipath(ctx, shortDevices)
+
+	s := newSnippets(l.tr, l.config.MultipathdCmd)
+
+	err = s.addDevices(ctx, shortDevices)
 	if err != nil {
-		return nil, fmt.Errorf("setupViaMultipathd: %w", err)
+		return "", fmt.Errorf("addDevices: %w", err)
 	}
 
-	deviceLink := l.config.MapperFolder + "/" + name
+	var name string
+	err = transport.Retry(time.Millisecond*50, time.Millisecond*250, func() error {
+		name, err = s.findMapName(ctx, shortDevices)
+		return err
+	})
+	if err != nil {
+		return "", fmt.Errorf("findMapName: %w", err)
+	}
 
 	encoded, err := json.Marshal(Data{
 		MapName: name,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("encode context data: %w", err)
+		return "", fmt.Errorf("encode context data: %w", err)
 	}
 
-	return &multipath.MultipathContext{
-		Device:         deviceLink,
-		SerializedData: string(encoded),
-	}, nil
+	return string(encoded), nil
 }
 
-func (l *localMp) enableMultipath(ctx context.Context, devices []string) (string, error) {
-	if len(devices) == 0 {
-		return "", fmt.Errorf("no devices as input")
-	}
-
-	for _, v := range devices {
-		cmd := l.mpCommand(fmt.Sprintf("add path %s", v))
-		err := transport.CheckedRun(ctx, l.tr, cmd)
-		if err != nil {
-			return "", fmt.Errorf("add device to multipath: %w", err)
-		}
-	}
-
-	cmd := l.mpCommand("show paths raw format %d/%m")
-	stdout, err := transport.CheckedRunStdout(ctx, l.tr, cmd)
+func (l *localMp) GetDevice(ctx context.Context, serializedData string) (device string, err error) {
+	data, err := parseData(serializedData)
 	if err != nil {
-		return "", fmt.Errorf("list multipath devices: %w", err)
-	}
-	for v := range strings.Lines(stdout) {
-		device, name, ok := strings.Cut(strings.TrimSpace(v), "/")
-		if !ok {
-			logs.FromCtx(ctx).Warn("show paths: invalid line format: %s", v)
-		}
-		if device == devices[0] {
-			if strings.Contains(name, "/") {
-				return "", fmt.Errorf("invalid multipath map name: %s", name)
-			}
-			return name, nil
-		}
+		return "", fmt.Errorf("parse serialized data: %w", err)
 	}
 
-	return "", fmt.Errorf("could not find device in the multipath device list")
+	deviceLink := l.config.MapperFolder + "/" + data.MapName
+	return deviceLink, nil
 }
 
 func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
@@ -126,23 +97,11 @@ func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
 		return fmt.Errorf("parse serialized data: %w", err)
 	}
 
-	cmd := l.mpCommand("show paths raw format %d/%m")
-	stdout, err := transport.CheckedRunStdout(ctx, l.tr, cmd)
+	s := newSnippets(l.tr, l.config.MultipathdCmd)
+
+	err = s.removeMapDevices(ctx, data.MapName)
 	if err != nil {
-		return fmt.Errorf("list multipath devices: %w", err)
-	}
-	for v := range strings.Lines(stdout) {
-		device, name, ok := strings.Cut(v, "/")
-		if !ok {
-			logs.FromCtx(ctx).Warn("invalid multipath show paths line format: %s", v)
-		}
-		if name == data.MapName {
-			cmd = l.mpCommand(fmt.Sprintf("del path %s", device))
-			_, err := transport.RelaxedRun(ctx, l.tr, cmd, "device not found")
-			if err != nil {
-				return fmt.Errorf("delete device from multipath: %w", err)
-			}
-		}
+		return fmt.Errorf("removeMapDevices: %w", err)
 	}
 
 	// when you delete all paths, multipath delete map automatically
@@ -160,10 +119,10 @@ func (l *localMp) Expand(ctx context.Context, serializedData string) error {
 		return fmt.Errorf("parse serialized data: %w", err)
 	}
 
-	cmd := l.mpCommand(fmt.Sprintf("resize map %s", data.MapName))
-	err = transport.CheckedRun(ctx, l.tr, cmd)
+	s := newSnippets(l.tr, l.config.MultipathdCmd)
+	err = s.resizeMap(ctx, data.MapName)
 	if err != nil {
-		return fmt.Errorf("request resize: %w", err)
+		return fmt.Errorf("resizeMap: %w", err)
 	}
 
 	return nil
