@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
+	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
@@ -35,7 +35,7 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	}
 
 	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
-	err = fsnip.EnsureBindMount(nvi.FolderPath, req.TargetPath)
+	err = fsnip.EnsureBindMount(ctx, nvi.FolderPath, req.TargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureBindMount: %w", err)
 	}

@@ -177,23 +177,25 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 	return nil
 }
 
-func (v *NodeVolumeInfo) cleanup(ctx context.Context, tr transport.Transport, mp multipath.Multipath, connector connectors.Connector) error {
+func (v *NodeVolumeInfo) cleanup(ctx context.Context, tr transport.Transport, mp multipath.Multipath, connector connectors.Connector, devFolder string) error {
 	var err error
 	logger := logs.FromCtx(ctx)
 
 	if v.ManagedOps.UnmountFs {
-		err = ensureFolderUnmounted(ctx, v, tr)
+		err = ensureFolderUnmounted(ctx, v, tr, devFolder)
 		if err != nil {
 			return fmt.Errorf("ensureFolderUnmounted: %w", err)
 		}
 		logger.MicroOp("ManagedOps: successfully unmounted folder")
 	}
 
-	err = ensureMultipathDisabled(ctx, v, mp)
-	if err != nil {
-		return fmt.Errorf("ensureMultipathDisabled: %w", err)
+	if v.SerializedMultipathData != "" {
+		err = ensureMultipathDisabled(ctx, v, mp)
+		if err != nil {
+			return fmt.Errorf("ensureMultipathDisabled: %w", err)
+		}
+		logger.MicroOp("ManagedOps: multipath disabled OK")
 	}
-	logger.MicroOp("ManagedOps: multipath disabled OK")
 
 	if v.SerializedConnectorData != "" {
 		err = connector.Disconnect(ctx, v.SerializedConnectorData)

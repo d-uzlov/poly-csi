@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 type connector struct {
@@ -38,27 +38,20 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("smb connector does not support more than one address")
 	}
-	credFile := req.StagingTargetPath + "/creds"
-	credContent := fmt.Sprintf("username=%s\npassword=%s", pc.UserName, pc.UserPassword)
-	err = c.tr.Cmds().Write(ctx, credFile, []byte(credContent))
-	if err != nil {
-		return nil, fmt.Errorf("create credential file: %w", err)
-	}
 
 	smbPath := fmt.Sprintf("//%s/%s", req.AddressOptions[0].Address, pc.ShareName)
 
 	flags := req.AccessMount.MountFlags
-
 	if req.AccessMount.VolumeMountGroup != "" {
 		flags = append(req.AccessMount.MountFlags, fmt.Sprintf("gid=%s", req.AccessMount.VolumeMountGroup))
 	}
+	flags = append(flags, fmt.Sprintf("username=%s", pc.UserName), fmt.Sprintf("password=%s", pc.UserPassword))
 
 	if req.AccessMount.FsType != "cifs" {
 		return nil, fmt.Errorf("expected cifs fs type but got %s", req.AccessMount.FsType)
 	}
 	mountTarget := req.StagingTargetPath + mountSuffix
-	flags = append(req.AccessMount.MountFlags, fmt.Sprintf("credentials=%s", credFile))
-	mi, err := fsutils.New(c.tr, c.devFolder).EnsureMounted(smbPath, mountTarget, req.AccessMount.FsType, flags)
+	mi, err := fsutils.New(c.tr, c.devFolder).EnsureMounted(ctx, smbPath, mountTarget, req.AccessMount.FsType, flags)
 	if err != nil {
 		return nil, err
 	}

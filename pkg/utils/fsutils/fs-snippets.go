@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"k8s.io/mount-utils"
 	"meoe.io/poly-csi/pkg/logs"
@@ -73,7 +74,7 @@ func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, 
 	return &result, nil
 }
 
-func (s *FsSnippets) EnsureMounted(sourcePath string, targetPath string, fsType string, mountOptions []string) (*mount.MountInfo, error) {
+func (s *FsSnippets) EnsureMounted(ctx context.Context, sourcePath string, targetPath string, fsType string, mountOptions []string) (*mount.MountInfo, error) {
 	err := os.MkdirAll(targetPath, 0777)
 	if err != nil {
 		return nil, fmt.Errorf("create target path: %w", err)
@@ -94,12 +95,21 @@ func (s *FsSnippets) EnsureMounted(sourcePath string, targetPath string, fsType 
 	if err != nil {
 		return nil, fmt.Errorf("create target path: %w", err)
 	}
-	m := mount.NewWithoutSystemd("")
+	cmd := []string{"mount"}
+	if fsType != "" {
+		cmd = append(cmd, "-t", fsType)
+	}
+	for _, v := range mountOptions {
+		cmd = append(cmd, "-o", v)
+	}
+	// can't use --source and --target because busybox does not support them
+	cmd = append(cmd, sourcePath, targetPath)
 
-	err = m.Mount(sourcePath, targetPath, fsType, mountOptions)
+	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("mount: %w", err)
 	}
+
 	mi, err = s.findMount(targetPath)
 	if err != nil {
 		return nil, err
@@ -180,24 +190,22 @@ func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string) error {
 	return fmt.Errorf("filesystem %s is not supported", mi.FsType)
 }
 
-func (s *FsSnippets) EnsureBindMount(sourcePath string, targetPath string) error {
+func (s *FsSnippets) EnsureBindMount(ctx context.Context, sourcePath string, targetPath string) error {
 	err := os.MkdirAll(targetPath, 0777)
 	if err != nil {
 		return fmt.Errorf("create target path: %w", err)
 	}
 
-	m := mount.NewWithoutSystemd("")
-
-	isMount, err := m.IsMountPoint(targetPath)
+	mi, err := s.findMount(targetPath)
 	if err != nil {
-		return fmt.Errorf("IsMountPoint: %w", err)
+		return err
 	}
-	if isMount {
+	if mi != nil {
 		// target is already mounted, nothing to do
 		return nil
 	}
-
-	err = m.Mount(sourcePath, targetPath, "", []string{"bind"})
+	cmd := []string{"mount", "--bind", sourcePath, targetPath}
+	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
@@ -206,12 +214,49 @@ func (s *FsSnippets) EnsureBindMount(sourcePath string, targetPath string) error
 }
 
 func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
-	cmd := []string{"umount", "-r", "-l", "-f", "-d", targetPath}
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "Invalid argument")
+	mi, err := s.findMount(targetPath)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("check existing mountpoint: %w", err)
 	}
-	return nil
+	if mi == nil {
+		return nil
+	}
+
+	// from umount --help:
+	// -r      Remount devices read-only if mount is busy
+	// -l      Lazy umount (detach filesystem)
+	// -f      Force umount (i.e., unreachable NFS server)
+	// can't use proper full-word options because busybox does not support them
+	cmd := []string{"umount", "-r", targetPath}
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
+	if err != nil {
+		return fmt.Errorf("unmount 1: %w", cmd, err)
+	}
+	if runResult.ExitCode == 0 {
+		return nil
+	}
+
+	logs.FromCtx(ctx).Warn("umount failed, will try 'umount --force'", "error", transport.FormatRunError(runResult))
+	cmd = []string{"umount", "-r", "-f", targetPath}
+	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
+	if err != nil {
+		return fmt.Errorf("unmount 2: %w", cmd, err)
+	}
+	if runResult.ExitCode == 0 {
+		return nil
+	}
+
+	logs.FromCtx(ctx).Warn("umount --force failed, will try 'umount --force --lazy'", "error", transport.FormatRunError(runResult))
+	cmd = []string{"umount", "-r", "-f", "-l", targetPath}
+	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
+	if err != nil {
+		return fmt.Errorf("unmount 3: %w", cmd, err)
+	}
+	if runResult.ExitCode == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("failed to unmount via 'umount --force --lazy': %w", transport.FormatRunError(runResult))
 }
 
 type StatsResult struct {

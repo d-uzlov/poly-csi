@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
+	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {

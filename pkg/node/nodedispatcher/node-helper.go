@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"k8s.io/mount-utils"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/mounts/fsutils"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 func ensureDevicePath(ctx context.Context, tr transport.Transport, nvi *NodeVolumeInfo, devices []string, mp multipath.Multipath) (string, error) {
@@ -86,7 +85,7 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder str
 
 	nvi.FolderPath = targetPath
 	logs.FromCtx(ctx).MicroOp("mount device: request", "device", devicePath)
-	_, err = fsnip.EnsureMounted(devicePath, nvi.FolderPath, "", requestMount.MountFlags)
+	_, err = fsnip.EnsureMounted(ctx, devicePath, nvi.FolderPath, "", requestMount.MountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}
@@ -104,7 +103,7 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder str
 	return nil
 }
 
-func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transport.Transport) error {
+func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transport.Transport, devFolder string) error {
 	if nvi.FolderPath == "" {
 		return nil
 	}
@@ -116,12 +115,8 @@ func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transpor
 	}
 	if runResult.ExitCode == 0 {
 		// nvi.FolderPath is a mount point, need to unmount
-		mh, ok := mount.NewWithoutSystemd("").(mount.MounterForceUnmounter)
-		if !ok {
-			panic("MounterForceUnmounter is not implemented on mount instance")
-		}
-		// TODO replace with manual invocation of umount, umount -f, umount -l
-		err = mh.UnmountWithForce(nvi.FolderPath, time.Second*1)
+		fsnip := fsutils.New(tr, devFolder)
+		err = fsnip.Unmount(ctx, nvi.FolderPath)
 		if err != nil {
 			return fmt.Errorf("unmount: %w", err)
 		}
