@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"time"
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
@@ -14,10 +13,6 @@ import (
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 )
 
-type ConnectorPlugin interface {
-	StartServe(ctx context.Context, shutdownTimeout time.Duration, doneCallback func(error))
-}
-
 type Config struct {
 	ServerType   string                        `yaml:"serverType"`
 	ServerConfig map[string]any                `yaml:"serverConfig"`
@@ -26,7 +21,7 @@ type Config struct {
 	Logs         logs.Config                   `yaml:"logs"`
 }
 
-type Inflate func(ctx context.Context, connector connectors.Connector) ConnectorPlugin
+type Inflate func(ctx context.Context, connector connectors.Connector) connectorpluginserver.ConnectorPlugin
 
 type parsedConfig struct {
 	InflateServer Inflate
@@ -56,7 +51,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	if err := yaml.Unmarshal(serverByteConfig, &cfg); err != nil {
 		return nil, fmt.Errorf("parse %s config: %w", config.ServerType, err)
 	}
-	inflateServer := func(ctx context.Context, connector connectors.Connector) ConnectorPlugin {
+	inflateServer := func(ctx context.Context, connector connectors.Connector) connectorpluginserver.ConnectorPlugin {
 		return connectorpluginserver.NewServer(ctx, cfg, connector, config.DevFolder, config.Logs)
 	}
 

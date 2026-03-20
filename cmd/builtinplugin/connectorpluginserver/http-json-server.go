@@ -15,8 +15,11 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	cntr "meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
-	"meoe.io/poly-csi/pkg/node/mounts/mountplugins"
 )
+
+type ConnectorPlugin interface {
+	StartServe(ctx context.Context, shutdownTimeout time.Duration, doneCallback func(error))
+}
 
 type Server struct {
 	config    ServerConfig
@@ -38,7 +41,7 @@ type ServerConfig struct {
 	Socket string `yaml:"socket"`
 }
 
-func NewServer(callCtx context.Context, config ServerConfig, connector connectors.Connector, devFolder string, logs logs.Config) mountplugins.ConnectorPlugin {
+func NewServer(callCtx context.Context, config ServerConfig, connector connectors.Connector, devFolder string, logs logs.Config) ConnectorPlugin {
 	return &Server{
 		callCtx:   callCtx,
 		config:    config,
