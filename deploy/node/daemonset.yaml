@@ -26,7 +26,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.127
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.2.130
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///var/lib/kubelet/plugins/io.meoe.poly-csi/csi.sock
@@ -73,8 +73,9 @@ spec:
           name: poly-csi-plugins
           mountPropagation: Bidirectional
 
+      # https://github.com/kubernetes-csi/node-driver-registrar
       - name: driver-registrar
-        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
+        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.16.0
         args:
         - --v=5
         - --automaxprocs
@@ -101,7 +102,7 @@ spec:
           name: registration-dir
 
       - name: iscsi-connector
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.128
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.2.130
         args:
         - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml

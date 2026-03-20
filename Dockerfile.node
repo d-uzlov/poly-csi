@@ -1,4 +1,4 @@
-FROM golang:1.25.3-alpine3.22 AS builder
+FROM golang:1.26.1-alpine3.23 AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN test -n "${APP_VERSION}"
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
   CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/node/config.externalVersion=${APP_VERSION}" ./cmd/node/
 
-FROM alpine:3.22.2 AS runtime
+FROM alpine:3.23.3 AS runtime
 
 WORKDIR /
 
@@ -26,11 +26,11 @@ WORKDIR /
 #     e2fsprogs-extra : resize2fs
 #     open-iscsi      : iscsiadm
 RUN apk add \
-  nvme-cli=2.14-r0 \
-  e2fsprogs=1.47.2-r2 \
-  e2fsprogs-extra=1.47.2-r2 \
-  cifs-utils=7.3-r0 \
-  multipath-tools=0.11.1-r2 \
+  nvme-cli=2.16-r1 \
+  e2fsprogs=1.47.3-r0 \
+  e2fsprogs-extra=1.47.3-r0 \
+  cifs-utils=7.4-r0 \
+  multipath-tools=0.13.0-r0 \
   --no-cache
 
 COPY --from=builder /app/node /node
