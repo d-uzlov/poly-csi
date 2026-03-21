@@ -26,7 +26,7 @@ type localExecWrapper struct {
 	config Config
 }
 
-func New(config Config) (transport.Transport, error) {
+func New(config Config) transport.Transport {
 	uid := os.Getuid()
 	isRoot := uid == 0
 	result := &localExecWrapper{
@@ -34,7 +34,7 @@ func New(config Config) (transport.Transport, error) {
 		config: config,
 	}
 
-	return result, nil
+	return result
 }
 
 func (s *localExecWrapper) Cleanup() {}

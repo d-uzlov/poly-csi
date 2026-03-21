@@ -16,13 +16,12 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 // TODO add cleanup on fail
 func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (res *csi.NodeStageVolumeResponse, err error) {
-	logger := logs.FromCtx(ctx)
-
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
 	}
@@ -33,15 +32,24 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, status.Error(codes.InvalidArgument, "volume capability missing")
 	}
 
+	logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
+	tr := localexec.New(conf.ExecConfig)
+	mp := conf.getMultipath(tr)
+
 	connectorId, ok := req.VolumeContext[connectors.ConnectorIdKey]
 	if !ok {
 		return nil, fmt.Errorf("volume context: '%s' missing", connectors.ConnectorIdKey)
+	}
+	connector := conf.findConnectorById(connectorId, tr)
+	if connector == nil {
+		return nil, fmt.Errorf("connector with id '%s' is not found", connectorId)
 	}
 
 	pcSecretEnc := req.PublishContext["_secret"]
 	var pcSecret map[string]string
 	if pcSecretEnc != "" {
-		aesSecret, err := encrypt.ExtractAesSecret(req.PublishContext, n.getPrivateKey())
+		aesSecret, err := encrypt.ExtractAesSecret(req.PublishContext, conf.Encrypt.NodeKey)
 		if err != nil {
 			return nil, fmt.Errorf("publish_context: extract aes secret: %w", err)
 		}
@@ -56,22 +64,14 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}
 
-	connector := n.findConnectorById(connectorId)
-	if connector == nil {
-		return nil, fmt.Errorf("connector with id '%s' is not found", connectorId)
-	}
-
-	// TODO protect with mutex
-	disableCleanup := n.conf.DisableCleanupOnFailure
-
 	nvi := newVolumeHandle(req.StagingTargetPath)
 	defer func() {
-		if disableCleanup {
+		if conf.DisableCleanupOnFailure {
 			return
 		}
 		if err != nil {
 			logger.Warn("detected failure, running cleanup")
-			cleanupErr := nvi.cleanup(ctx, n.getTransport(), n.getMultipath(), connector, n.conf.DevFolder)
+			cleanupErr := nvi.cleanup(ctx, tr, mp, connector, conf.DevFolder)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
 				logger.Error("failed to cleanup partially initialized volume", "error", cleanupErr.Error())
@@ -93,13 +93,12 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		AccessMount:             req.VolumeCapability.GetMount(),
 		Secrets:                 req.Secrets,
 		PublishContextSecret:    pcSecret,
-		DisableCleanupOnFailure: disableCleanup,
+		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
 	}
 	if len(nvi.intermediateDeviceList) != 0 {
-		tr := n.getTransport()
 		for _, v := range nvi.intermediateDeviceList {
 			sr, err := tr.Cmds().Stat(ctx, v)
 			if err != nil {
@@ -120,7 +119,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("block mounting is not implemented")
 	}
 
-	err = nvi.ensureFolderPath(ctx, n.getTransport(), n.conf.DevFolder, n.getMultipath(), mountRequest)
+	err = nvi.ensureFolderPath(ctx, tr, conf.DevFolder, mp, mountRequest)
 	if err != nil {
 		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", connectorId, err)
 	}
@@ -136,14 +135,17 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 }
 
 func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (res *csi.NodeUnstageVolumeResponse, err error) {
-	// logger := slogctx.FromCtx(ctx)
-
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
 	}
 	if req.StagingTargetPath == "" {
 		return nil, status.Error(codes.InvalidArgument, "staging target path is empty")
 	}
+
+	// logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
+	tr := localexec.New(conf.ExecConfig)
+	mp := conf.getMultipath(tr)
 
 	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath)
 	if err != nil {
@@ -161,12 +163,12 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 		return nil, fmt.Errorf("node volume info is not found")
 	}
 
-	connector := n.findConnectorById(nvi.ConnectorId)
+	connector := conf.findConnectorById(nvi.ConnectorId, tr)
 	if connector == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
 
-	err = nvi.cleanup(ctx, n.getTransport(), n.getMultipath(), connector, n.conf.DevFolder)
+	err = nvi.cleanup(ctx, tr, mp, connector, conf.DevFolder)
 	if err != nil {
 		return nil, fmt.Errorf("cleanup: %w", err)
 	}

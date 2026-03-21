@@ -26,7 +26,7 @@ func TransportFromType(transportType string, byteConfig []byte) (Inflate, config
 			return nil, nil, fmt.Errorf("parse %s config: %w", transportType, err)
 		}
 		return func(ctx context.Context) (transport.Transport, error) {
-			return localexec.New(cfg)
+			return localexec.New(cfg), nil
 		}, nil, nil
 	case TransportTypeSsh:
 		var cfg ssh_wrapper.SshConfig

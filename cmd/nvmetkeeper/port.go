@@ -40,15 +40,12 @@ type can theoretically be any NVMe transport type value supported by Linux, but 
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		var c nvmet.Port
-		err = json.Unmarshal([]byte(args[0]), &c)
+		err := json.Unmarshal([]byte(args[0]), &c)
 		if err != nil {
 			return fmt.Errorf("parse json: %w", err)
 		}
@@ -74,15 +71,12 @@ var portDeleteCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		name := args[0]
-		err = k.DeletePort(ctx, name)
+		err := k.DeletePort(ctx, name)
 		if err != nil {
 			return fmt.Errorf("DeletePort: %w", err)
 		}

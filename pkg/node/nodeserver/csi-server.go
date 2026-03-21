@@ -89,22 +89,26 @@ func (s *Server) GoListenAndServe(ctx context.Context, address string, doneCallb
 	return nil
 }
 
-func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	logConfig := s.node.GetRpcLogConfig(info.FullMethod)
+func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res any, err error) {
+	currentConfig := s.node.GetConfig()
+
+	logConfig := currentConfig.GetRpcLogConfig(info.FullMethod)
 	logger := logConfig.MakeInstance()
+	defer func() {
+		logger.Commit(err == nil)
+	}()
 	ctx = logs.NewCtx(ctx, logger)
+	ctx = nodedispatcher.NewCtx(ctx, currentConfig)
 
 	logger.Info("GRPC request", "request", req)
 
 	resp, err := handler(ctx, req)
 	if err != nil {
 		logger.Error("GRPC error", "error", err.Error())
-		logger.Commit(false)
 		return nil, fmt.Errorf("%s: %w", info.FullMethod, err)
 	}
 
 	logger.Info("GRPC success", "response", resp)
-	logger.Commit(true)
 
 	return resp, nil
 }

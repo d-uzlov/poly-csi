@@ -36,10 +36,7 @@ func main() {
 	// set log level after the 'using config' log entry, so that it is always present
 	logLevel.Set(appConfig.LogLevel)
 
-	tr, err := localexec.New(localexec.Config{})
-	if err != nil {
-		panic(err.Error())
-	}
+	tr := localexec.New(localexec.Config{})
 
 	serverDoneCh := make(chan struct{})
 	switch appConfig.PluginType {

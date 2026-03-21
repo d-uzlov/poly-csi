@@ -30,15 +30,12 @@ var configSaveMergeCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
-		err = k.SaveStateToConfig(ctx)
+		err := k.SaveStateToConfig(ctx)
 		if err != nil {
 			return fmt.Errorf("SaveStateToConfig: %w", err)
 		}
@@ -55,15 +52,12 @@ var configRestoreMergeCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := false
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 
-		err = k.RestoreConfig(ctx)
+		err := k.RestoreConfig(ctx)
 		if err != nil {
 			return fmt.Errorf("RestoreConfig: %w", err)
 		}

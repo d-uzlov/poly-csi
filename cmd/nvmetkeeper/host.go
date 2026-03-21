@@ -49,15 +49,12 @@ When need_auth=true, all host_key, controller_key, hash_type, dh_group must be s
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		var c nvmet.Host
-		err = json.Unmarshal([]byte(args[0]), &c)
+		err := json.Unmarshal([]byte(args[0]), &c)
 		if err != nil {
 			return fmt.Errorf("parse json: %w", err)
 		}

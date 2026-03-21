@@ -39,15 +39,12 @@ model and serial can be arbitrary strings. When left empty, Linux kernel will se
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		var c nvmet.Subsys
-		err = json.Unmarshal([]byte(args[0]), &c)
+		err := json.Unmarshal([]byte(args[0]), &c)
 		if err != nil {
 			return fmt.Errorf("parse json: %w", err)
 		}
@@ -73,15 +70,12 @@ var subsysDeleteCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		name := args[0]
-		err = k.DeleteSubsys(ctx, name)
+		err := k.DeleteSubsys(ctx, name)
 		if err != nil {
 			return fmt.Errorf("DeleteSubsys: %w", err)
 		}
@@ -99,10 +93,7 @@ var subsysAttachCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
@@ -110,7 +101,7 @@ var subsysAttachCmd = &cobra.Command{
 		name := args[0]
 		port := args[1]
 
-		err = k.AttachNqnToPort(ctx, name, port)
+		err := k.AttachNqnToPort(ctx, name, port)
 		if err != nil {
 			return fmt.Errorf("AttachNqnToPort: %w", err)
 		}
@@ -128,10 +119,7 @@ var subsysDetachCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
@@ -139,7 +127,7 @@ var subsysDetachCmd = &cobra.Command{
 		name := args[0]
 		port := args[1]
 
-		err = k.DetachPortFromNqn(ctx, name, port)
+		err := k.DetachPortFromNqn(ctx, name, port)
 		if err != nil {
 			return fmt.Errorf("DetachPortFromNqn: %w", err)
 		}
@@ -157,10 +145,7 @@ var subsysAllowHostCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
@@ -168,7 +153,7 @@ var subsysAllowHostCmd = &cobra.Command{
 		name := args[0]
 		hostNqn := args[1]
 
-		err = k.AllowHost(ctx, name, hostNqn)
+		err := k.AllowHost(ctx, name, hostNqn)
 		if err != nil {
 			return fmt.Errorf("AllowHost: %w", err)
 		}
@@ -186,10 +171,7 @@ var subsysDisallowHostCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
@@ -197,7 +179,7 @@ var subsysDisallowHostCmd = &cobra.Command{
 		name := args[0]
 		hostNqn := args[1]
 
-		err = k.DisallowHost(ctx, name, hostNqn)
+		err := k.DisallowHost(ctx, name, hostNqn)
 		if err != nil {
 			return fmt.Errorf("DisallowHost: %w", err)
 		}

@@ -11,9 +11,12 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
+	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
@@ -23,7 +26,6 @@ type ParsedEncrypt struct {
 	Conf    nodeconfig.NodeEncryptConfig
 }
 
-// TODO add cleanup policy for debugging
 type parsedConfig struct {
 	Encrypt                 ParsedEncrypt
 	NodeInfoDb              nodeconfig.NodeInfoDbConfig
@@ -122,17 +124,17 @@ func loadOrGenerateKey(filepath string) (*encrypt.RsaPrivateKey, error) {
 	return rsa, nil
 }
 
-func (c *parsedConfig) findConnectorById(id string) *connectorfactory.ParsedConnector {
+func (c *parsedConfig) findConnectorById(id string, tr transport.Transport) connectors.Connector {
 	for _, v := range c.Mounts {
 		if v.Conf.Id == id {
-			return v
+			return v.Inflate(tr)
 		}
 	}
 
 	return nil
 }
 
-func (c *parsedConfig) getRpcLogConfig(rpcPath string) logs.Config {
+func (c *parsedConfig) GetRpcLogConfig(rpcPath string) logs.Config {
 	result := logs.Config{
 		LogLevel:     "info",
 		EchoCommands: false,
@@ -149,7 +151,7 @@ func (c *parsedConfig) getRpcLogConfig(rpcPath string) logs.Config {
 	return result
 }
 
-func (c *parsedConfig) getNodeInfoLogConfig() logs.Config {
+func (c *parsedConfig) GetNodeInfoLogConfig() logs.Config {
 	result := logs.Config{
 		LogLevel:     "info",
 		EchoCommands: false,
@@ -160,4 +162,16 @@ func (c *parsedConfig) getNodeInfoLogConfig() logs.Config {
 	result = result.Combine(c.Logs.Default)
 	result = result.Combine(c.Logs.NodeInfo)
 	return result
+}
+
+func (c *parsedConfig) getMultipath(tr transport.Transport) multipath.Multipath {
+	if !c.Multipath.Valid {
+		return nil
+	}
+
+	if c.Multipath.Inflate == nil {
+		return nil
+	}
+
+	return c.Multipath.Inflate(tr)
 }

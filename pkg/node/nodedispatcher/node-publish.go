@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
@@ -26,6 +27,11 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 		return nil, status.Error(codes.InvalidArgument, "volume capability missing")
 	}
 
+	// logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
+	tr := localexec.New(conf.ExecConfig)
+	// mp := conf.getMultipath(tr)
+
 	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
@@ -34,7 +40,7 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 		return nil, fmt.Errorf("node volume info: FolderPath is empty")
 	}
 
-	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
+	fsnip := fsutils.New(tr, conf.DevFolder)
 	err = fsnip.EnsureBindMount(ctx, nvi.FolderPath, req.TargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureBindMount: %w", err)
@@ -50,7 +56,12 @@ func (n *Node) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVo
 		return nil, status.Error(codes.InvalidArgument, "target path is empty")
 	}
 
-	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
+	// logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
+	tr := localexec.New(conf.ExecConfig)
+	// mp := conf.getMultipath(tr)
+
+	fsnip := fsutils.New(tr, conf.DevFolder)
 	err := fsnip.Unmount(ctx, req.TargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("Unmount: %w", err)

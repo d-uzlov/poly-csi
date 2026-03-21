@@ -2,22 +2,16 @@ package nodedispatcher
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
 	"log/slog"
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 func New(logger *slog.Logger, name string, version string, nodeId string) (*Node, error) {
@@ -37,18 +31,13 @@ type Node struct {
 	nodeId  string
 
 	confMutex sync.RWMutex
-	conf      parsedConfig
-	tr        transport.Transport
+	conf      *parsedConfig
 
-	nodeInfoCancel func()
-	nodeInfoCh     <-chan struct{}
+	nodeInfoCancel func(ctx context.Context)
 }
 
-func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
-	tr, err := localexec.New(newConf.ExecConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create exec object: %w", err)
-	}
+func (n *Node) ReloadConfig(ctx context.Context, newConf *parsedConfig) error {
+	tr := localexec.New(newConf.ExecConfig)
 
 	mounts := map[string]connectors.Connector{}
 	for _, v := range newConf.Mounts {
@@ -62,89 +51,43 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf parsedConfig) error {
 		mounts[v.Conf.Id] = m
 	}
 
-	aesSecret := make([]byte, 32)
-	// TODO move this to startup
-	_, err = rand.Read(aesSecret)
-	if err != nil {
-		return fmt.Errorf("generate random bytes for aes: %w", err)
-	}
-
 	n.confMutex.Lock()
 	defer n.confMutex.Unlock()
 
-	if n.nodeInfoCh != nil && n.nodeInfoCancel != nil {
+	if n.nodeInfoCancel != nil {
 		slogctx.FromCtx(ctx).Debug("cancelling node info push")
-		n.nodeInfoCancel()
-		<-n.nodeInfoCh
+		n.nodeInfoCancel(ctx)
 		n.nodeInfoCancel = nil
-		n.nodeInfoCh = nil
 	}
 
 	pushCtx, pushCancel := context.WithCancel(ctx)
 	pushCh := make(chan struct{})
 
-	go nodeinfo.PeriodicInfoPush(pushCtx, n.conf.getNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
+	go nodeinfo.PeriodicInfoPush(pushCtx, newConf.GetNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
 		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
 			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, newConf.Networks)
 		}, func() {
-			pushCh <- struct{}{}
+			close(pushCh)
 		},
 	)
 
-	n.nodeInfoCancel = pushCancel
-	n.nodeInfoCh = pushCh
+	n.nodeInfoCancel = func(ctx context.Context) {
+		pushCancel()
+		select {
+		case <-pushCh:
+		case <-ctx.Done():
+		}
+	}
 
 	n.conf = newConf
-	if n.tr != nil {
-		// TODO this is unsafe, we need to use extra RW-lock for n.tr
-		n.tr.Cleanup()
-	}
-	n.tr = tr
 
 	return nil
 }
 
-func (n *Node) findConnectorById(id string) connectors.Connector {
+func (n *Node) GetConfig() (conf *parsedConfig) {
 	n.confMutex.RLock()
 	defer n.confMutex.RUnlock()
 
-	res := n.conf.findConnectorById(id)
-	if res == nil {
-		return nil
-	}
-	return res.Inflate(n.tr)
-}
-
-func (n *Node) getMultipath() multipath.Multipath {
-	n.confMutex.RLock()
-	defer n.confMutex.RUnlock()
-
-	if !n.conf.Multipath.Valid {
-		return nil
-	}
-	if n.conf.Multipath.Inflate == nil {
-		return nil
-	}
-	return n.conf.Multipath.Inflate(n.tr)
-}
-
-func (n *Node) getPrivateKey() encrypt.RsaPrivateKey {
-	n.confMutex.RLock()
-	defer n.confMutex.RUnlock()
-
-	return n.conf.Encrypt.NodeKey
-}
-
-func (n *Node) getTransport() transport.Transport {
-	n.confMutex.RLock()
-	defer n.confMutex.RUnlock()
-
-	return n.tr
-}
-
-func (n *Node) GetRpcLogConfig(rpcPath string) logs.Config {
-	n.confMutex.RLock()
-	defer n.confMutex.RUnlock()
-
-	return n.conf.getRpcLogConfig(rpcPath)
+	result := n.conf
+	return result
 }

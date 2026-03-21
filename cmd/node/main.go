@@ -51,7 +51,7 @@ func main() {
 		panic(err)
 	}
 
-	err = nodeInstance.ReloadConfig(ctx, *initialNodeConfig)
+	err = nodeInstance.ReloadConfig(ctx, initialNodeConfig)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -66,7 +66,7 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
-		err = nodeInstance.ReloadConfig(ctx, *nodeConfig)
+		err = nodeInstance.ReloadConfig(ctx, nodeConfig)
 		if err != nil {
 			logger.Error("config reload failed", "error", err.Error())
 			return

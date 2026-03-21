@@ -30,17 +30,14 @@ var stateShowCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		// var b bytes.Buffer
 		// w := bufio.NewWriter(&b)
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
-		err = k.ShowState(ctx, os.Stdout)
+		err := k.ShowState(ctx, os.Stdout)
 		if err != nil {
 			return fmt.Errorf("ShowState: %w", err)
 		}
@@ -57,14 +54,11 @@ var stateResetAllCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		localExec, err := localexec.New(localexec.Config{})
-		if err != nil {
-			return fmt.Errorf("create local exec: %w", err)
-		}
+		localExec := localexec.New(localexec.Config{})
 
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
-		err = k.ResetState(ctx)
+		err := k.ResetState(ctx)
 		if err != nil {
 			return fmt.Errorf("ResetState: %w", err)
 		}

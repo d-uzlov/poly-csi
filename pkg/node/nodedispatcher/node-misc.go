@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
@@ -17,7 +18,12 @@ func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeSta
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
 	}
 
-	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
+	// logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
+	tr := localexec.New(conf.ExecConfig)
+	// mp := conf.getMultipath(tr)
+
+	fsnip := fsutils.New(tr, conf.DevFolder)
 
 	// req.StagingTargetPath is empty in this call
 	stats, err := fsnip.GetMountStats(req.VolumePath)
@@ -62,7 +68,12 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 		return nil, fmt.Errorf("node volume info: FolderPath is empty")
 	}
 
-	connector := n.findConnectorById(nvi.ConnectorId)
+	// logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
+	tr := localexec.New(conf.ExecConfig)
+	mp := conf.getMultipath(tr)
+
+	connector := conf.findConnectorById(nvi.ConnectorId, tr)
 	if connector == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
@@ -72,14 +83,14 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	}
 	logs.FromCtx(ctx).MicroOp("connector.Expand: success")
 	if nvi.SerializedMultipathData != "" {
-		err = n.getMultipath().Expand(ctx, nvi.SerializedMultipathData)
+		err = mp.Expand(ctx, nvi.SerializedMultipathData)
 		if err != nil {
 			return nil, fmt.Errorf("multipath.Expand: %w", err)
 		}
 		logs.FromCtx(ctx).MicroOp("multipath.Expand: success")
 	}
 
-	fsnip := fsutils.New(n.getTransport(), n.conf.DevFolder)
+	fsnip := fsutils.New(tr, conf.DevFolder)
 
 	if nvi.ManagedOps.ExpandFs {
 		err = fsnip.ExpandFs(ctx, nvi.FolderPath)
