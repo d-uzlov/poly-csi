@@ -7,10 +7,6 @@ import (
 	"meoe.io/poly-csi/pkg/node/addropt"
 )
 
-const (
-	ConnectorIdKey = "connector_id"
-)
-
 type Connector interface {
 	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
 	Connect(ctx context.Context, req ConnectRequest) (*ConnectResult, error)

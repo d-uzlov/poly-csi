@@ -27,6 +27,8 @@ type NodeVolumeInfo struct {
 	// or create mounts.
 	// TODO remove this? connectors should not manually store data in filesystem
 	ConnectorPath string `json:"connector_path"`
+
+	InitDone bool `json:"initDone"`
 	// Folder path is a path to the main volume mount
 	FolderPath string `json:"folder_path"`
 	// SerializedMultipathData contains serialized data returned by multipath module

@@ -81,14 +81,16 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder str
 		if err != nil {
 			return fmt.Errorf("format: %w", err)
 		}
+		logs.FromCtx(ctx).MicroOp("format fs: success", "device", devicePath)
 	}
 
-	nvi.FolderPath = targetPath
 	logs.FromCtx(ctx).MicroOp("mount device: request", "device", devicePath)
-	_, err = fsnip.EnsureMounted(ctx, devicePath, nvi.FolderPath, "", requestMount.MountFlags)
+	_, err = fsnip.EnsureMounted(ctx, devicePath, targetPath, "", requestMount.MountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}
+	nvi.FolderPath = targetPath
+	logs.FromCtx(ctx).MicroOp("mount device: success", "device", devicePath, "target-path", targetPath)
 	// mi.Source is a commentary, it's not linked to a block device
 	// maybe we can instead compare maj:min pair
 	// if mi.Source != devicePath {
@@ -98,7 +100,15 @@ func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder str
 	// if mi.FsType != requestMount.FsType {
 	// 	return nil, fmt.Errorf("fs is already mounted with different fs type: %s != %s, at mountpoint %s", mi.FsType, requestMount.FsType, mi.MountPoint)
 	// }
-	logs.FromCtx(ctx).MicroOp("mount device: success", "device", devicePath)
+
+	if !nvi.InitDone {
+		err = fsnip.InitFs(ctx, nvi.FolderPath)
+		if err != nil {
+			return fmt.Errorf("InitFs: %w", err)
+		}
+		nvi.InitDone = true
+		logs.FromCtx(ctx).MicroOp("init fs: success")
+	}
 
 	return nil
 }

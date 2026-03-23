@@ -13,14 +13,15 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-// TODO add cleanup on fail
 func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (res *csi.NodeStageVolumeResponse, err error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
@@ -37,13 +38,15 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.getMultipath(tr)
 
-	connectorId, ok := req.VolumeContext[connectors.ConnectorIdKey]
-	if !ok {
-		return nil, fmt.Errorf("volume context: '%s' missing", connectors.ConnectorIdKey)
+	var vc volumecontext.VolumeContext
+	err = serialmaps.Parse(req.VolumeContext, volumecontext.Prefix, &vc)
+	if err != nil {
+		return nil, fmt.Errorf("parse volume context: %w", err)
 	}
-	connector := conf.findConnectorById(connectorId, tr)
+
+	connector := conf.findConnectorById(vc.ConnectorId, tr)
 	if connector == nil {
-		return nil, fmt.Errorf("connector with id '%s' is not found", connectorId)
+		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
 	}
 
 	pcSecretEnc := req.PublishContext["_secret"]
@@ -84,7 +87,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse address options from publish context: %w", err)
 	}
 
-	err = nvi.connect(ctx, connectorId, connector, connectors.ConnectRequest{
+	err = nvi.connect(ctx, vc.ConnectorId, connector, connectors.ConnectRequest{
 		AddressOptions: addressOptions,
 		VolumeContext:  req.VolumeContext,
 		PublishContext: req.PublishContext,
@@ -96,7 +99,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("connect via connector[id=%s]: %w", connectorId, err)
+		return nil, fmt.Errorf("connect via connector[id=%s]: %w", vc.ConnectorId, err)
 	}
 	if len(nvi.intermediateDeviceList) != 0 {
 		for _, v := range nvi.intermediateDeviceList {
@@ -121,7 +124,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 
 	err = nvi.ensureFolderPath(ctx, tr, conf.DevFolder, mp, mountRequest)
 	if err != nil {
-		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", connectorId, err)
+		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", vc.ConnectorId, err)
 	}
 	logger.MicroOp("ensure folder path: success")
 

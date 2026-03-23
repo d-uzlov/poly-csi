@@ -25,12 +25,14 @@ WORKDIR /
 #     e2fsprogs       : mkfs.ext*
 #     e2fsprogs-extra : resize2fs
 #     open-iscsi      : iscsiadm
+#     util-linux      : mount
 RUN apk add \
   nvme-cli=2.16-r1 \
   e2fsprogs=1.47.3-r0 \
   e2fsprogs-extra=1.47.3-r0 \
   cifs-utils=7.4-r0 \
   multipath-tools=0.13.0-r0 \
+  util-linux=2.41.2-r0 \
   --no-cache
 
 COPY --from=builder /app/node /node

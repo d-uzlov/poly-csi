@@ -16,8 +16,9 @@ import (
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
+	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type IdFields struct {
@@ -422,9 +423,23 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		}
 	}()
 
-	volumeContext := map[string]string{}
-	volumeContext[connectors.ConnectorIdKey] = dispatchParams.connectorId
-	volumeContext["uuid"] = uuidString
+	// vcMap := map[string]string{}
+	logs.FromCtx(ctx).Error("creating volume context")
+	vc := volumecontext.VolumeContext{
+		ServerName:  dispatchParams.serverName,
+		StorageType: dispatchParams.storageType,
+		ShareType:   dispatchParams.shareType,
+		ConnectorId: dispatchParams.connectorId,
+		Uuid:        uuidString,
+	}
+	err = vc.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate volume context")
+	}
+	vcMap, err := serialmaps.Serialize(vc, volumecontext.Prefix)
+	if err != nil {
+		return nil, fmt.Errorf("serialize volume context")
+	}
 
 	var addressIds []string
 	for _, v := range addressOptions {
@@ -445,7 +460,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
 		ConnectorId:   dispatchParams.connectorId,
 		TransportId:   srv.Conf.StableId,
-		VolumeContext: volumeContext,
+		VolumeContext: vcMap,
 		AddressIds:    addressIds,
 		StorageType:   dispatchParams.storageType,
 		StorageData:   serializedVolume,
@@ -461,7 +476,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		Volume: &csi.Volume{
 			VolumeId:      volumeId,
 			CapacityBytes: 0,
-			VolumeContext: volumeContext,
+			VolumeContext: vcMap,
 			ContentSource: req.VolumeContentSource,
 		},
 	}, nil
