@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -156,48 +155,48 @@ func (s targetcliSnippets) deleteTarget(ctx context.Context, subsysConfig iscsiT
 }
 
 type chapAcl struct {
-	client     cntriscsiadm.Chap
-	controller cntriscsiadm.Chap
+	userId         string
+	password       string
+	mutualUserId   string
+	mutualPassword string
 }
 
 func (s targetcliSnippets) readClientAcl(ctx context.Context, targetIqn string, clientIqn string) (*chapAcl, error) {
+	result := chapAcl{}
+	var err error
+
 	path := fmt.Sprintf("/iscsi/%s/tpg1/acls/%s", targetIqn, clientIqn)
-	user, err := s.readAttribute(ctx, path, "auth", "userid")
+	result.userId, err = s.readAttribute(ctx, path, "auth", "userid")
 	if err != nil {
 		return nil, err
 	}
-	if user == "" {
+	if result.userId == "" {
 		return nil, nil
 	}
-	pass, err := s.readAttribute(ctx, path, "auth", "password")
+	result.password, err = s.readAttribute(ctx, path, "auth", "password")
 	if err != nil {
 		return nil, err
 	}
-	if pass == "" {
+	if result.password == "" {
 		return nil, nil
 	}
-	client := cntriscsiadm.Chap{User: user, Pass: pass}
 
-	mutualUser, err := s.readAttribute(ctx, path, "auth", "mutual_userid")
+	result.mutualUserId, err = s.readAttribute(ctx, path, "auth", "mutual_userid")
 	if err != nil {
 		return nil, err
 	}
-	if mutualUser == "" {
+	if result.mutualUserId == "" {
 		return nil, nil
 	}
-	mutualPass, err := s.readAttribute(ctx, path, "auth", "mutual_password")
+	result.mutualPassword, err = s.readAttribute(ctx, path, "auth", "mutual_password")
 	if err != nil {
 		return nil, err
 	}
-	if mutualPass == "" {
+	if result.mutualPassword == "" {
 		return nil, nil
 	}
-	controller := cntriscsiadm.Chap{User: mutualUser, Pass: mutualPass}
 
-	return &chapAcl{
-		client:     client,
-		controller: controller,
-	}, nil
+	return &result, nil
 }
 
 func (s targetcliSnippets) createClient(ctx context.Context, targetIqn string, clientIqn string) error {
@@ -211,22 +210,22 @@ func (s targetcliSnippets) createClient(ctx context.Context, targetIqn string, c
 
 func (s targetcliSnippets) setupClientAcl(ctx context.Context, targetIqn string, clientIqn string, acl chapAcl) error {
 	path := fmt.Sprintf("/iscsi/%s/tpg1/acls/%s", targetIqn, clientIqn)
-	cmd := append(s.targetcliCmd, path, "set", "auth", "userid="+acl.client.User)
+	cmd := append(s.targetcliCmd, path, "set", "auth", "userid="+acl.userId)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s '%s' set auth userid: %w", s.targetcliCmd, path, err)
 	}
-	cmd = append(s.targetcliCmd, path, "set", "auth", "password="+acl.client.Pass)
+	cmd = append(s.targetcliCmd, path, "set", "auth", "password="+acl.password)
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s '%s' set auth password: %w", s.targetcliCmd, path, err)
 	}
-	cmd = append(s.targetcliCmd, path, "set", "auth", "mutual_userid="+acl.controller.User)
+	cmd = append(s.targetcliCmd, path, "set", "auth", "mutual_userid="+acl.mutualUserId)
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s '%s' set auth mutual_userid: %w", s.targetcliCmd, path, err)
 	}
-	cmd = append(s.targetcliCmd, path, "set", "auth", "mutual_password="+acl.controller.Pass)
+	cmd = append(s.targetcliCmd, path, "set", "auth", "mutual_password="+acl.mutualPassword)
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s '%s' set auth mutual_password: %w", s.targetcliCmd, path, err)

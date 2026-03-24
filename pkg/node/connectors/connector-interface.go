@@ -23,8 +23,8 @@ type ConnectRequest struct {
 	StagingTargetPath       string                            `json:"staging_target_path"`
 	AccessBlock             *csi.VolumeCapability_BlockVolume `json:"access_block"`
 	AccessMount             *csi.VolumeCapability_MountVolume `json:"access_mount"`
-	Secrets                 map[string]string                 `json:"secrets"`
-	PublishContextSecret    map[string]string                 `json:"publish_context_secret"`
+	CsiSecrets              map[string]string                 `json:"csi_secrets"`
+	PublishSecret           []byte                            `json:"publish_context_secret"`
 	DisableCleanupOnFailure bool                              `json:"disableCleanupOnFailure"`
 }
 

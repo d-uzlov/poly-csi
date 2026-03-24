@@ -1,88 +1,77 @@
 package cntriscsiadm
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 const (
-	ChapNone              = "none"
-	ChapFromPublishSecret = "publish-secret-mutual"
+	AuthNone                  = "none"
+	AuthChapFromPublishSecret = "publish-secret-mutual"
 )
 
-type IscsiPublishContext struct {
-	Iqn       string
-	Port      string
-	Transport string
-	Chap      string
+type PublicContext struct {
+	Iqn       string `map:"iscsi.nqn"`
+	Port      string `map:"iscsi.port"`
+	Transport string `map:"iscsi.transport"`
+	AuthType  string `map:"iscsi.chap"`
 }
 
-func InjectPublishContext(dst map[string]string, src IscsiPublishContext) error {
-	dst["iscsi.nqn"] = src.Iqn
-	dst["iscsi.port"] = src.Port
-	dst["iscsi.transport"] = src.Transport
-	switch src.Chap {
-	case ChapNone, ChapFromPublishSecret:
-		dst["iscsi.chap"] = src.Chap
+type SecretContext struct {
+	ClientUser string `map:"iscsi.client_user"`
+	ClientPass string `map:"iscsi.client_pass"`
+	TargetUser string `map:"iscsi.target_user"`
+	TargetPass string `map:"iscsi.target_pass"`
+}
+
+func validateContext(public PublicContext, secret SecretContext) error {
+	if public.Iqn == "" {
+		return fmt.Errorf("missing iqn")
+	}
+	if public.Port == "" {
+		return fmt.Errorf("missing port")
+	}
+	if public.Transport == "" {
+		return fmt.Errorf("missing transport")
+	}
+	switch public.AuthType {
+	case "":
+		return fmt.Errorf("missing auth type")
+	case AuthNone:
+		// nothing to do here
+	case AuthChapFromPublishSecret:
+		if secret.ClientUser == "" {
+			return fmt.Errorf("missing client user")
+		}
+		if secret.ClientPass == "" {
+			return fmt.Errorf("missing client pass")
+		}
+		if secret.TargetUser == "" {
+			return fmt.Errorf("missing target user")
+		}
+		if secret.TargetPass == "" {
+			return fmt.Errorf("missing target pass")
+		}
 	default:
-		return fmt.Errorf("chap: unknown value: %s", src.Chap)
+		return fmt.Errorf("auth type: unknown value: '%s'", public.AuthType)
 	}
 	return nil
 }
 
-func ParsePublishContext(src map[string]string) (IscsiPublishContext, error) {
-	nqn := src["iscsi.nqn"]
-	if nqn == "" {
-		return IscsiPublishContext{}, fmt.Errorf("missing 'iscsi.nqn'")
-	}
-	port := src["iscsi.port"]
-	if port == "" {
-		return IscsiPublishContext{}, fmt.Errorf("missing 'iscsi.port'")
-	}
-	transport := src["iscsi.transport"]
-	if transport == "" {
-		return IscsiPublishContext{}, fmt.Errorf("missing 'iscsi.transport'")
-	}
-	chap := src["iscsi.chap"]
-	switch chap {
-	case "":
-		return IscsiPublishContext{}, fmt.Errorf("missing 'iscsi.chap'")
-	case ChapNone, ChapFromPublishSecret:
-		// nothing to do here
-	default:
-		return IscsiPublishContext{}, fmt.Errorf("iscsi.chap: unknown value: '%s'", chap)
+func ParsePublishContext(public map[string]string, secret []byte) (PublicContext, SecretContext, error) {
+	var resPublic PublicContext
+	err := serialmaps.Parse(public, "", &resPublic)
+	if err != nil {
+		return PublicContext{}, SecretContext{}, fmt.Errorf("public: %w", err)
 	}
 
-	return IscsiPublishContext{
-		Iqn:       nqn,
-		Port:      port,
-		Transport: transport,
-		Chap:      chap,
-	}, nil
-}
-
-type Chap struct {
-	User string
-	Pass string
-}
-
-func ParseChap(src map[string]string, prefix string) (Chap, error) {
-	userKey := fmt.Sprintf("%s.user", prefix)
-	nodeUser := src[userKey]
-	if nodeUser == "" {
-		return Chap{}, fmt.Errorf("field is missing: %s", userKey)
+	var resSecret SecretContext
+	err = json.Unmarshal(secret, &resSecret)
+	if err != nil {
+		return PublicContext{}, SecretContext{}, fmt.Errorf("secret: %w", err)
 	}
-	passKey := fmt.Sprintf("%s.pass", prefix)
-	nodePass := src[passKey]
-	if nodePass == "" {
-		return Chap{}, fmt.Errorf("field is missing: %s", passKey)
-	}
-	return Chap{
-		User: nodeUser,
-		Pass: nodePass,
-	}, nil
-}
 
-func (chap Chap) Inject(src map[string]string, prefix string) {
-	src[fmt.Sprintf("%s.user", prefix)] = chap.User
-	src[fmt.Sprintf("%s.pass", prefix)] = chap.Pass
+	return resPublic, resSecret, nil
 }

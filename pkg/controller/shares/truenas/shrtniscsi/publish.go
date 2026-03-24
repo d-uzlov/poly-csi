@@ -65,24 +65,18 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("attach iscsi group: %w", err)
 	}
 
-	pc := map[string]string{}
-	err = cntriscsiadm.InjectPublishContext(pc, cntriscsiadm.IscsiPublishContext{
-		Iqn:       c.Iqn,
-		Port:      "3260",
-		Transport: "tcp",
-		Chap:      cntriscsiadm.ChapNone,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create publish context: %w", err)
-	}
-
 	pd := publishData{
 		HostIqn: iscsiInfo.HostIqn,
 	}
 
 	return &shares.PublishContext{
-		Public: pc,
-		Data:   pd,
+		Public: cntriscsiadm.PublicContext{
+			Iqn:       c.Iqn,
+			Port:      "3260",
+			Transport: "tcp",
+			AuthType:  cntriscsiadm.AuthNone,
+		},
+		LocalData: pd,
 	}, nil
 }
 

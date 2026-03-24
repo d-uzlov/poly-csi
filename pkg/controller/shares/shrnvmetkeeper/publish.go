@@ -66,7 +66,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	hostId := uuid.NewString()
 	hostNqn := nvmeInfo.HostNqn + ":" + hostId
 
-	secret := map[string]string{}
+	var secret cntrnvme.SecretContext
 	authType := ""
 
 	switch c.AuthType {
@@ -103,12 +103,9 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
 		}
 
-		err = cntrnvme.NvmeSecrets{
+		secret = cntrnvme.SecretContext{
 			HostKey:       hostKey,
 			ControllerKey: controllerKey,
-		}.Inject(secret)
-		if err != nil {
-			return nil, fmt.Errorf("inject nvme secret publish context: %w", err)
 		}
 
 		cmd = append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
@@ -131,28 +128,20 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("subsys allow: %w", err)
 	}
 
-	pc := map[string]string{}
-	err = cntrnvme.NvmePublishContext{
-		TargetNqn:     c.Nqn,
-		HostNqn:       hostNqn,
-		HostId:        hostId,
-		AuthType:      authType,
-		ConnectPort:   c.Port,
-		TransportType: c.Transport,
-		IoQueues:      c.IoQueues,
-	}.Inject(pc)
-	if err != nil {
-		return nil, fmt.Errorf("inject nvme public publish context: %w", err)
-	}
-
-	pd := &publishData{
-		HostNqn: hostNqn,
-	}
-
 	return &shares.PublishContext{
-		Public: pc,
-		Data:   pd,
+		Public: cntrnvme.PublicContext{
+			TargetNqn:     c.Nqn,
+			HostNqn:       hostNqn,
+			HostId:        hostId,
+			AuthType:      authType,
+			ConnectPort:   c.Port,
+			TransportType: c.Transport,
+			IoQueues:      c.IoQueues,
+		},
 		Secret: secret,
+		LocalData: &publishData{
+			HostNqn: hostNqn,
+		},
 	}, nil
 }
 

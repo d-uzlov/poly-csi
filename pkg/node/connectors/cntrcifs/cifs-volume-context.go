@@ -1,13 +1,19 @@
 package cntrcifs
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-type CifsMountContext struct {
-	ShareName    string
-	UserName     string
-	UserPassword string
+type PublicContext struct {
+	ShareName string `map:"cifs.share_name"`
+	UserName  string `map:"cifs.user_name"`
+}
+
+type SecretContext struct {
+	UserPassword string `json:"cifs.user_pass"`
 }
 
 const (
@@ -16,33 +22,31 @@ const (
 	userPassKey  = "cifs.user_pass"
 )
 
-func (c CifsMountContext) InjectPublic(dst map[string]string) error {
-	dst[shareNameKey] = c.ShareName
-	dst[userNameKey] = c.UserName
+func validateContext(public PublicContext, secret SecretContext) error {
+	if public.ShareName == "" {
+		return fmt.Errorf("missing field %s", shareNameKey)
+	}
+	if public.UserName == "" {
+		return fmt.Errorf("missing field %s", userNameKey)
+	}
+	if secret.UserPassword == "" {
+		return fmt.Errorf("missing field %s", userPassKey)
+	}
 	return nil
 }
 
-func (c CifsMountContext) InjectSecret(dst map[string]string) error {
-	dst[userPassKey] = c.UserPassword
-	return nil
-}
+func ParsePublishContext(public map[string]string, secret []byte) (PublicContext, SecretContext, error) {
+	var resPublic PublicContext
+	err := serialmaps.Parse(public, "", &resPublic)
+	if err != nil {
+		return PublicContext{}, SecretContext{}, fmt.Errorf("public: %w", err)
+	}
 
-func ParsePublishContext(public map[string]string, secret map[string]string) (CifsMountContext, error) {
-	shareName, ok := public[shareNameKey]
-	if !ok {
-		return CifsMountContext{}, fmt.Errorf("missing field %s", shareNameKey)
+	var resSecret SecretContext
+	err = json.Unmarshal(secret, &resSecret)
+	if err != nil {
+		return PublicContext{}, SecretContext{}, fmt.Errorf("secret: %w", err)
 	}
-	userName, ok := public[userNameKey]
-	if !ok {
-		return CifsMountContext{}, fmt.Errorf("missing field %s", userNameKey)
-	}
-	userPassword, ok := secret[userPassKey]
-	if !ok {
-		return CifsMountContext{}, fmt.Errorf("missing field %s", userPassKey)
-	}
-	return CifsMountContext{
-		ShareName:    shareName,
-		UserName:     userName,
-		UserPassword: userPassword,
-	}, nil
+
+	return resPublic, resSecret, nil
 }

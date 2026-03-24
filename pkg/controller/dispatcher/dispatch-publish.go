@@ -13,6 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
@@ -79,23 +80,28 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return &csi.ControllerPublishVolumeResponse{}, nil
 	}
 
-	if pc.Public == nil {
-		pc.Public = map[string]string{}
-	}
-	err = InjectAddressOptions(addressOptions, pc.Public)
+	publishContext := map[string]string{}
+	err = InjectAddressOptions(addressOptions, publishContext)
 	if err != nil {
 		return nil, fmt.Errorf("inject address options: %w", err)
 	}
 
+	if pc.Public != nil {
+		_, err = serialmaps.SerializeInto(pc.Public, publishContext, "")
+		if err != nil {
+			return nil, fmt.Errorf("inject public data: %w", err)
+		}
+	}
+
 	if pc.Secret != nil {
-		logger.Info("creating encrypted publish context")
+		logger.Info("creating encrypted publish secret")
 
 		aesSecret := make([]byte, 32)
 		_, err = rand.Read(aesSecret)
 		if err != nil {
 			return nil, fmt.Errorf("generate random bytes for aes: %w", err)
 		}
-		encrypt.InjectAesSecret(pc.Public, *ni.PublicKey, aesSecret)
+		encrypt.InjectAesSecret(publishContext, *ni.PublicKey, aesSecret)
 		secretJson, err := json.Marshal(pc.Secret)
 		if err != nil {
 			return nil, fmt.Errorf("publish_context: marshal secret: %w", err)
@@ -104,22 +110,22 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		if err != nil {
 			return nil, fmt.Errorf("publish_context: encrypt secret: %w", err)
 		}
-		pc.Public["_secret"] = base64.StdEncoding.EncodeToString(secretJsonEnc)
+		publishContext["_secret"] = base64.StdEncoding.EncodeToString(secretJsonEnc)
 	}
 
-	if pc.Data != nil {
-		serialized, err := pc.Data.Serialize()
+	if pc.LocalData != nil {
+		serialized, err := json.Marshal(pc.LocalData)
 		if err != nil {
-			return nil, fmt.Errorf("serialize publish data: %w", err)
+			return nil, fmt.Errorf("serialize local data: %w", err)
 		}
-		err = mh.wrapper.SetPublishCtx(ctx, req.NodeId, serialized)
+		err = mh.wrapper.SetPublishCtx(ctx, req.NodeId, string(serialized))
 		if err != nil {
 			return nil, fmt.Errorf("publish_context: save to db: %w", err)
 		}
 	}
 
 	return &csi.ControllerPublishVolumeResponse{
-		PublishContext: pc.Public,
+		PublishContext: publishContext,
 	}, nil
 }
 

@@ -15,24 +15,16 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
-	result := &shares.PublishContext{
-		Public: map[string]string{},
-		Secret: map[string]string{},
-	}
-	cc := cntrcifs.CifsMountContext{
-		ShareName:    c.ShareName,
-		UserName:     c.UserName,
-		UserPassword: c.UserPass,
-	}
-	err = cc.InjectPublic(result.Public)
-	if err != nil {
-		return nil, fmt.Errorf("inject public values into context: %w", err)
-	}
-	err = cc.InjectSecret(result.Secret)
-	if err != nil {
-		return nil, fmt.Errorf("inject secret values into context: %w", err)
-	}
-	return result, nil
+	return &shares.PublishContext{
+		Public: cntrcifs.PublicContext{
+			ShareName: c.ShareName,
+			UserName:  c.UserName,
+		},
+		Secret: cntrcifs.SecretContext{
+			UserPassword: c.UserPass,
+		},
+		LocalData: nil,
+	}, nil
 }
 
 func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {

@@ -29,16 +29,22 @@ func (m *nfsConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeIn
 }
 
 func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
-	pc, err := ParsePublishContext(req.PublishContext)
-	if err != nil {
-		return nil, fmt.Errorf("ParsePublishContext: %w", err)
-	}
 	if req.AccessMount == nil {
 		return nil, fmt.Errorf("nfs does not support block mounting")
 	}
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("nfs connector does not support more than one address")
 	}
+
+	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
+	if err != nil {
+		return nil, fmt.Errorf("ParsePublishContext: %w", err)
+	}
+	err = validateContext(pc, sc)
+	if err != nil {
+		return nil, fmt.Errorf("validateContext: %w", err)
+	}
+
 	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
 
 	mountTarget := req.StagingTargetPath + nfsMountSuffix

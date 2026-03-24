@@ -1,24 +1,38 @@
 package cntrnfs
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-type NfsMountContext struct {
-	Path string
+type PublicContext struct {
+	Path string `map:"nfs.share_path"`
 }
 
-func InjectPublishContext(dst map[string]string, src NfsMountContext) error {
-	dst["nfs.share_path"] = src.Path
+type SecretContext struct {
+}
+
+func validateContext(public PublicContext, secret SecretContext) error {
+	if public.Path == "" {
+		return fmt.Errorf("missing share path")
+	}
 	return nil
 }
 
-func ParsePublishContext(vc map[string]string) (NfsMountContext, error) {
-	share, ok := vc["nfs.share_path"]
-	if !ok {
-		return NfsMountContext{}, fmt.Errorf("volume_context: 'nfs.share_path': field is empty")
+func ParsePublishContext(public map[string]string, secret []byte) (PublicContext, SecretContext, error) {
+	var resPublic PublicContext
+	err := serialmaps.Parse(public, "", &resPublic)
+	if err != nil {
+		return PublicContext{}, SecretContext{}, fmt.Errorf("public: %w", err)
 	}
-	return NfsMountContext{
-		Path: share,
-	}, nil
+
+	var resSecret SecretContext
+	err = json.Unmarshal(secret, &resSecret)
+	if err != nil {
+		return PublicContext{}, SecretContext{}, fmt.Errorf("secret: %w", err)
+	}
+
+	return resPublic, resSecret, nil
 }

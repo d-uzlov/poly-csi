@@ -30,30 +30,18 @@ func New(tr transport.Transport, config Config, devFolder string) connectors.Con
 }
 
 func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
-	pc, err := ParsePublishContext(req.PublishContext)
+	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
 	}
-
-	hostKey := ""
-	controllerKey := ""
-	switch pc.AuthType {
-	case AuthTypeNqn:
-		// nothing to do
-	case AuthTypeDhChap:
-		secret, err := ParseSecretContext(req.PublishContextSecret)
-		if err != nil {
-			return nil, fmt.Errorf("ParseSecretContext: %w", err)
-		}
-		hostKey = secret.HostKey
-		controllerKey = secret.ControllerKey
-	default:
-		return nil, fmt.Errorf("unknown auth type: %s", pc.AuthType)
+	err = validateContext(pc, sc)
+	if err != nil {
+		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
 	successCount := 0
 	for _, v := range req.AddressOptions {
-		err = m.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, pc.IoQueues, hostKey, controllerKey)
+		err = m.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, pc.IoQueues, sc.HostKey, sc.ControllerKey)
 		if err != nil {
 			if len(req.AddressOptions) <= 1 {
 				return nil, fmt.Errorf("nvmeConnect: %w", err)

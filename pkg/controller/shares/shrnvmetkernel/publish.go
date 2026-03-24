@@ -79,27 +79,19 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("nvmet_save: %w", err)
 	}
 
-	pc := map[string]string{}
-	err = cntrnvme.NvmePublishContext{
-		TargetNqn:     c.Nqn,
-		HostNqn:       nvmeInfo.HostNqn,
-		HostId:        nvmeInfo.HostId,
-		AuthType:      cntrnvme.AuthTypeNqn,
-		ConnectPort:   c.Port,
-		TransportType: c.Transport,
-		IoQueues:      c.IoQueues,
-	}.Inject(pc)
-	if err != nil {
-		return nil, fmt.Errorf("inject nvme publish context: %w", err)
-	}
-
-	pd := &publishData{
-		HostNqn: nvmeInfo.HostNqn,
-	}
-
 	return &shares.PublishContext{
-		Public: pc,
-		Data:   pd,
+		Public: cntrnvme.PublicContext{
+			TargetNqn:     c.Nqn,
+			HostNqn:       nvmeInfo.HostNqn,
+			HostId:        nvmeInfo.HostId,
+			AuthType:      cntrnvme.AuthTypeNqn,
+			ConnectPort:   c.Port,
+			TransportType: c.Transport,
+			IoQueues:      c.IoQueues,
+		},
+		LocalData: &publishData{
+		HostNqn: nvmeInfo.HostNqn,
+	},
 	}, nil
 }
 

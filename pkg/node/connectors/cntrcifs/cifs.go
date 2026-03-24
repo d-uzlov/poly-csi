@@ -28,15 +28,19 @@ func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 }
 
 func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
-	pc, err := ParsePublishContext(req.PublishContext, req.PublishContextSecret)
-	if err != nil {
-		return nil, fmt.Errorf("ParsePublishContext: %w", err)
-	}
 	if req.AccessMount == nil {
 		return nil, fmt.Errorf("smb/cifs does not support block mounting")
 	}
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("smb connector does not support more than one address")
+	}
+	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
+	if err != nil {
+		return nil, fmt.Errorf("ParsePublishContext: %w", err)
+	}
+	err = validateContext(pc, sc)
+	if err != nil {
+		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
 	smbPath := fmt.Sprintf("//%s/%s", req.AddressOptions[0].Address, pc.ShareName)
@@ -45,7 +49,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	if req.AccessMount.VolumeMountGroup != "" {
 		flags = append(req.AccessMount.MountFlags, fmt.Sprintf("gid=%s", req.AccessMount.VolumeMountGroup))
 	}
-	flags = append(flags, fmt.Sprintf("username=%s", pc.UserName), fmt.Sprintf("password=%s", pc.UserPassword))
+	flags = append(flags, fmt.Sprintf("username=%s", pc.UserName), fmt.Sprintf("password=%s", sc.UserPassword))
 
 	if req.AccessMount.FsType != "cifs" {
 		return nil, fmt.Errorf("expected cifs fs type but got %s", req.AccessMount.FsType)

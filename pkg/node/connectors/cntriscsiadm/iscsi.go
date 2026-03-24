@@ -25,9 +25,13 @@ func New(tr transport.Transport, config Config, devFolder string) connectors.Con
 }
 
 func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (result *connectors.ConnectResult, err error) {
-	pc, err := ParsePublishContext(req.PublishContext)
+	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
+	}
+	err = validateContext(pc, sc)
+	if err != nil {
+		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
 	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
@@ -53,26 +57,17 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 
 	attributes := map[string]string{}
 
-	switch pc.Chap {
-	case ChapNone:
+	switch pc.AuthType {
+	case AuthNone:
 		attributes["node.session.auth.authmethod"] = "None"
-	case ChapFromPublishSecret:
-		clientChap, err := ParseChap(req.PublishContextSecret, "chap.client")
-		if err != nil {
-			return nil, fmt.Errorf("parse chap.client from publish secret: %w", err)
-		}
-		targetChap, err := ParseChap(req.PublishContextSecret, "chap.target")
-		if err != nil {
-			return nil, fmt.Errorf("parse chap.target from publish secret: %w", err)
-		}
-
+	case AuthChapFromPublishSecret:
 		attributes["node.session.auth.authmethod"] = "CHAP"
-		attributes["node.session.auth.username"] = clientChap.User
-		attributes["node.session.auth.password"] = clientChap.Pass
-		attributes["node.session.auth.username_in"] = targetChap.User
-		attributes["node.session.auth.password_in"] = targetChap.Pass
+		attributes["node.session.auth.username"] = sc.ClientUser
+		attributes["node.session.auth.password"] = sc.ClientPass
+		attributes["node.session.auth.username_in"] = sc.TargetUser
+		attributes["node.session.auth.password_in"] = sc.TargetPass
 	default:
-		return nil, fmt.Errorf("unknown chap type: '%s'", pc.Chap)
+		return nil, fmt.Errorf("unknown chap type: '%s'", pc.AuthType)
 	}
 
 	var combinedError string

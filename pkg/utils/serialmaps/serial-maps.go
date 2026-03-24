@@ -57,6 +57,12 @@ func ParseRemove[T any](src map[string]string, prefix string, remove bool, out *
 
 // Serialize converts a struct value into map[string]string using the `map` tag.
 func Serialize[T any](in T, prefix string) (map[string]string, error) {
+	return SerializeInto(in, nil, prefix)
+}
+
+// SerializeInto will inject values into provided map if out is not nil
+// If out already contains required key, SerializeInto will return an error.
+func SerializeInto[T any](in T, out map[string]string, prefix string) (map[string]string, error) {
 	v := reflect.ValueOf(in)
 	if !v.IsValid() {
 		return nil, fmt.Errorf("invalid value")
@@ -74,7 +80,9 @@ func Serialize[T any](in T, prefix string) (map[string]string, error) {
 	}
 
 	t := v.Type()
-	out := make(map[string]string, t.NumField())
+	if out == nil {
+		out = make(map[string]string, t.NumField())
+	}
 
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
@@ -92,11 +100,17 @@ func Serialize[T any](in T, prefix string) (map[string]string, error) {
 			continue
 		}
 
+		mapKey := prefix + key
+		_, ok := out[mapKey]
+		if ok {
+			return nil, fmt.Errorf("field %s: out map already contains key '%s'", sf.Name, mapKey)
+		}
+
 		s, err := stringFromValue(v.Field(i))
 		if err != nil {
 			return nil, fmt.Errorf("field %s: %w", sf.Name, err)
 		}
-		out[prefix+key] = s
+		out[mapKey] = s
 	}
 
 	return out, nil

@@ -16,30 +16,6 @@ type ShareManager interface {
 	DeleteShare(ctx context.Context, shareData string) error
 }
 
-type CreateShareRequest struct {
-	ShareId       string
-	StaticParams  map[string]string
-	MutableParams map[string]string
-	LocalVolume   string
-	OpaqueVolume  string
-	Volume        storage.Volume
-}
-
-type PublishContext struct {
-	// Public map is passed to node deployment as cleartext
-	// Users (both human and automated controllers) can inspect it.
-	Public map[string]string
-	// Secret map is similar to Public, but it's encrypted
-	Secret map[string]string
-	// Data is an arbitrary storage for internal information for ShareManager.Publish and ShareManager.Unpublish.
-	// Can be empty/nil if ShareManager.Unpublish is a no-op.
-	Data PublishData
-}
-
-type PublishData interface {
-	Serialize() (string, error)
-}
-
 type Capabilities struct {
 	// UnpublishAll indicates whether this ShareManager implements an optimized UnpublishAll method.
 	// When false, dispatcher will call Unpublish for each published node instead of attempting to use UnpublishAll.
@@ -50,4 +26,29 @@ type Capabilities struct {
 	// OpaqueVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.OpaqueVolume.
 	// When empty, this check is skipped.
 	OpaqueVolume []string
+}
+
+type CreateShareRequest struct {
+	ShareId       string
+	StaticParams  map[string]string
+	MutableParams map[string]string
+	LocalVolume   string
+	OpaqueVolume  string
+	Volume        storage.Volume
+}
+
+type PublishContext struct {
+	// Public data is passed to node deployment as cleartext.
+	// Users (both human and automated controllers) can inspect it.
+	//
+	// It is serialized using serialmaps package.
+	// It must be a struct with fields annotated with `map:"map_key"` tags
+	Public any
+	// Secret data is passed to node deployment as serialized and encrypted string.
+	// It is serialized into JSON, annotate it accordingly.
+	Secret any
+	// LocalData is an arbitrary storage for internal information for ShareManager.Publish and ShareManager.Unpublish.
+	// Can be empty/nil if ShareManager.Unpublish is a no-op.
+	// It is serialized into JSON, annotate it accordingly.
+	LocalData any
 }

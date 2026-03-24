@@ -3,7 +3,6 @@ package nodedispatcher
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -50,7 +49,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	}
 
 	pcSecretEnc := req.PublishContext["_secret"]
-	var pcSecret map[string]string
+	var pcSecretPlaintext []byte
 	if pcSecretEnc != "" {
 		aesSecret, err := encrypt.ExtractAesSecret(req.PublishContext, conf.Encrypt.NodeKey)
 		if err != nil {
@@ -60,10 +59,9 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		if err != nil {
 			return nil, fmt.Errorf("publish_context: extract secret value: %w", err)
 		}
-		plaintext, err := encrypt.DecryptAes(aesSecret, ciphertext)
-		err = json.Unmarshal(plaintext, &pcSecret)
+		pcSecretPlaintext, err = encrypt.DecryptAes(aesSecret, ciphertext)
 		if err != nil {
-			return nil, fmt.Errorf("publish_context: unmarshal decrypted secret value: %w", err)
+			return nil, fmt.Errorf("publish_context: decrypt secret value: %w", err)
 		}
 	}
 
@@ -94,8 +92,8 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		// StagingTargetPath:    "", // StagingTargetPath is set automatically
 		AccessBlock:             req.VolumeCapability.GetBlock(),
 		AccessMount:             req.VolumeCapability.GetMount(),
-		Secrets:                 req.Secrets,
-		PublishContextSecret:    pcSecret,
+		CsiSecrets:              req.Secrets,
+		PublishSecret:           pcSecretPlaintext,
 		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
 	})
 	if err != nil {

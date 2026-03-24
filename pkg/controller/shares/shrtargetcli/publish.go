@@ -64,19 +64,15 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
 	}
 
-	chap := cntriscsiadm.ChapNone
+	chap := cntriscsiadm.AuthNone
 	if c.AuthType == authTypeChapProvision {
-		chap = cntriscsiadm.ChapFromPublishSecret
+		chap = cntriscsiadm.AuthChapFromPublishSecret
 	}
-	pc := map[string]string{}
-	err = cntriscsiadm.InjectPublishContext(pc, cntriscsiadm.IscsiPublishContext{
+	pc := cntriscsiadm.PublicContext{
 		Iqn:       c.Iqn,
 		Port:      c.Port,
 		Transport: c.Transport,
-		Chap:      chap,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create publish context: %w", err)
+		AuthType:  chap,
 	}
 	pd := publishData{
 		HostIqn: iscsiInfo.HostIqn,
@@ -84,8 +80,8 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	if c.AuthType == authTypeNone {
 		return &shares.PublishContext{
-			Public: pc,
-			Data:   pd,
+			Public:    pc,
+			LocalData: pd,
 		}, nil
 	}
 
@@ -103,12 +99,12 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		}
 
 		return &shares.PublishContext{
-			Public: pc,
-			Data:   pd,
+			Public:    pc,
+			LocalData: pd,
 		}, nil
 	}
 
-	secret := map[string]string{}
+	secret := cntriscsiadm.SecretContext{}
 
 	acl, err := snip.readClientAcl(ctx, c.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
@@ -117,18 +113,22 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	if acl == nil {
 		logs.FromCtx(ctx).MicroOp("acl is not found, generating a new one", "share-iqn", c.Iqn, "host-iqn", iscsiInfo.HostIqn)
 		acl = &chapAcl{
-			client:     cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
-			controller: cntriscsiadm.Chap{User: randstr.Base62(16), Pass: randstr.Base62(32)},
+			userId:         randstr.Base62(16),
+			password:       randstr.Base62(32),
+			mutualUserId:   randstr.Base62(16),
+			mutualPassword: randstr.Base62(32),
 		}
 
 		err = snip.setupClientAcl(ctx, c.Iqn, iscsiInfo.HostIqn, *acl)
 		if err != nil {
 			return nil, fmt.Errorf("setup client acl: %w", err)
 		}
-	}
 
-	acl.client.Inject(secret, "chap.client")
-	acl.controller.Inject(secret, "chap.target")
+		secret.ClientUser = acl.userId
+		secret.ClientPass = acl.password
+		secret.TargetUser = acl.mutualUserId
+		secret.TargetPass = acl.mutualPassword
+	}
 
 	err = snip.save(ctx)
 	if err != nil {
@@ -136,9 +136,9 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	}
 
 	return &shares.PublishContext{
-		Public: pc,
-		Secret: secret,
-		Data:   pd,
+		Public:    pc,
+		Secret:    secret,
+		LocalData: pd,
 	}, nil
 }
 
