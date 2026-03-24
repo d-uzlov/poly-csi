@@ -17,26 +17,26 @@ func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityReques
 		return nil, fmt.Errorf("parseDispatchParams: %w", err)
 	}
 
-	srv, err := d.FindServerByName(dispatchParams.serverName)
+	srv, err := d.FindServerByName(dispatchParams.ServerName)
 	if err != nil {
-		return nil, fmt.Errorf("server[name=%s]: not found", dispatchParams.serverName)
+		return nil, fmt.Errorf("server[name=%s]: not found", dispatchParams.ServerName)
 	}
 	srv.mutex.RLock()
 	defer srv.mutex.RUnlock()
 
 	err = srv.Check()
 	if err != nil {
-		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.serverName, err)
+		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.ServerName, err)
 	}
 
-	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.Conf.Commands, srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.StorageType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
 	available, err := strInstance.GetAvailableCapacity(ctx, req.Parameters)
 	if err != nil {
-		return nil, fmt.Errorf("server[name=%s]: storage[%s]: GetAvailableCapacity: %w", dispatchParams.serverName, dispatchParams.storageType, err)
+		return nil, fmt.Errorf("server[name=%s]: storage[%s]: GetAvailableCapacity: %w", dispatchParams.ServerName, dispatchParams.StorageType, err)
 	}
 
 	return &csi.GetCapacityResponse{

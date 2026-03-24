@@ -47,6 +47,10 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	if err != nil {
 		return "", fmt.Errorf("parse params: %w", err)
 	}
+	err = p.validate()
+	if err != nil {
+		return "", fmt.Errorf("validate params: %w", err)
+	}
 
 	devicePath, err := req.Volume.GetLocalPath(ctx)
 	if err != nil {
@@ -65,7 +69,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	enforceAuth := true
 	disableAuth := false
-	switch p.authType {
+	switch p.AuthType {
 	case authTypeNone:
 		enforceAuth = false
 		disableAuth = true
@@ -93,10 +97,10 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	c := shareContext{
 		Iqn:           iqn,
-		Port:          p.listenPort,
-		Transport:     p.transport,
+		Port:          p.ListenPort,
+		Transport:     p.Transport,
 		BackstoreName: backstoreName,
-		AuthType:      p.authType,
+		AuthType:      p.AuthType,
 	}
 	err = c.validate()
 	if err != nil {

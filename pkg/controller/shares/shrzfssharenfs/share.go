@@ -55,7 +55,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	snip := zfs.NewSnippets(sh.tr, sh.cmds.zfsCmd)
 
-	err = snip.SetShareNfs(ctx, zfsVol.Path, p.shareOptions)
+	err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
 	if err != nil {
 		return "", err
 	}

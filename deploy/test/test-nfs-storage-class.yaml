@@ -17,6 +17,7 @@ parameters:
   dispatch.connectorId: nfs
   dispatch.addressNames: storage
   zfs.parentDataset: tulip/test-guid
+  nfs.shareOptions: rw,no_subtree_check,no_root_squash
   fsType: nfs4
 
 mountOptions:

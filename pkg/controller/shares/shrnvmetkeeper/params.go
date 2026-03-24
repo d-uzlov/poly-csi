@@ -3,6 +3,8 @@ package shrnvmetkeeper
 import (
 	"fmt"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type commandsConfig struct {
@@ -25,24 +27,19 @@ type globalParams struct {
 }
 
 type params struct {
-	transportType string
-	nvmetPort     string
-	// TODO add fallback to reading listenPort from current nvmet state
-	listenPort string
-	ioQueues   string
-	authType   string
+	TransportType string `map:"transportType"`
+	NvmetPortName string `map:"nvmetPortName"`
+	ConnectPort   string `map:"connectPort"`
+	IoQueues      string `map:"ioQueues"`
+	AuthType      string `map:"authType"`
+
+	// TODO add fallback to reading ListenPort from current nvmet state
 }
 
 const paramsPrefix = "nvmet."
 
 const (
 	keyNqnBase = "nqnBase"
-
-	keyTransport   = "nvmet.transportType"
-	keyNvmetPort   = "nvmet.nvmetPortName"
-	keyConnectPort = "nvmet.connectPort"
-	keyIoQueues    = "nvmet.ioQueues"
-	keyAuthType    = "nvmet.authType"
 )
 
 const (
@@ -76,78 +73,67 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (params, error) {
+func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
 	result := params{}
-
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyTransport:
-			result.transportType = v
-		case keyNvmetPort:
-			result.nvmetPort = v
-		case keyConnectPort:
-			result.listenPort = v
-		case keyIoQueues:
-			result.ioQueues = v
-		case keyAuthType:
-			result.authType = v
-		default:
-			return params{}, fmt.Errorf("static params: unknown key '%s'", k)
-		}
-	}
-
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyTransport:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyNvmetPort:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyConnectPort:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyIoQueues:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyAuthType:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return params{}, fmt.Errorf("mutable params: unknown key '%s'", k)
-		}
-	}
-
-	if result.transportType == "" {
-		result.transportType = "tcp"
-	}
-
-	err := result.validate()
+	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
 	if err != nil {
-		return params{}, err
+		return nil, fmt.Errorf("static params: %w", err)
 	}
 
-	return result, nil
+	resMutable := params{}
+	err = serialmaps.ParseRemove(mutable, paramsPrefix, true, &resMutable)
+	if err != nil {
+		return nil, fmt.Errorf("mutable params: %w", err)
+	}
+
+	if resMutable.TransportType != "" {
+		return nil, fmt.Errorf("transport type is not mutable")
+	}
+	if resMutable.NvmetPortName != "" {
+		return nil, fmt.Errorf("port name is not mutable")
+	}
+	if resMutable.ConnectPort != "" {
+		return nil, fmt.Errorf("connect port is not mutable")
+	}
+	if resMutable.AuthType != "" {
+		return nil, fmt.Errorf("auth type is not mutable")
+	}
+	if resMutable.IoQueues != "" {
+		return nil, fmt.Errorf("io queues is not mutable")
+	}
+
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return nil, fmt.Errorf("unknown key: %s", k)
+		}
+	}
+
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return nil, fmt.Errorf("unknown mutable key: %s", k)
+		}
+	}
+
+	return &result, nil
 }
 
 func (p params) validate() error {
-	if p.transportType == "" {
-		return fmt.Errorf("missing key %s", keyTransport)
+	if p.TransportType == "" {
+		return fmt.Errorf("missing key transport type")
 	}
-	if p.listenPort == "" {
-		return fmt.Errorf("missing key %s", keyConnectPort)
+	if p.ConnectPort == "" {
+		return fmt.Errorf("missing connect port")
 	}
-	if p.authType == "" {
-		return fmt.Errorf("missing key %s", keyAuthType)
+	if p.AuthType == "" {
+		return fmt.Errorf("missing auth type")
 	}
-	switch p.authType {
+	switch p.AuthType {
 	case "":
 		return fmt.Errorf("authType is empty")
 	case authTypeNone, authTypeNqn, authTypeChapProvision:
 		// ok
 	default:
-		return fmt.Errorf("%s: unknown type: '%s', must be one of: %v", keyAuthType, p.authType, allowedAuth)
+		return fmt.Errorf("auth: unknown type: '%s', must be one of: %v", p.AuthType, allowedAuth)
 	}
 	return nil
 }

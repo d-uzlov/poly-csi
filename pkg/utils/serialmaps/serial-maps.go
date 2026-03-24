@@ -6,10 +6,17 @@ import (
 	"strconv"
 )
 
+const tag = "map"
+
 // Parse fills a struct of type T from map[string]string using the `map` tag.
 // Example: `Qwe string `map:"qwe"“
-func Parse[T any](m map[string]string, prefix string, out *T) error {
-	v := reflect.ValueOf(&out).Elem()
+func Parse[T any](src map[string]string, prefix string, out *T) error {
+	return ParseRemove(src, prefix, false, out)
+}
+
+// ParseRemove parses struct from a map, removing any fields that it uses from src
+func ParseRemove[T any](src map[string]string, prefix string, remove bool, out *T) error {
+	v := reflect.ValueOf(out).Elem()
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("expected struct, got %s", v.Kind())
 	}
@@ -23,25 +30,24 @@ func Parse[T any](m map[string]string, prefix string, out *T) error {
 			continue
 		}
 
-		key := sf.Tag.Get("map")
+		key := sf.Tag.Get(tag)
 		if key == "" {
-			return fmt.Errorf("field %s: missing 'map' tag", sf.Name)
+			return fmt.Errorf("field %s: missing '%s' tag", sf.Name, tag)
 		}
 		if key == "-" {
 			continue
 		}
 
-		raw, ok := m[prefix+key]
+		mapKey := prefix + key
+		raw, ok := src[mapKey]
 		if !ok {
 			continue
 		}
-
-		fv := v.Field(i)
-		if !fv.CanSet() {
-			return fmt.Errorf("field %s: not settable", sf.Name)
+		if remove {
+			delete(src, mapKey)
 		}
 
-		if err := setFromString(fv, raw); err != nil {
+		if err := setFromString(v.Field(i), raw); err != nil {
 			return fmt.Errorf("field %s: %w", sf.Name, err)
 		}
 	}
@@ -78,9 +84,9 @@ func Serialize[T any](in T, prefix string) (map[string]string, error) {
 			continue
 		}
 
-		key := sf.Tag.Get("map")
+		key := sf.Tag.Get(tag)
 		if key == "" {
-			return nil, fmt.Errorf("field %s: missing 'map' tag", sf.Name)
+			return nil, fmt.Errorf("field %s: missing '%s' tag", sf.Name, tag)
 		}
 		if key == "-" {
 			continue
@@ -97,11 +103,15 @@ func Serialize[T any](in T, prefix string) (map[string]string, error) {
 }
 
 func setFromString(v reflect.Value, s string) error {
+	if !v.CanSet() {
+		return fmt.Errorf("not settable")
+	}
+
 	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			v.Set(reflect.New(v.Type().Elem()))
 		}
-		return setFromString(v.Elem(), s)
+		v = v.Elem()
 	}
 
 	switch v.Kind() {

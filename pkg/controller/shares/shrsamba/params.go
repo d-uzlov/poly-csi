@@ -3,6 +3,8 @@ package shrsamba
 import (
 	"fmt"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 const (
@@ -80,28 +82,30 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (params, error) {
+func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
 	result := params{}
+	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	if err != nil {
+		return nil, fmt.Errorf("static params: %w", err)
+	}
+
+	resMutable := params{}
+	err = serialmaps.ParseRemove(mutable, paramsPrefix, true, &resMutable)
+	if err != nil {
+		return nil, fmt.Errorf("mutable params: %w", err)
+	}
 
 	for k := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
+		if strings.HasPrefix(k, paramsPrefix) {
+			return nil, fmt.Errorf("unknown key: %s", k)
 		}
 	}
 
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return nil, fmt.Errorf("unknown mutable key: %s", k)
 		}
 	}
 
-	return result, nil
+	return &result, nil
 }

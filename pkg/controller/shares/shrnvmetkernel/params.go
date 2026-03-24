@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type commands struct {
@@ -65,21 +66,16 @@ type globalParams struct {
 }
 
 type params struct {
-	transport  string
-	nvmetPort  string
-	listenPort string
-	ioQueues   string
+	TransportType string `map:"transportType"`
+	NvmetPortName string `map:"nvmetPortName"`
+	ConnectPort   string `map:"connectPort"`
+	IoQueues      string `map:"ioQueues"`
 }
 
 const paramsPrefix = "nvmet."
 
 const (
 	keyNqnBase = "nqnBase"
-
-	keyTransport  = "nvmet.transport"
-	keyNvmetPort  = "nvmet.nvmetPort"
-	keyListenPort = "nvmet.listenPort"
-	keyIoQueues   = "nvmet.ioQueues"
 )
 
 func parseGlobalParams(src map[string]string) (globalParams, error) {
@@ -105,60 +101,43 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (params, error) {
+func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
 	result := params{}
-
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyTransport:
-			result.transport = v
-		case keyNvmetPort:
-			result.nvmetPort = v
-		case keyListenPort:
-			result.listenPort = v
-		case keyIoQueues:
-			result.ioQueues = v
-		default:
-			return params{}, fmt.Errorf("static params: unknown key '%s'", k)
-		}
+	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	if err != nil {
+		return nil, fmt.Errorf("static params: %w", err)
 	}
 
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyTransport:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyNvmetPort:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyListenPort:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyIoQueues:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return params{}, fmt.Errorf("mutable params: unknown key '%s'", k)
+	resMutable := params{}
+	err = serialmaps.ParseRemove(mutable, paramsPrefix, true, &resMutable)
+	if err != nil {
+		return nil, fmt.Errorf("mutable params: %w", err)
+	}
+
+	if resMutable.TransportType != "" {
+		return nil, fmt.Errorf("transport type is not mutable")
+	}
+	if resMutable.NvmetPortName != "" {
+		return nil, fmt.Errorf("port name is not mutable")
+	}
+	if resMutable.ConnectPort != "" {
+		return nil, fmt.Errorf("connect port is not mutable")
+	}
+	if resMutable.IoQueues != "" {
+		return nil, fmt.Errorf("io queues is not mutable")
+	}
+
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return nil, fmt.Errorf("unknown key: %s", k)
 		}
 	}
 
-	// fill defaults
-	if result.transport == "" {
-		result.transport = "tcp"
-	}
-	if result.nvmetPort == "" {
-		result.nvmetPort = "1"
-	}
-	if result.listenPort == "" {
-		result.listenPort = "4420"
-	}
-	if result.nvmetPort == "" {
-		result.nvmetPort = "1"
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return nil, fmt.Errorf("unknown mutable key: %s", k)
+		}
 	}
 
-	// no need for validations
-
-	return result, nil
+	return &result, nil
 }

@@ -3,17 +3,20 @@ package dispatcher
 import (
 	"fmt"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type DispatchParams struct {
-	onFailPolicy      string // TODO use ?
-	storageType       string
-	storageIdTemplate string
-	shareType         string
-	shareIdTemplate   string
-	connectorId       string
-	addressNames      string
-	serverName        string
+	// TODO use ?
+	OnFailPolicy      string `map:"on_fail_policy"`
+	StorageType       string `map:"storageType"`
+	StorageIdTemplate string `map:"storageIdTemplate"`
+	ShareType         string `map:"shareType"`
+	ShareIdTemplate   string `map:"shareIdTemplate"`
+	ConnectorId       string `map:"connectorId"`
+	AddressNames      string `map:"addressNames"`
+	ServerName        string `map:"serverName"`
 }
 
 const paramsPrefix = "dispatch."
@@ -29,37 +32,11 @@ const (
 )
 
 func parseDispatchParams(global map[string]string, static map[string]string, mutable map[string]string) (DispatchParams, error) {
-	result := DispatchParams{}
 	for k := range global {
 		if !strings.HasPrefix(k, paramsPrefix) {
 			continue
 		}
 		return DispatchParams{}, fmt.Errorf("global parameters: dispatch is not allowed in global parameters")
-	}
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case "dispatch.on-fail-policy":
-			result.onFailPolicy = v
-		case keyStorageType:
-			result.storageType = v
-		case keyStorageIdTemplate:
-			result.storageIdTemplate = v
-		case keyShareType:
-			result.shareType = v
-		case keyShareIdTemplate:
-			result.shareIdTemplate = v
-		case keyConnectorId:
-			result.connectorId = v
-		case keyAddressNames:
-			result.addressNames = v
-		case keyServerName:
-			result.serverName = v
-		default:
-			return DispatchParams{}, fmt.Errorf("static parameters: unknown key '%s'", k)
-		}
 	}
 	for k := range mutable {
 		if !strings.HasPrefix(k, paramsPrefix) {
@@ -68,23 +45,34 @@ func parseDispatchParams(global map[string]string, static map[string]string, mut
 		return DispatchParams{}, fmt.Errorf("mutable parameters: dispatch is not allowed in mutable parameters")
 	}
 
-	if result.storageType == "" {
+	result := DispatchParams{}
+	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	if err != nil {
+		return DispatchParams{}, fmt.Errorf("static params: %w", err)
+	}
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return DispatchParams{}, fmt.Errorf("unknown key: %s", k)
+		}
+	}
+
+	if result.StorageType == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyStorageType)
 	}
-	if result.shareType == "" {
+	if result.ShareType == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyShareType)
 	}
-	if result.connectorId == "" {
+	if result.ConnectorId == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyConnectorId)
 	}
-	if result.addressNames == "" {
+	if result.AddressNames == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyAddressNames)
 	}
-	if result.serverName == "" {
+	if result.ServerName == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyServerName)
 	}
-	if result.onFailPolicy == "" {
-		result.onFailPolicy = "cleanup"
+	if result.OnFailPolicy == "" {
+		result.OnFailPolicy = "cleanup"
 	}
 
 	return result, nil

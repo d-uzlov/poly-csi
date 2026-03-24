@@ -55,24 +55,24 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("parseDispatchParams: %w", err)
 	}
 
-	srv, err := d.FindServerByName(dispatchParams.serverName)
+	srv, err := d.FindServerByName(dispatchParams.ServerName)
 	if err != nil {
-		return nil, fmt.Errorf("server[name=%s]: not found", dispatchParams.serverName)
+		return nil, fmt.Errorf("server[name=%s]: not found", dispatchParams.ServerName)
 	}
 	srv.mutex.RLock()
 	defer srv.mutex.RUnlock()
 
 	err = srv.Check()
 	if err != nil {
-		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.serverName, err)
+		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.ServerName, err)
 	}
 
-	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.storageType, srv.Conf.Commands, srv.Conf.GlobalParams)
+	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.StorageType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.shareType, srv.Conf.Commands, srv.Conf.GlobalParams)
+	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.ShareType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -82,18 +82,18 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 	if shrCaps.LocalVolume != nil {
 		if !slices.Contains(shrCaps.LocalVolume, strCaps.LocalVolume) {
-			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.shareType, shrCaps.LocalVolume, dispatchParams.storageType, strCaps.LocalVolume)
+			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.ShareType, shrCaps.LocalVolume, dispatchParams.StorageType, strCaps.LocalVolume)
 		}
 	}
 
 	if shrCaps.OpaqueVolume != nil {
 		if !slices.Contains(shrCaps.OpaqueVolume, strCaps.OpaqueVolume) {
-			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.shareType, shrCaps.OpaqueVolume, dispatchParams.storageType, strCaps.OpaqueVolume)
+			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.ShareType, shrCaps.OpaqueVolume, dispatchParams.StorageType, strCaps.OpaqueVolume)
 		}
 	}
 
 	var addressOptions []AddressOption
-	for name := range strings.SplitSeq(dispatchParams.addressNames, ",") {
+	for name := range strings.SplitSeq(dispatchParams.AddressNames, ",") {
 		found := false
 		for _, v := range srv.Conf.AddressList {
 			if v.Name == name {
@@ -133,8 +133,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	success := false
 
 	storageId := req.Name
-	if dispatchParams.storageIdTemplate != "" {
-		id, err := generateId("storageIdTemplate", dispatchParams.storageIdTemplate, req.Name, uuidString, req.Parameters)
+	if dispatchParams.StorageIdTemplate != "" {
+		id, err := generateId("storageIdTemplate", dispatchParams.StorageIdTemplate, req.Name, uuidString, req.Parameters)
 		if err != nil {
 			return nil, fmt.Errorf("generate storage id: %w", err)
 		}
@@ -277,11 +277,11 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 			recvVol, err := str.CreateVolume(ctx, storageCreateRequest)
 			if err != nil {
-				return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.storageType, err)
+				return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.StorageType, err)
 			}
 			targetPath, err := recvVol.GetLocalPath(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("storage[%s]:CreateVolume:GetLocalPath %w", dispatchParams.storageType, err)
+				return nil, fmt.Errorf("storage[%s]:CreateVolume:GetLocalPath %w", dispatchParams.StorageType, err)
 			}
 			logger.Info("storage.CreateVolume: success")
 
@@ -368,7 +368,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	} else {
 		vol, err = str.CreateVolume(ctx, storageCreateRequest)
 		if err != nil {
-			return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.storageType, err)
+			return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.StorageType, err)
 		}
 		logger.Info("storage.CreateVolume: success")
 	}
@@ -390,8 +390,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}
 
 	shareId := req.Name
-	if dispatchParams.shareIdTemplate != "" {
-		id, err := generateId("shareIdTemplate", dispatchParams.shareIdTemplate, req.Name, uuidString, req.Parameters)
+	if dispatchParams.ShareIdTemplate != "" {
+		id, err := generateId("shareIdTemplate", dispatchParams.ShareIdTemplate, req.Name, uuidString, req.Parameters)
 		if err != nil {
 			return nil, fmt.Errorf("generate share id: %w", err)
 		}
@@ -426,10 +426,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	// vcMap := map[string]string{}
 	logs.FromCtx(ctx).Error("creating volume context")
 	vc := volumecontext.VolumeContext{
-		ServerName:  dispatchParams.serverName,
-		StorageType: dispatchParams.storageType,
-		ShareType:   dispatchParams.shareType,
-		ConnectorId: dispatchParams.connectorId,
+		ServerName:  dispatchParams.ServerName,
+		StorageType: dispatchParams.StorageType,
+		ShareType:   dispatchParams.ShareType,
+		ConnectorId: dispatchParams.ConnectorId,
 		Uuid:        uuidString,
 	}
 	err = vc.Validate()
@@ -458,13 +458,13 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	wrapped := voldbwrapper.New(dbEntry)
 	// TODO save req.VolumeContentSource
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
-		ConnectorId:   dispatchParams.connectorId,
+		ConnectorId:   dispatchParams.ConnectorId,
 		TransportId:   srv.Conf.StableId,
 		VolumeContext: vcMap,
 		AddressIds:    addressIds,
-		StorageType:   dispatchParams.storageType,
+		StorageType:   dispatchParams.StorageType,
 		StorageData:   serializedVolume,
-		ShareType:     dispatchParams.shareType,
+		ShareType:     dispatchParams.ShareType,
 		ShareData:     shareData,
 	})
 	if err != nil {

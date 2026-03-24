@@ -17,7 +17,10 @@ parameters:
   dispatch.connectorId: iscsi
   dispatch.addressNames: storage,k8s
   zfs.parentDataset: tulip/test-guid
-  iscsi.auth: chap-provision
+  lio.transport: tcp
+  lio.listenPort: '3260'
+  lio.authType: chap-provision
+  
   fsType: ext4
 
 mountOptions:

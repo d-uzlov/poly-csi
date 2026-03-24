@@ -3,10 +3,12 @@ package shrzfssharenfs
 import (
 	"fmt"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type commands struct {
-	zfsCmd     []string
+	zfsCmd []string
 }
 
 func parseCommands(src map[string][]string) (commands, error) {
@@ -21,45 +23,38 @@ func parseCommands(src map[string][]string) (commands, error) {
 }
 
 type params struct {
-	shareOptions string
+	ShareOptions string `map:"shareOptions"`
 }
 
 const paramsPrefix = "nfs."
 
-const (
-	keyShareOptions = "nfs.shareOptions"
-)
-
 func parseParams(static map[string]string, mutable map[string]string) (params, error) {
 	result := params{}
+	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	if err != nil {
+		return params{}, fmt.Errorf("static params: %w", err)
+	}
 
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyShareOptions:
-			result.shareOptions = v
-		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
+	resMutable := params{}
+	err = serialmaps.ParseRemove(mutable, paramsPrefix, true, &resMutable)
+	if err != nil {
+		return params{}, fmt.Errorf("mutable params: %w", err)
+	}
+
+	if resMutable.ShareOptions != "" {
+		result.ShareOptions = resMutable.ShareOptions
+	}
+
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return params{}, fmt.Errorf("unknown key: %s", k)
 		}
 	}
 
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
+	for k := range static {
+		if strings.HasPrefix(k, paramsPrefix) {
+			return params{}, fmt.Errorf("unknown mutable key: %s", k)
 		}
-		switch k {
-		case keyShareOptions:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
-
-	// fill defaults
-	if result.shareOptions == "" {
-		result.shareOptions = "rw,no_subtree_check,no_root_squash"
 	}
 
 	return result, nil

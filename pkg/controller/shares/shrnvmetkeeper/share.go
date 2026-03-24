@@ -54,7 +54,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	nqn := fmt.Sprintf("%s:%s", sh.gp.nqnBase, req.ShareId)
 
 	allowAnyHost := false
-	if p.authType == authTypeNone {
+	if p.AuthType == authTypeNone {
 		allowAnyHost = true
 	}
 
@@ -78,7 +78,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("namespace create: %w", err)
 	}
 
-	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "attach", nqn, p.nvmetPort)
+	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "attach", nqn, p.NvmetPortName)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return "", fmt.Errorf("subsys attach: %w", err)
@@ -86,10 +86,10 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	c := shareContext{
 		Nqn:       nqn,
-		Port:      p.listenPort,
-		Transport: p.transportType,
-		IoQueues:  p.ioQueues,
-		AuthType:  p.authType,
+		Port:      p.ConnectPort,
+		Transport: p.TransportType,
+		IoQueues:  p.IoQueues,
+		AuthType:  p.AuthType,
 	}
 	err = c.validate()
 	if err != nil {
