@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
@@ -62,17 +61,18 @@ func (l *localMp) Setup(ctx context.Context, devices []string) (serializedData s
 		return "", fmt.Errorf("addDevices: %w", err)
 	}
 
-	var name string
-	err = transport.Retry(time.Millisecond*50, time.Millisecond*250, func() error {
-		name, err = s.findMapName(ctx, shortDevices)
-		return err
-	})
+	wwid, err := s.findWwid(ctx, shortDevices)
 	if err != nil {
 		return "", fmt.Errorf("findMapName: %w", err)
 	}
 
+	err = s.addMap(ctx, wwid)
+	if err != nil {
+		return "", fmt.Errorf("add map: %w", err)
+	}
+
 	encoded, err := json.Marshal(Data{
-		MapName: name,
+		MapName: wwid,
 	})
 	if err != nil {
 		return "", fmt.Errorf("encode context data: %w", err)
@@ -99,17 +99,16 @@ func (l *localMp) Destroy(ctx context.Context, serializedData string) error {
 
 	s := newSnippets(l.tr, l.config.MultipathdCmd)
 
-	err = s.removeMapDevices(ctx, data.MapName)
+	err = s.removeMap(ctx, data.MapName)
+	if err != nil {
+		return fmt.Errorf("removeMap: %w", err)
+	}
+
+	err = s.removeDevices(ctx, data.MapName)
 	if err != nil {
 		return fmt.Errorf("removeMapDevices: %w", err)
 	}
 
-	// when you delete all paths, multipath delete map automatically
-	// cmd = l.mpCommand(fmt.Sprintf("del map %s", data.MapName))
-	// err = transport.CheckedRun(ctx, l.tr, cmd)
-	// if err != nil {
-	// 	return fmt.Errorf("add device to multipath: %w", err)
-	// }
 	return nil
 }
 

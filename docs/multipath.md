@@ -35,15 +35,15 @@ We still need multipath to automatically handle device failures, but we don't ne
 We can disable device discovery and partition management in multipath config.
 
 If you already have a working multipath setup, you should be able to continue using it without changes,
-but if you are configuring multipath from scratch,
-it probably makes sense to use a minimalistic configuration from example down below:
+but if you are configuring multipath from scratch
+then you are advised to use a minimalistic configuration from example down below:
 
 ```bash
 
  sudo tee /etc/multipath.conf << EOF
 defaults {
   user_friendly_names no
-  find_multipaths strict
+  find_multipaths off
   skip_kpartx yes
   flush_on_last_del always
   auto_resize never

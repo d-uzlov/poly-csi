@@ -53,18 +53,19 @@ func (s *snippets) status(ctx context.Context) error {
 	return nil
 }
 
-func (s *snippets) removeMapDevices(ctx context.Context, mapName string) error {
-	cmd := s.mpCommand("show paths raw format %d/%m")
+func (s *snippets) removeDevices(ctx context.Context, wwid string) error {
+	cmd := s.mpCommand("show paths raw format %d/%w")
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("list multipath devices: %w", err)
 	}
 	for v := range strings.Lines(stdout) {
-		device, name, ok := strings.Cut(v, "/")
+		device, devWwid, ok := strings.Cut(v, "/")
 		if !ok {
 			logs.FromCtx(ctx).Warn("invalid multipath show paths line format: %s", v)
+			continue
 		}
-		if name == mapName {
+		if devWwid == wwid {
 			cmd = s.mpCommand(fmt.Sprintf("del path %s", device))
 			_, err := transport.RelaxedRun(ctx, s.tr, cmd, "device not found")
 			if err != nil {
@@ -76,26 +77,48 @@ func (s *snippets) removeMapDevices(ctx context.Context, mapName string) error {
 	return nil
 }
 
-func (s *snippets) findMapName(ctx context.Context, devices []string) (string, error) {
-	cmd := s.mpCommand("show paths raw format %d/%m")
+func (s *snippets) findWwid(ctx context.Context, devices []string) (string, error) {
+	cmd := s.mpCommand("show paths raw format %d/%w")
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return "", fmt.Errorf("list multipath devices: %w", err)
 	}
 	for v := range strings.Lines(stdout) {
-		device, name, ok := strings.Cut(strings.TrimSpace(v), "/")
+		device, wwid, ok := strings.Cut(strings.TrimSpace(v), "/")
 		if !ok {
 			logs.FromCtx(ctx).Warn("show paths: invalid line format: %s", v)
+			continue
 		}
 		if device == devices[0] {
-			if strings.Contains(name, "/") {
-				return "", fmt.Errorf("invalid multipath map name: %s", name)
+			if strings.Contains(wwid, "/") {
+				return "", fmt.Errorf("invalid multipath list stdout: %s", v)
 			}
-			return name, nil
+			if strings.HasPrefix(wwid, "[") {
+				return "", fmt.Errorf("invalid multipath list stdout: %s", v)
+			}
+			return wwid, nil
 		}
 	}
 
 	return "", fmt.Errorf("could not find device in the multipath device list")
+}
+
+func (s *snippets) addMap(ctx context.Context, wwid string) error {
+	cmd := s.mpCommand(fmt.Sprintf("add map %s", wwid))
+	err := transport.CheckedRun(ctx, s.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("add map to multipath: %w", err)
+	}
+	return nil
+}
+
+func (s *snippets) removeMap(ctx context.Context, wwid string) error {
+	cmd := s.mpCommand(fmt.Sprintf("del map %s", wwid))
+	err := transport.CheckedRun(ctx, s.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("remove map from multipath: %w", err)
+	}
+	return nil
 }
 
 func (s *snippets) resizeMap(ctx context.Context, mapName string) error {
