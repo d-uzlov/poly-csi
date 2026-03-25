@@ -16,11 +16,19 @@ parameters:
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: iscsi
   dispatch.addressNames: storage,k8s
+
   zfs.parentDataset: tulip/test-guid
+
+  init.on: controller
+  init.blockFormat: mkfs.ext4
+  init.ownerUser: '0'
+  init.ownerGroup: '10000'
+  init.rootDirMode: '777'
+
   lio.transport: tcp
   lio.listenPort: '3260'
   lio.authType: chap-provision
-  
+
   fsType: ext4
 
 mountOptions:

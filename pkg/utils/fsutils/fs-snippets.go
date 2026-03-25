@@ -16,13 +16,11 @@ import (
 
 type FsSnippets struct {
 	tr        transport.Transport
-	devFolder string
 }
 
-func New(tr transport.Transport, devFolder string) *FsSnippets {
+func New(tr transport.Transport) *FsSnippets {
 	return &FsSnippets{
 		tr:        tr,
-		devFolder: devFolder,
 	}
 }
 
@@ -145,7 +143,7 @@ func (s *FsSnippets) FormatFs(ctx context.Context, devicePath string, fsType str
 		cmd := []string{"mkfs.ext4", devicePath}
 		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
-			return fmt.Errorf("%s: %w", cmd, err)
+			return fmt.Errorf("format: %w", err)
 		}
 		return nil
 	}
@@ -167,7 +165,7 @@ func (s *FsSnippets) findBlockDevice(ctx context.Context, minMaj string) (string
 	return filepath.Base(sr.Path), nil
 }
 
-func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string) error {
+func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string, devFolder string) error {
 	mi, err := s.findMount(mountedPath)
 	if err != nil {
 		return err
@@ -175,7 +173,7 @@ func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string) error {
 
 	minMaj := fmt.Sprintf("%d:%d", mi.Major, mi.Minor)
 	deviceName, err := s.findBlockDevice(ctx, minMaj)
-	devicePath := fmt.Sprintf("%s/%s", s.devFolder, deviceName)
+	devicePath := fmt.Sprintf("%s/%s", devFolder, deviceName)
 
 	logs.FromCtx(ctx).Info("ExpandFs", "mi.FsType", mi.FsType)
 	switch mi.FsType {
@@ -230,7 +228,7 @@ func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 	cmd := []string{"umount", "-r", targetPath}
 	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
 	if err != nil {
-		return fmt.Errorf("unmount 1: %w", cmd, err)
+		return fmt.Errorf("unmount 1: %w", err)
 	}
 	if runResult.ExitCode == 0 {
 		return nil
@@ -240,7 +238,7 @@ func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 	cmd = []string{"umount", "-r", "-f", targetPath}
 	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
 	if err != nil {
-		return fmt.Errorf("unmount 2: %w", cmd, err)
+		return fmt.Errorf("unmount 2: %w", err)
 	}
 	if runResult.ExitCode == 0 {
 		return nil
@@ -250,7 +248,7 @@ func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 	cmd = []string{"umount", "-r", "-f", "-l", targetPath}
 	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
 	if err != nil {
-		return fmt.Errorf("unmount 3: %w", cmd, err)
+		return fmt.Errorf("unmount 3: %w", err)
 	}
 	if runResult.ExitCode == 0 {
 		return nil

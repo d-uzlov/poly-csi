@@ -2,7 +2,7 @@ package volumecontext
 
 import "fmt"
 
-const Prefix = "poly-csi.meoe.io"
+const Prefix = "poly-csi.meoe.io/"
 
 type VolumeContext struct {
 	ServerName    string `map:"server_name"`

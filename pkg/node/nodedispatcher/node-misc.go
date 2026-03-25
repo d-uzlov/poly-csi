@@ -23,7 +23,7 @@ func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeSta
 	tr := localexec.New(conf.ExecConfig)
 	// mp := conf.getMultipath(tr)
 
-	fsnip := fsutils.New(tr, conf.DevFolder)
+	fsnip := fsutils.New(tr)
 
 	// req.StagingTargetPath is empty in this call
 	stats, err := fsnip.GetMountStats(req.VolumePath)
@@ -90,10 +90,10 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 		logs.FromCtx(ctx).MicroOp("multipath.Expand: success")
 	}
 
-	fsnip := fsutils.New(tr, conf.DevFolder)
+	fsnip := fsutils.New(tr)
 
 	if nvi.ManagedOps.ExpandFs {
-		err = fsnip.ExpandFs(ctx, nvi.FolderPath)
+		err = fsnip.ExpandFs(ctx, nvi.FolderPath, conf.DevFolder)
 		if err != nil {
 			return nil, fmt.Errorf("ExpandFs: %w", err)
 		}

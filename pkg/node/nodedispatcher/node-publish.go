@@ -61,7 +61,7 @@ func (n *Node) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVo
 	tr := localexec.New(conf.ExecConfig)
 	// mp := conf.getMultipath(tr)
 
-	fsnip := fsutils.New(tr, conf.DevFolder)
+	fsnip := fsutils.New(tr)
 	err := fsnip.Unmount(ctx, req.TargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("Unmount: %w", err)

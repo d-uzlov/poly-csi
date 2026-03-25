@@ -16,12 +16,21 @@ parameters:
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nvme
   dispatch.addressNames: storage,k8s
+
   zfs.parentDataset: rose/test
+
+  init.on: node
+  init.blockFormat: mkfs.ext4
+  init.ownerUser: '0'
+  init.ownerGroup: '10000'
+  init.rootDirMode: '777'
+
   nvmet.nvmetPortName: '4420'
   nvmet.connectPort: '4420'
   nvmet.transportType: tcp
   nvmet.ioQueues: '4'
   nvmet.authType: chap-provision
+
   fsType: ext4
 
 mountOptions:

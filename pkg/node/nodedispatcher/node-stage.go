@@ -19,6 +19,7 @@ import (
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
+	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (res *csi.NodeStageVolumeResponse, err error) {
@@ -65,6 +66,12 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}
 
+	var initConfig volumeinit.InitConfig
+	err = serialmaps.Parse(req.PublishContext, volumeinit.PreferredPrefix, &initConfig)
+	if err != nil {
+		return nil, fmt.Errorf("parse init config: %w", err)
+	}
+
 	nvi := newVolumeHandle(req.StagingTargetPath)
 	defer func() {
 		if conf.DisableCleanupOnFailure {
@@ -72,7 +79,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 		if err != nil {
 			logger.Warn("detected failure, running cleanup")
-			cleanupErr := nvi.cleanup(ctx, tr, mp, connector, conf.DevFolder)
+			cleanupErr := nvi.cleanup(ctx, tr, mp, connector)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
 				logger.Error("failed to cleanup partially initialized volume", "error", cleanupErr.Error())
@@ -120,7 +127,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("block mounting is not implemented")
 	}
 
-	err = nvi.ensureFolderPath(ctx, tr, conf.DevFolder, mp, mountRequest)
+	err = nvi.ensureFolderPath(ctx, tr, conf.DevFolder, mp, mountRequest, initConfig)
 	if err != nil {
 		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", vc.ConnectorId, err)
 	}
@@ -169,7 +176,7 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
 
-	err = nvi.cleanup(ctx, tr, mp, connector, conf.DevFolder)
+	err = nvi.cleanup(ctx, tr, mp, connector)
 	if err != nil {
 		return nil, fmt.Errorf("cleanup: %w", err)
 	}

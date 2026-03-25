@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
@@ -63,57 +62,7 @@ func ensureDevicePath(ctx context.Context, tr transport.Transport, nvi *NodeVolu
 	return device, nil
 }
 
-func ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder string, devicePath string, nvi *NodeVolumeInfo, requestMount *csi.VolumeCapability_MountVolume, targetPath string) error {
-	if devicePath == "" {
-		return fmt.Errorf("device path is not set")
-	}
-
-	fsnip := fsutils.New(tr, devFolder)
-
-	fsInfo, err := fsnip.GetBlkid(ctx, devicePath)
-	if err != nil {
-		return fmt.Errorf("GetFsInfo: %w", err)
-	}
-
-	if fsInfo == nil {
-		logs.FromCtx(ctx).MicroOp("run fs format on block device", "device", devicePath)
-		err = fsnip.FormatFs(ctx, devicePath, requestMount.FsType, nil)
-		if err != nil {
-			return fmt.Errorf("format: %w", err)
-		}
-		logs.FromCtx(ctx).MicroOp("format fs: success", "device", devicePath)
-	}
-
-	logs.FromCtx(ctx).MicroOp("mount device: request", "device", devicePath)
-	_, err = fsnip.EnsureMounted(ctx, devicePath, targetPath, "", requestMount.MountFlags)
-	if err != nil {
-		return fmt.Errorf("EnsureMounted: %w", err)
-	}
-	nvi.FolderPath = targetPath
-	logs.FromCtx(ctx).MicroOp("mount device: success", "device", devicePath, "target-path", targetPath)
-	// mi.Source is a commentary, it's not linked to a block device
-	// maybe we can instead compare maj:min pair
-	// if mi.Source != devicePath {
-	// 	return fmt.Errorf("already mounted from different source: real %s != expected %s: mounted at %s", mi.Source, devicePath, mi.MountPoint)
-	// }
-	// do we need to also check that mounted filesystem type matches requested?
-	// if mi.FsType != requestMount.FsType {
-	// 	return nil, fmt.Errorf("fs is already mounted with different fs type: %s != %s, at mountpoint %s", mi.FsType, requestMount.FsType, mi.MountPoint)
-	// }
-
-	if !nvi.InitDone {
-		err = fsnip.InitFs(ctx, nvi.FolderPath)
-		if err != nil {
-			return fmt.Errorf("InitFs: %w", err)
-		}
-		nvi.InitDone = true
-		logs.FromCtx(ctx).MicroOp("init fs: success")
-	}
-
-	return nil
-}
-
-func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transport.Transport, devFolder string) error {
+func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transport.Transport) error {
 	if nvi.FolderPath == "" {
 		return nil
 	}
@@ -125,7 +74,7 @@ func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transpor
 	}
 	if runResult.ExitCode == 0 {
 		// nvi.FolderPath is a mount point, need to unmount
-		fsnip := fsutils.New(tr, devFolder)
+		fsnip := fsutils.New(tr)
 		err = fsnip.Unmount(ctx, nvi.FolderPath)
 		if err != nil {
 			return fmt.Errorf("unmount: %w", err)

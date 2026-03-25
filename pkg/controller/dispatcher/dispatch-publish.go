@@ -14,6 +14,7 @@ import (
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
+	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
@@ -111,6 +112,11 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 			return nil, fmt.Errorf("publish_context: encrypt secret: %w", err)
 		}
 		publishContext["_secret"] = base64.StdEncoding.EncodeToString(secretJsonEnc)
+	}
+
+	_, err = serialmaps.SerializeInto(mh.vi.InitConfig, publishContext, volumeinit.PreferredPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("inject init config: %w", err)
 	}
 
 	if pc.LocalData != nil {

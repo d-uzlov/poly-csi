@@ -13,6 +13,8 @@ import (
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/fsutils"
+	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 type NodeVolumeInfo struct {
@@ -140,7 +142,7 @@ func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connec
 	return nil
 }
 
-func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder string, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume) error {
+func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder string, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume, initConfig volumeinit.InitConfig) error {
 	if v.FolderPath != "" {
 		return nil
 	}
@@ -149,42 +151,57 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 		return fmt.Errorf("connector did not set FolderPath and did not request automatic mount")
 	}
 
-	logger := logs.FromCtx(ctx)
-
 	// ensureDevicePath will setup multipath if needed
-	device, err := ensureDevicePath(ctx, tr, v, v.intermediateDeviceList, mp)
+	devicePath, err := ensureDevicePath(ctx, tr, v, v.intermediateDeviceList, mp)
 	if err != nil {
 		return fmt.Errorf("ensureDevicePath: %w", err)
 	}
-	sr, err := tr.Cmds().Stat(ctx, device)
+	sr, err := tr.Cmds().Stat(ctx, devicePath)
 	if err != nil {
-		return fmt.Errorf("failed to check device path at %s: %w", device, err)
+		return fmt.Errorf("failed to check device path at %s: %w", devicePath, err)
 	}
 	if !sr.FileExists {
-		return fmt.Errorf("checking device path at %s: file does not exist", device)
+		return fmt.Errorf("checking device path at %s: file does not exist", devicePath)
 	}
 	if !sr.IsBlock() {
-		return fmt.Errorf("checking device path at %s: file is not a block device", device)
+		return fmt.Errorf("checking device path at %s: file is not a block device", devicePath)
 	}
 
 	mountPath := v.parentFolder + managedMountPath
-	err = ensureFolderPath(ctx, tr, devFolder, device, v, mountRequest, mountPath)
+
+	fsnip := fsutils.New(tr)
+
+	init := volumeinit.NewNode(map[string][]string{}, tr)
+	err = init.RunBlock(ctx, initConfig, devicePath)
 	if err != nil {
-		return fmt.Errorf("ensureFolderPath: %w", err)
+		return fmt.Errorf("init block device: %w", err)
 	}
-	logger.MicroOp("ManagedOps: mounted fs at " + managedMountPath)
+	logs.FromCtx(ctx).MicroOp("init block device: success")
+
+	_, err = fsnip.EnsureMounted(ctx, devicePath, mountPath, "", mountRequest.MountFlags)
+	if err != nil {
+		return fmt.Errorf("EnsureMounted: %w", err)
+	}
+	v.FolderPath = mountPath
+	logs.FromCtx(ctx).MicroOp("mount device: success", "device", devicePath, "target-path", mountPath)
+
+	err = init.RunFs(ctx, initConfig, mountPath)
+	if err != nil {
+		return fmt.Errorf("init fs: %w", err)
+	}
+	logs.FromCtx(ctx).MicroOp("init fs: success")
 
 	v.FolderPath = mountPath
 
 	return nil
 }
 
-func (v *NodeVolumeInfo) cleanup(ctx context.Context, tr transport.Transport, mp multipath.Multipath, connector connectors.Connector, devFolder string) error {
+func (v *NodeVolumeInfo) cleanup(ctx context.Context, tr transport.Transport, mp multipath.Multipath, connector connectors.Connector) error {
 	var err error
 	logger := logs.FromCtx(ctx)
 
 	if v.ManagedOps.UnmountFs {
-		err = ensureFolderUnmounted(ctx, v, tr, devFolder)
+		err = ensureFolderUnmounted(ctx, v, tr)
 		if err != nil {
 			return fmt.Errorf("ensureFolderUnmounted: %w", err)
 		}

@@ -55,7 +55,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("expected cifs fs type but got %s", req.AccessMount.FsType)
 	}
 	mountTarget := req.StagingTargetPath + mountSuffix
-	mi, err := fsutils.New(c.tr, c.devFolder).EnsureMounted(ctx, smbPath, mountTarget, req.AccessMount.FsType, flags)
+	mi, err := fsutils.New(c.tr).EnsureMounted(ctx, smbPath, mountTarget, req.AccessMount.FsType, flags)
 	if err != nil {
 		return nil, err
 	}

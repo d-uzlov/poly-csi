@@ -19,6 +19,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
+	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 type IdFields struct {
@@ -75,6 +76,21 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.ShareType, srv.Conf.Commands, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
+	}
+
+	var initConfig volumeinit.InitConfig
+	err = serialmaps.ParseRemove(req.Parameters, volumeinit.PreferredPrefix, true, &initConfig)
+	if err != nil {
+		return nil, fmt.Errorf("parse init config: %w", err)
+	}
+	err = initConfig.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate init config: %w", err)
+	}
+	for k := range req.Parameters {
+		if strings.HasPrefix(k, volumeinit.PreferredPrefix) {
+			return nil, fmt.Errorf("unknown key '%s'", k)
+		}
 	}
 
 	strCaps := str.GetCapabilities()
@@ -377,15 +393,38 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("volume create did not set storage context")
 	}
 
-	// when using local volumes, we can check common stuff here, to avoid repeating it in each share
 	if strCaps.LocalVolume != "" {
 		localPath, err := vol.GetLocalPath(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("get local file: %w", err)
 		}
+
+		// when using local volumes, we can check common stuff here, to avoid repeating it in each share
 		err = checkFile(ctx, srv.trInstance, strCaps.LocalVolume, localPath)
 		if err != nil {
 			return nil, fmt.Errorf("check local file: %w", err)
+		}
+
+		init := volumeinit.NewController(srv.Conf.Commands, srv.trInstance)
+		switch strCaps.LocalVolume {
+		case storage.VolDevice:
+			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalVolume)
+			err = init.RunBlock(ctx, initConfig, localPath)
+			if err != nil {
+				return nil, fmt.Errorf("init block: %w", err)
+			}
+			err = init.RunFsWithTmpMount(ctx, initConfig, localPath)
+			if err != nil {
+				return nil, fmt.Errorf("init fs: %w", err)
+			}
+		case storage.VolFolder:
+			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalVolume)
+			err = init.RunFs(ctx, initConfig, localPath)
+			if err != nil {
+				return nil, fmt.Errorf("init fs: %w", err)
+			}
+		default:
+			logs.FromCtx(ctx).MicroOp("skipping volume init", "volume-type", strCaps.LocalVolume)
 		}
 	}
 
@@ -415,7 +454,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return
 		}
 		logger.Info("deleting share on failure")
-		logs.FromCtx(ctx).Info("running share cleanup")
+		logs.FromCtx(ctx).MicroOp("running share cleanup")
 		err = shr.DeleteShare(ctx, shareData)
 		if err != nil {
 			logs.FromCtx(ctx).Error("failed to run share cleanup", "error", err.Error())
@@ -423,8 +462,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		}
 	}()
 
-	// vcMap := map[string]string{}
-	logs.FromCtx(ctx).Error("creating volume context")
+	logs.FromCtx(ctx).MicroOp("creating volume context")
 	vc := volumecontext.VolumeContext{
 		ServerName:  dispatchParams.ServerName,
 		StorageType: dispatchParams.StorageType,
@@ -466,6 +504,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		StorageData:   serializedVolume,
 		ShareType:     dispatchParams.ShareType,
 		ShareData:     shareData,
+		InitConfig:    initConfig,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("save volume info: %w", err)
