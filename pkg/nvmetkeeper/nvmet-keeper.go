@@ -378,6 +378,21 @@ func (k *NvmetKeeper) CreatePort(ctx context.Context, c nvmet.Port) error {
 func (k *NvmetKeeper) DeleteSubsys(ctx context.Context, nqn string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
+	hostList, err := snip.ListHostAttachments(nqn)
+	if err != nil {
+		return fmt.Errorf("list namespaces for '%s': %w", nqn, err)
+	}
+	for _, v := range hostList {
+		err = snip.DisallowHost(nqn, v)
+		if err != nil {
+			return fmt.Errorf("delete host attachment '%s/%s': %w", nqn, v, err)
+		}
+		err = k.str.deleteHostAttachment(ctx, nqn, v)
+		if err != nil {
+			return fmt.Errorf("delete host attachment '%s/%s': %w", nqn, v, err)
+		}
+	}
+
 	nsList, err := snip.ListNamespaces(nqn)
 	if err != nil {
 		return fmt.Errorf("list namespaces for '%s': %w", nqn, err)
@@ -392,6 +407,7 @@ func (k *NvmetKeeper) DeleteSubsys(ctx context.Context, nqn string) error {
 			return fmt.Errorf("delete namespace '%s/%s': %w", nqn, v, err)
 		}
 	}
+
 	err = snip.DeleteSubsys(nqn)
 	if err != nil {
 		return fmt.Errorf("delete subsystem '%s': %w", nqn, err)
