@@ -524,22 +524,18 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	logger := logs.FromCtx(ctx)
 
-	// TODO this fails when volume does not exist
-	_, err := d.ControllerUnpublishVolume(ctx, &csi.ControllerUnpublishVolumeRequest{
-		VolumeId: req.VolumeId,
-		NodeId:   "",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unpublish before delete: %w", err)
-	}
-
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
 	defer mh.release()
 	if mh.vi == nil {
-		return nil, fmt.Errorf("volume not found")
+		return &csi.DeleteVolumeResponse{}, nil
+	}
+
+	_, err = d.unpublishVolume(ctx, mh, "")
+	if err != nil {
+		return nil, fmt.Errorf("unpublish before delete: %w", err)
 	}
 
 	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)

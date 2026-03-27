@@ -136,8 +136,6 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 }
 
 func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	logger := logs.FromCtx(ctx)
-
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
@@ -147,13 +145,19 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("volume not found")
 	}
 
+	return d.unpublishVolume(ctx, mh, req.NodeId)
+}
+
+func (d *Dispatcher) unpublishVolume(ctx context.Context, mh *volumeManagementHandle, nodeId string) (*csi.ControllerUnpublishVolumeResponse, error) {
+	logger := logs.FromCtx(ctx)
+
 	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
 
-	if req.NodeId != "" {
-		pds, err := mh.wrapper.GetPublishData(ctx, req.NodeId)
+	if nodeId != "" {
+		pds, err := mh.wrapper.GetPublishData(ctx, nodeId)
 		if err != nil {
 			return nil, fmt.Errorf("publish data: get from db: %w", err)
 		}
@@ -169,7 +173,7 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		}
 		logger.Info("share.Unpublish: success")
 
-		err = mh.wrapper.DeletePublishData(ctx, req.NodeId)
+		err = mh.wrapper.DeletePublishData(ctx, nodeId)
 		if err != nil {
 			return nil, fmt.Errorf("db: delete publish context: %w", err)
 		}
