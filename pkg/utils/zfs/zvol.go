@@ -12,26 +12,26 @@ type ZvolConfig struct {
 }
 
 func (s *Snippets) CreateZvol(ctx context.Context, path string, config ZvolConfig) (alreadyExisted bool, err error) {
-	cmd := append(s.zfsCmd,
+	cmd := append(zfsCmd,
 		"create", path,
 		"-V", fmt.Sprintf("%d", config.Size),
 	)
 	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists")
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", cmd, err)
+		return false, fmt.Errorf("zfs create: %w", err)
 	}
 	return recovered, nil
 }
 
 func (s *Snippets) ConfigureZvol(ctx context.Context, path string, config ZvolConfig) error {
-	cmd := append(s.zfsCmd,
+	cmd := append(zfsCmd,
 		"set",
 		fmt.Sprintf("volsize=%d", config.Size),
 		path,
 	)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("zfs set size: %w", err)
 	}
 	return nil
 }

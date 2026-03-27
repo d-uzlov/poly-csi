@@ -101,6 +101,7 @@ func (c *parsedServer) Reuse(old *parsedServer) {
 		if old.Conf.ExecType == c.Conf.ExecType && reflect.DeepEqual(c.Conf.ExecConfig, old.Conf.ExecConfig) {
 			c.trInstance = old.trInstance
 			old.trInstance = nil
+			c.trInstance.SetCommands(c.Conf.Commands)
 		}
 	}
 	if old.dbInstance != nil {
@@ -163,6 +164,8 @@ func (c *parsedServer) InitTransport(ctx context.Context, logPrefix string) erro
 
 	c.trInstance = instance
 	c.trConfig = cfg
+
+	c.trInstance.SetCommands(c.Conf.Commands)
 
 	return nil
 }

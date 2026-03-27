@@ -2,10 +2,7 @@ package nodedispatcher
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"time"
 
 	"meoe.io/poly-csi/pkg/logs"
@@ -67,22 +64,14 @@ func ensureFolderUnmounted(ctx context.Context, nvi *NodeVolumeInfo, tr transpor
 		return nil
 	}
 
-	cmd := []string{"mountpoint", nvi.FolderPath}
-	runResult, err := tr.RunCommand(ctx, cmd)
+	fsnip := fsutils.New(tr)
+	err := fsnip.Unmount(ctx, nvi.FolderPath)
 	if err != nil {
-		return fmt.Errorf("check nvi.FolderPath: %w", err)
-	}
-	if runResult.ExitCode == 0 {
-		// nvi.FolderPath is a mount point, need to unmount
-		fsnip := fsutils.New(tr)
-		err = fsnip.Unmount(ctx, nvi.FolderPath)
-		if err != nil {
-			return fmt.Errorf("unmount: %w", err)
-		}
+		return fmt.Errorf("unmount: %w", err)
 	}
 
-	err = os.Remove(nvi.FolderPath)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	err = tr.Cmds().RmDir(ctx, nvi.FolderPath)
+	if err != nil {
 		return fmt.Errorf("remove mount path: %w", err)
 	}
 	nvi.FolderPath = ""

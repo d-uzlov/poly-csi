@@ -8,6 +8,8 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
+var midcltCmd = []string{"midclt"}
+
 type tnNfsInfo struct {
 	Id   int    `json:"id"`
 	Path string `json:"path"`
@@ -15,13 +17,11 @@ type tnNfsInfo struct {
 
 type nfsSnippets struct {
 	tr        transport.Transport
-	midcltCmd []string
 }
 
-func newNfsSnippets(tr transport.Transport, midcltCmd []string) nfsSnippets {
+func newNfsSnippets(tr transport.Transport) nfsSnippets {
 	return nfsSnippets{
 		tr:        tr,
-		midcltCmd: midcltCmd,
 	}
 }
 
@@ -35,7 +35,7 @@ func (s nfsSnippets) configureNfsShare(ctx context.Context, path string) error {
 		return nil
 	}
 
-	cmd := append(s.midcltCmd, "call", "sharing.nfs.create", fmt.Sprintf(`{"path": "%s"}`, path))
+	cmd := append(midcltCmd, "call", "sharing.nfs.create", fmt.Sprintf(`{"path": "%s"}`, path))
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
@@ -50,7 +50,7 @@ func (s nfsSnippets) configureNfsShare(ctx context.Context, path string) error {
 }
 
 func (s nfsSnippets) listNfsSharesForPath(ctx context.Context, path string) ([]tnNfsInfo, error) {
-	cmd := append(s.midcltCmd, "call", "sharing.nfs.query", fmt.Sprintf(`[["path","=","%s"]]`, path))
+	cmd := append(midcltCmd, "call", "sharing.nfs.query", fmt.Sprintf(`[["path","=","%s"]]`, path))
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)
@@ -76,7 +76,7 @@ func (s nfsSnippets) removeNfsShare(ctx context.Context, path string) error {
 	}
 
 	for _, v := range shareList {
-		cmd := append(s.midcltCmd, "call", "sharing.nfs.delete", fmt.Sprintf("%d", v.Id))
+		cmd := append(midcltCmd, "call", "sharing.nfs.delete", fmt.Sprintf("%d", v.Id))
 		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd, err)

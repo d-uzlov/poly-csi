@@ -9,9 +9,10 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
+var btrfsCmd = []string{"btrfs"}
+
 type Snippets struct {
-	tr       transport.Transport
-	btrfsCmd []string
+	tr transport.Transport
 }
 
 type BtrfsJsonResult struct {
@@ -22,15 +23,14 @@ type BtrfsJsonResult struct {
 	FilesystemDf []QuotaEntry `json:"filesystem-df"`
 }
 
-func NewSnippets(tr transport.Transport, btrfsCmd []string) Snippets {
+func NewSnippets(tr transport.Transport) Snippets {
 	return Snippets{
-		tr:       tr,
-		btrfsCmd: btrfsCmd,
+		tr: tr,
 	}
 }
 
 func (s *Snippets) SubvolumeTest(ctx context.Context, path string) (exists bool, err error) {
-	cmd := append(s.btrfsCmd, "subvolume", "show", path)
+	cmd := append(btrfsCmd, "subvolume", "show", path)
 	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "Not a Btrfs subvolume")
 	if err != nil {
 		return false, err
@@ -42,7 +42,7 @@ func (s *Snippets) SubvolumeTest(ctx context.Context, path string) (exists bool,
 }
 
 func (s *Snippets) SubvolumeCreate(ctx context.Context, path string) (alreadyExists bool, err error) {
-	cmd := append(s.btrfsCmd, "subvolume", "create", path)
+	cmd := append(btrfsCmd, "subvolume", "create", path)
 	alreadyExists, err = transport.RelaxedRun(ctx, s.tr, cmd, "target path already exists")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
@@ -51,7 +51,7 @@ func (s *Snippets) SubvolumeCreate(ctx context.Context, path string) (alreadyExi
 }
 
 func (s *Snippets) SubvolumeDelete(ctx context.Context, path string) (doesNotExist bool, err error) {
-	cmd := append(s.btrfsCmd, "subvolume", "delete", path)
+	cmd := append(btrfsCmd, "subvolume", "delete", path)
 	doesNotExist, err = transport.RelaxedRun(ctx, s.tr, cmd, "No such file or directory")
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", cmd, err)
@@ -60,7 +60,7 @@ func (s *Snippets) SubvolumeDelete(ctx context.Context, path string) (doesNotExi
 }
 
 func (s *Snippets) SubvolumeSnapshot(ctx context.Context, source string, dest string) error {
-	cmd := append(s.btrfsCmd, "subvolume", "snapshot", "-r", source, dest)
+	cmd := append(btrfsCmd, "subvolume", "snapshot", "-r", source, dest)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
@@ -69,7 +69,7 @@ func (s *Snippets) SubvolumeSnapshot(ctx context.Context, source string, dest st
 }
 
 func (s *Snippets) Send(ctx context.Context, sourceSnapshot string, targetFile string, timeout time.Duration) error {
-	cmd := append(s.btrfsCmd,
+	cmd := append(btrfsCmd,
 		"send",
 		sourceSnapshot,
 	)
@@ -84,7 +84,7 @@ func (s *Snippets) Send(ctx context.Context, sourceSnapshot string, targetFile s
 }
 
 func (s *Snippets) Receive(ctx context.Context, targetParent string, sourceFile string, timeout time.Duration) (string, error) {
-	cmd := append(s.btrfsCmd,
+	cmd := append(btrfsCmd,
 		"receive",
 		targetParent,
 	)

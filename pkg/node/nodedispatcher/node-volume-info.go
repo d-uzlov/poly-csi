@@ -171,7 +171,7 @@ func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Tran
 
 	fsnip := fsutils.New(tr)
 
-	init := volumeinit.NewNode(map[string][]string{}, tr)
+	init := volumeinit.NewNode(tr)
 	err = init.RunBlock(ctx, initConfig, devicePath)
 	if err != nil {
 		return fmt.Errorf("init block device: %w", err)

@@ -13,7 +13,7 @@ type manager struct {
 	tr transport.Transport
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) storage.StorageManager {
+func New(tr transport.Transport, globalParams map[string]string) storage.StorageManager {
 	return &manager{
 		tr: tr,
 	}

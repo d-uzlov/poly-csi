@@ -26,24 +26,24 @@ const (
 	shareSamba       = "samba"
 )
 
-func ShareFromType(tr transport.Transport, vmType string, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func ShareFromType(tr transport.Transport, vmType string, globalParams map[string]string) (shares.ShareManager, error) {
 	switch vmType {
 	case shareZfsSharenfs:
-		return shrzfssharenfs.New(tr, commands, globalParams)
+		return shrzfssharenfs.New(tr, globalParams)
 	case shareNfs:
-		return shrnfs.New(tr, commands, globalParams)
+		return shrnfs.New(tr, globalParams)
 	case shareNvmetKernel:
-		return shrnvmetkernel.New(tr, commands, globalParams)
+		return shrnvmetkernel.New(tr, globalParams)
 	case shareNvmetKeeper:
-		return shrnvmetkeeper.New(tr, commands, globalParams)
+		return shrnvmetkeeper.New(tr, globalParams)
 	case shareTargetcli:
-		return shrtargetcli.New(tr, commands, globalParams)
+		return shrtargetcli.New(tr, globalParams)
 	case shareTnNfs:
-		return shrtnnfs.New(tr, commands, globalParams)
+		return shrtnnfs.New(tr, globalParams)
 	case shareTnIscsi:
-		return shrtniscsi.New(tr, commands, globalParams)
+		return shrtniscsi.New(tr, globalParams)
 	case shareSamba:
-		return shrsamba.New(tr, commands, globalParams)
+		return shrsamba.New(tr, globalParams)
 	}
 	return nil, fmt.Errorf("unknown share type: %s", vmType)
 }

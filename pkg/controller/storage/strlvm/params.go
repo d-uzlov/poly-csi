@@ -5,21 +5,6 @@ import (
 	"strings"
 )
 
-type commands struct {
-	lvmCmd []string
-}
-
-func parseCommands(src map[string][]string) (commands, error) {
-	result := commands{}
-
-	result.lvmCmd = src["lvm"]
-	if len(result.lvmCmd) == 0 {
-		result.lvmCmd = []string{"sudo", "lvm"}
-	}
-
-	return result, nil
-}
-
 type params struct {
 	vgName string
 }

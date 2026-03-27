@@ -13,7 +13,6 @@ type ConfigStorage struct {
 	tr           transport.Transport
 	configFolder string
 	useSudo      bool
-	sudoPrefix   string
 	saveState    bool
 }
 
@@ -25,15 +24,10 @@ type savedSubsys struct {
 }
 
 func NewConfigStorage(tr transport.Transport, configFolder string, useSudo bool, saveState bool) ConfigStorage {
-	sudoPrefix := ""
-	if useSudo {
-		sudoPrefix = "sudo"
-	}
 	return ConfigStorage{
 		tr:           tr,
 		configFolder: configFolder,
 		useSudo:      useSudo,
-		sudoPrefix:   sudoPrefix,
 		saveState:    saveState,
 	}
 }

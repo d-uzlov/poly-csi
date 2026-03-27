@@ -12,22 +12,16 @@ import (
 
 type share struct {
 	tr   transport.Transport
-	cmds commands
 	gp   globalParams
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
 	return &share{
 		tr:   tr,
-		cmds: cmds,
 		gp:   gp,
 	}, nil
 }
@@ -46,7 +40,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("parse params: %w", err)
 	}
 
-	snip := newSambaSnippets(sh.tr, sh.gp, sh.cmds)
+	snip := newSambaSnippets(sh.tr, sh.gp)
 
 	shareName := req.ShareId
 	userName := fmt.Sprintf("smb-for-%s", req.ShareId)
@@ -89,7 +83,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newSambaSnippets(sh.tr, sh.gp, sh.cmds)
+	snip := newSambaSnippets(sh.tr, sh.gp)
 
 	err = snip.removeShare(ctx, c.ConfigFile)
 	if err != nil {

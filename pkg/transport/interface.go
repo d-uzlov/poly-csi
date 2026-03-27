@@ -6,8 +6,17 @@ import (
 )
 
 type Transport interface {
+	// Cleanup stops background processes and releases external resources
+	// After cleanup this transport may be inoperable
 	Cleanup()
+	// SetCommands sets command overrides
+	// It's not thread-safe.
+	SetCommands(commands map[string][]string)
+	// RunCommand runs specified command to completion
+	// Safe to run in parallel.
 	RunCommand(ctx context.Context, cmd []string, opts ...ExecOption) (CommandResult, error)
+	// Cmds creates Commands object with optimized common commands
+	// Safe to run in parallel.
 	Cmds() Commands
 	SudoCmds() Commands
 }
@@ -31,7 +40,7 @@ type Commands interface {
 	RmDir(ctx context.Context, path string) error
 	// Delete file. Can fail on directories
 	RmFile(ctx context.Context, path string) error
-	// Stat returns StatResult for existing directory, or null if directory is not found
+	// Stat probes info about objects in filesystem
 	Stat(ctx context.Context, path string) (StatResult, error)
 	Df(ctx context.Context, path string) (*FsSizeInfo, error)
 	CreateSymlink(ctx context.Context, link string, target string) error
@@ -48,9 +57,10 @@ const (
 	// skip zero to be able to detect uninitialized variables
 	__zero = iota
 	FtDirectory
-	// FtLink
 	FtBlock
 	FtFile
+	FtFifo
+	// FtLink
 )
 
 type StatResult struct {
@@ -69,6 +79,6 @@ type FsSizeInfo struct {
 
 func (r StatResult) IsDirectory() bool { return r.Type == FtDirectory }
 
-// func (r StatResult) IsLink() bool      { return r.Type == FtLink }
 func (r StatResult) IsBlock() bool { return r.Type == FtBlock }
 func (r StatResult) IsFile() bool  { return r.Type == FtFile }
+func (r StatResult) IsFifo() bool  { return r.Type == FtFifo }

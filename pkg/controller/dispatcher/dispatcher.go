@@ -70,6 +70,17 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 		d.conf = newConf
 	}()
 
+	defer func() {
+		for _, v := range oldConf.Servers {
+			func() {
+				v.mutex.Lock()
+				defer v.mutex.Unlock()
+
+				v.Cleanup()
+			}()
+		}
+	}()
+
 	d.confMutex.RLock()
 	defer d.confMutex.RUnlock()
 
@@ -101,15 +112,6 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 			}
 
 			logger.Info("successfully initialized server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId)
-		}()
-	}
-
-	for _, v := range oldConf.Servers {
-		func() {
-			v.mutex.Lock()
-			defer v.mutex.Unlock()
-
-			v.Cleanup()
 		}()
 	}
 }

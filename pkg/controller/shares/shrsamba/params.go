@@ -7,54 +7,15 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-const (
-	createUserCmdKey       = "user_create"
-	deleteUserCmdKey       = "user_delete"
-	sambaSetPasswordCmdKey = "samba_set_password"
-	sambaDeleteUserCmdKey  = "samba_user_delete"
-	sambaRefreshCmdKey     = "samba_refresh"
+var createUserCmd = []string{"user_create"}
+var deleteUserCmd = []string{"user_delete"}
+var sambaSetPassCmd = []string{"samba_set_password"}
+var sambaDeleteUserCmd = []string{"samba_user_delete"}
+var sambaRefreshCmd = []string{"samba_refresh"}
 
+const (
 	sambaConfigDirKey = "samba_config_dir"
 )
-
-type commands struct {
-	createUser      []string
-	deleteUser      []string
-	sambaSetPass    []string
-	sambaDeleteUser []string
-	smbRefresh      []string
-}
-
-func parseCommands(src map[string][]string) (commands, error) {
-	createUserCmd := src[createUserCmdKey]
-	if len(createUserCmdKey) == 0 {
-		return commands{}, fmt.Errorf("missing command %s", createUserCmdKey)
-	}
-	deleteUserCmd := src[deleteUserCmdKey]
-	if len(deleteUserCmd) == 0 {
-		return commands{}, fmt.Errorf("missing command %s", deleteUserCmdKey)
-	}
-	sambaSetPasswordCmd := src[sambaSetPasswordCmdKey]
-	if len(sambaSetPasswordCmd) == 0 {
-		return commands{}, fmt.Errorf("missing command %s", sambaSetPasswordCmdKey)
-	}
-	sambaDeleteUserCmd := src[sambaDeleteUserCmdKey]
-	if len(sambaDeleteUserCmd) == 0 {
-		return commands{}, fmt.Errorf("missing command %s", sambaDeleteUserCmdKey)
-	}
-	sambaRefreshCmd := src[sambaRefreshCmdKey]
-	if len(sambaRefreshCmd) == 0 {
-		return commands{}, fmt.Errorf("missing command %s", sambaRefreshCmdKey)
-	}
-
-	return commands{
-		createUser:      createUserCmd,
-		deleteUser:      deleteUserCmd,
-		sambaSetPass:    sambaSetPasswordCmd,
-		sambaDeleteUser: sambaDeleteUserCmd,
-		smbRefresh:      sambaRefreshCmd,
-	}, nil
-}
 
 type globalParams struct {
 	sambaConfigDir string

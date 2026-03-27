@@ -7,20 +7,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-type commandsConfig struct {
-	nvmetKeeperCmd []string
-}
-
-func parseCommands(commands map[string][]string) (commandsConfig, error) {
-	nvmetKeeperCmd := commands["nvmet_keeper"]
-	if len(nvmetKeeperCmd) == 0 {
-		return commandsConfig{}, fmt.Errorf("missing command 'nvmet_keeper'")
-	}
-
-	return commandsConfig{
-		nvmetKeeperCmd: nvmetKeeperCmd,
-	}, nil
-}
+var nvmetKeeperCmd = []string{"nvmet_keeper"}
 
 type globalParams struct {
 	nqnBase string

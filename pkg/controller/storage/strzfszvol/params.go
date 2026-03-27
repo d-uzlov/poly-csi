@@ -5,21 +5,6 @@ import (
 	"strings"
 )
 
-type commands struct {
-	zfsCmd     []string
-}
-
-func parseCommands(src map[string][]string) (commands, error) {
-	result := commands{}
-
-	result.zfsCmd = src["zfs"]
-	if len(result.zfsCmd) == 0 {
-		result.zfsCmd = []string{"sudo", "zfs"}
-	}
-
-	return result, nil
-}
-
 type params struct {
 	parentDataset string
 	customOptions string

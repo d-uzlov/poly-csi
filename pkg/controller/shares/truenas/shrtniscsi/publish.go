@@ -58,7 +58,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
 	}
 
-	snip := newSnippets(sh.tr, sh.cmds.Midclt)
+	snip := newSnippets(sh.tr)
 
 	err = snip.attachGroup(ctx, c.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
@@ -90,7 +90,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 		return fmt.Errorf("parse publish data: %w", err)
 	}
 
-	snip := newSnippets(sh.tr, sh.cmds.Midclt)
+	snip := newSnippets(sh.tr)
 
 	err = snip.detachGroup(ctx, c.Iqn, pd.HostIqn)
 	if err != nil {

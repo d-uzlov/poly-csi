@@ -29,7 +29,7 @@ func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityReques
 		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.ServerName, err)
 	}
 
-	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.StorageType, srv.Conf.Commands, srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.StorageType, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}

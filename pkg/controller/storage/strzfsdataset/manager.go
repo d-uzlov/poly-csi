@@ -17,12 +17,8 @@ type manager struct {
 	snip zfs.Snippets
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
-	snip := zfs.NewSnippets(tr, cmds.zfsCmd)
+func New(tr transport.Transport, globalParams map[string]string) (storage.StorageManager, error) {
+	snip := zfs.NewSnippets(tr)
 	return &manager{
 		tr:   tr,
 		snip: snip,

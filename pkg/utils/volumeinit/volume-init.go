@@ -27,11 +27,16 @@ type InitConfig struct {
 
 func (c *InitConfig) Validate() error {
 	switch c.On {
+	case "":
+		return fmt.Errorf("missing 'init on' setting")
 	case placeNode, placeController:
 	default:
 		return fmt.Errorf("unknown value for 'on': %s", c.On)
 	}
 
+	// if c.BlockFormat == "" {
+	// 	return fmt.Errorf("block format cmd")
+	// }
 	if c.OwnerUser == "" {
 		return fmt.Errorf("missing owner user")
 	}
@@ -46,24 +51,21 @@ func (c *InitConfig) Validate() error {
 }
 
 type Init struct {
-	place    string
-	tr       transport.Transport
-	commands map[string][]string
+	place string
+	tr    transport.Transport
 }
 
-func NewController(commands map[string][]string, tr transport.Transport) Init {
+func NewController(tr transport.Transport) Init {
 	return Init{
-		place:    placeController,
-		tr:       tr,
-		commands: commands,
+		place: placeController,
+		tr:    tr,
 	}
 }
 
-func NewNode(commands map[string][]string, tr transport.Transport) Init {
+func NewNode(tr transport.Transport) Init {
 	return Init{
-		place:    placeNode,
-		tr:       tr,
-		commands: commands,
+		place: placeNode,
+		tr:    tr,
 	}
 }
 
@@ -89,10 +91,10 @@ func (n *Init) RunBlock(ctx context.Context, cfg InitConfig, devicePath string) 
 		return fmt.Errorf("block format command is not set")
 	}
 
-	cmd, ok := n.commands[cfg.BlockFormat]
-	if !ok {
-		cmd = []string{"mkfs.ext4"}
+	if cfg.BlockFormat == "" {
+		return fmt.Errorf("missing block format command")
 	}
+	var cmd = []string{cfg.BlockFormat}
 	cmd = append(cmd, devicePath)
 	err = transport.CheckedRun(ctx, n.tr, cmd)
 	if err != nil {
@@ -109,8 +111,19 @@ func (n *Init) RunFsWithTmpMount(ctx context.Context, cfg InitConfig, devicePath
 	}
 
 	tmpMount := fmt.Sprintf("/tmp/%s", uuid.NewString())
+	err := n.tr.Cmds().Mkdir(ctx, tmpMount, false)
+	if err != nil {
+		return fmt.Errorf("mkdir for temp mount: %w", err)
+	}
+	defer func() {
+		cleanupErr := n.tr.Cmds().RmDir(ctx, tmpMount)
+		if cleanupErr != nil {
+			logs.FromCtx(ctx).Error("failed to cleanup temp dir", "path", tmpMount, "error", cleanupErr.Error())
+		}
+	}()
+
 	fs := fsutils.New(n.tr)
-	_, err := fs.EnsureMounted(ctx, devicePath, tmpMount, "", nil)
+	_, err = fs.EnsureMounted(ctx, devicePath, tmpMount, "", nil)
 	if err != nil {
 		return fmt.Errorf("tmp mount: %w", err)
 	}
@@ -141,9 +154,11 @@ func (n *Init) RunFs(ctx context.Context, cfg InitConfig, fsPath string) error {
 	} else if cfg.OwnerGroup != "-" {
 		cmd = []string{"chgrp", cfg.OwnerGroup, fsPath}
 	}
-	err = transport.CheckedRun(ctx, n.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s: %w", cmd[0], err)
+	if len(cmd) != 0 {
+		err = transport.CheckedRun(ctx, n.tr, cmd)
+		if err != nil {
+			return fmt.Errorf("%s: %w", cmd[0], err)
+		}
 	}
 
 	cmd = []string{"chmod", cfg.RootDirMode, fsPath}

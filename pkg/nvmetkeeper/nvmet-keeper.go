@@ -10,23 +10,16 @@ import (
 )
 
 type NvmetKeeper struct {
-	tr         transport.Transport
-	useSudo    bool
-	sudoPrefix string
-	str        ConfigStorage
+	tr      transport.Transport
+	useSudo bool
+	str     ConfigStorage
 }
 
 func New(tr transport.Transport, configFolder string, useSudo bool, saveState bool) *NvmetKeeper {
-	sudoPrefix := ""
-	if useSudo {
-		sudoPrefix = "sudo"
-	}
-
 	return &NvmetKeeper{
-		tr:         tr,
-		useSudo:    useSudo,
-		sudoPrefix: sudoPrefix,
-		str:        NewConfigStorage(tr, configFolder, useSudo, saveState),
+		tr:      tr,
+		useSudo: useSudo,
+		str:     NewConfigStorage(tr, configFolder, useSudo, saveState),
 	}
 }
 

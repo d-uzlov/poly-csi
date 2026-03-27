@@ -15,12 +15,8 @@ type manager struct {
 	snip lvm.Snippets
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
-	snip := lvm.NewSnippets(tr, cmds.lvmCmd)
+func New(tr transport.Transport, globalParams map[string]string) (storage.StorageManager, error) {
+	snip := lvm.NewSnippets(tr)
 	return &manager{
 		tr:   tr,
 		snip: snip,

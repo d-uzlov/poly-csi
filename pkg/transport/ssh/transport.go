@@ -38,6 +38,15 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 		options.Timeout = defaultTimeout
 	}
 
+	realCmd := s.commands[cmd[0]]
+	if len(realCmd) != 0 {
+		cmd = append(realCmd, cmd[1:]...)
+	}
+
+	if options.Sudo {
+		cmd = append([]string{"sudo"}, cmd...)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
 

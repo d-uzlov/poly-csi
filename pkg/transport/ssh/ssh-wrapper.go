@@ -29,6 +29,7 @@ type sshWrapper struct {
 	client          *ssh.Client
 	sshLogId        string
 	logger          *slog.Logger
+	commands        map[string][]string
 }
 
 func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
@@ -88,6 +89,7 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
+	// TODO this will mean that if app context is cancelled, cleanup is not possible
 	result.watcherCtx, result.watcherCancel = context.WithCancel(ctx)
 	result.watcherCtx = slogctx.With(result.watcherCtx, "thread", "SshWrapper:client-watcher")
 
@@ -117,6 +119,10 @@ func (s *sshWrapper) watchClient(ctx context.Context) {
 		s.logger.Info("SshWrapper.watchClient: UpdateClient created new client")
 	}
 	s.logger.Debug("context cancelled, stopping ssh watcher")
+}
+
+func (s *sshWrapper) SetCommands(commands map[string][]string) {
+	s.commands = commands
 }
 
 func (s *sshWrapper) Cleanup() {

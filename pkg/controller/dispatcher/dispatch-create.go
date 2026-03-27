@@ -68,12 +68,12 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("server[name=%s]: %w", dispatchParams.ServerName, err)
 	}
 
-	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.StorageType, srv.Conf.Commands, srv.Conf.GlobalParams)
+	str, err := storagefactory.StorageFromType(srv.trInstance, dispatchParams.StorageType, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.ShareType, srv.Conf.Commands, srv.Conf.GlobalParams)
+	shr, err := sharefactory.ShareFromType(srv.trInstance, dispatchParams.ShareType, srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 			sourceServer = sh.srv
 
-			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.Conf.Commands, sh.srv.Conf.GlobalParams)
+			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.Conf.GlobalParams)
 			if err != nil {
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
@@ -231,7 +231,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 			sourceServer = sh.srv
 
-			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.Conf.Commands, sh.srv.Conf.GlobalParams)
+			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.Conf.GlobalParams)
 			if err != nil {
 				return nil, fmt.Errorf("get source storage: %w", err)
 			}
@@ -405,7 +405,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("check local file: %w", err)
 		}
 
-		init := volumeinit.NewController(srv.Conf.Commands, srv.trInstance)
+		init := volumeinit.NewController(srv.trInstance)
 		switch strCaps.LocalVolume {
 		case storage.VolDevice:
 			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalVolume)
@@ -497,7 +497,6 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	// TODO save req.VolumeContentSource
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
 		ConnectorId:   dispatchParams.ConnectorId,
-		TransportId:   srv.Conf.StableId,
 		VolumeContext: vcMap,
 		AddressIds:    addressIds,
 		StorageType:   dispatchParams.StorageType,
@@ -524,6 +523,15 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	logger := logs.FromCtx(ctx)
 
+	// TODO this fails when volume does not exist
+	_, err := d.ControllerUnpublishVolume(ctx, &csi.ControllerUnpublishVolumeRequest{
+		VolumeId: req.VolumeId,
+		NodeId:   "",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unpublish before delete: %w", err)
+	}
+
 	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
@@ -533,19 +541,21 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
+
+	logger.MicroOp("initialized managers", "storage", mh.vi.StorageType, "share", mh.vi.ShareType)
 
 	err = shrInstance.DeleteShare(ctx, mh.vi.ShareData)
 	if err != nil {
-		return nil, fmt.Errorf("delete share: %w", err)
+		return nil, fmt.Errorf("delete share[%s]: %w", mh.vi.ShareType, err)
 	}
 	logger.Info("share.DeleteShare: success")
 
@@ -556,7 +566,7 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 
 	err = vol.Delete(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("delete storage: %w", err)
+		return nil, fmt.Errorf("delete storage[%s]: %w", mh.vi.StorageType, err)
 	}
 	logger.Info("storage.DeleteVolume: success")
 

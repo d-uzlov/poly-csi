@@ -49,7 +49,7 @@ func parsePublishData(serialized string) (publishData, error) {
 }
 
 func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	if !sh.cmds.ready(ctx, sh.tr) {
+	if !testReady(ctx, sh.tr) {
 		return nil, fmt.Errorf("nvmet is not ready")
 	}
 	c, err := parseShareData(shareData)
@@ -74,7 +74,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		return nil, fmt.Errorf("allow host: %w", err)
 	}
 
-	err = sh.cmds.save(ctx, sh.tr)
+	err = saveState(ctx, sh.tr)
 	if err != nil {
 		return nil, fmt.Errorf("nvmet_save: %w", err)
 	}
@@ -96,7 +96,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 }
 
 func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
-	if !sh.cmds.ready(ctx, sh.tr) {
+	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
 	}
 	c, err := parseShareData(shareData)
@@ -115,7 +115,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 		return fmt.Errorf("disallow host: %w", err)
 	}
 
-	err = sh.cmds.save(ctx, sh.tr)
+	err = saveState(ctx, sh.tr)
 	if err != nil {
 		return fmt.Errorf("nvmet_save: %w", err)
 	}

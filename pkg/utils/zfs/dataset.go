@@ -15,7 +15,7 @@ type DatasetConfig struct {
 }
 
 func (s *Snippets) CreateDataset(ctx context.Context, path string, config DatasetConfig) (alreadyExisted bool, err error) {
-	cmd := append(s.zfsCmd,
+	cmd := append(zfsCmd,
 		"create", path,
 		"-o", fmt.Sprintf("quota=%d", config.Quota),
 		"-o", fmt.Sprintf("refquota=%d", config.RefQuota),
@@ -24,13 +24,13 @@ func (s *Snippets) CreateDataset(ctx context.Context, path string, config Datase
 	)
 	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists")
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", cmd, err)
+		return false, fmt.Errorf("zfs create: %w", err)
 	}
 	return recovered, nil
 }
 
 func (s *Snippets) ConfigureDataset(ctx context.Context, path string, config DatasetConfig) error {
-	cmd := append(s.zfsCmd,
+	cmd := append(zfsCmd,
 		"set",
 		fmt.Sprintf("quota=%d", config.Quota),
 		fmt.Sprintf("refquota=%d", config.RefQuota),
@@ -40,16 +40,16 @@ func (s *Snippets) ConfigureDataset(ctx context.Context, path string, config Dat
 	)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("zfs set size: %w", err)
 	}
 	return nil
 }
 
 func (s *Snippets) SetShareNfs(ctx context.Context, path string, nfsOptions string) error {
-	cmd := append(s.zfsCmd, "set", "sharenfs="+nfsOptions, path)
+	cmd := append(zfsCmd, "set", "sharenfs="+nfsOptions, path)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("zfs set sharenfs: %w", err)
 	}
 	return nil
 }

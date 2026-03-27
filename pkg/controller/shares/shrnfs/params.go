@@ -5,20 +5,7 @@ import (
 	"strings"
 )
 
-type commands struct {
-	reloadCmd []string
-}
-
-func parseCommands(src map[string][]string) (commands, error) {
-	reloadCmd := src["nfs_reload"]
-	if len(reloadCmd) == 0 {
-		reloadCmd = []string{"sudo", "exportfs", "-r"}
-	}
-
-	return commands{
-		reloadCmd: reloadCmd,
-	}, nil
-}
+var nfsReloadCmd = []string{"nfs_reload"}
 
 type globalParams struct {
 }

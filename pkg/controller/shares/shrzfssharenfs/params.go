@@ -7,21 +7,6 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-type commands struct {
-	zfsCmd []string
-}
-
-func parseCommands(src map[string][]string) (commands, error) {
-	result := commands{}
-
-	result.zfsCmd = src["zfs"]
-	if len(result.zfsCmd) == 0 {
-		result.zfsCmd = []string{"sudo", "zfs"}
-	}
-
-	return result, nil
-}
-
 type params struct {
 	ShareOptions string `map:"shareOptions"`
 }
@@ -43,6 +28,10 @@ func parseParams(static map[string]string, mutable map[string]string) (params, e
 
 	if resMutable.ShareOptions != "" {
 		result.ShareOptions = resMutable.ShareOptions
+	}
+
+	if result.ShareOptions == "" {
+		return params{}, fmt.Errorf("shareOptions is not set")
 	}
 
 	for k := range static {

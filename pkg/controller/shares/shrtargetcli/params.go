@@ -9,30 +9,10 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-type commands struct {
-	targetcliCmd []string
-	readyCmd     []string
-}
+var readyCmd = []string{"targetcli_ready"}
 
-func parseCommands(src map[string][]string) (commands, error) {
-	targetcliCmd := src["targetcli"]
-	if len(targetcliCmd) == 0 {
-		targetcliCmd = []string{"sudo", "targetcli"}
-	}
-	readyCmd := src["targetcli_ready"]
-
-	return commands{
-		targetcliCmd: targetcliCmd,
-		readyCmd:     readyCmd,
-	}, nil
-}
-
-func (c commands) ready(ctx context.Context, tr transport.Transport) bool {
-	if len(c.readyCmd) == 0 {
-		return true
-	}
-
-	runResult, err := tr.RunCommand(ctx, c.readyCmd)
+func testReady(ctx context.Context, tr transport.Transport) bool {
+	runResult, err := tr.RunCommand(ctx, readyCmd)
 	if err != nil {
 		return false
 	}

@@ -45,27 +45,25 @@ func (sp ShareParameters) validate() error {
 }
 
 type snippets struct {
-	tr   transport.Transport
-	gp   globalParams
-	cmds commands
+	tr transport.Transport
+	gp globalParams
 }
 
-func newSambaSnippets(tr transport.Transport, gp globalParams, cmds commands) snippets {
+func newSambaSnippets(tr transport.Transport, gp globalParams) snippets {
 	return snippets{
-		tr:   tr,
-		gp:   gp,
-		cmds: cmds,
+		tr: tr,
+		gp: gp,
 	}
 }
 
 func (s snippets) configureUser(ctx context.Context, name string, password string) error {
-	cmd := append(s.cmds.createUser, name)
+	cmd := append(createUserCmd, name)
 	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "already exists")
 	if err != nil {
 		return fmt.Errorf("create linux user: %w", err)
 	}
 
-	cmd = append(s.cmds.sambaSetPass, name, password)
+	cmd = append(sambaSetPassCmd, name, password)
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("set samba password: %w", err)
@@ -74,13 +72,13 @@ func (s snippets) configureUser(ctx context.Context, name string, password strin
 }
 
 func (s snippets) deleteUser(ctx context.Context, name string) error {
-	cmd := append(s.cmds.sambaDeleteUser, name)
+	cmd := append(sambaDeleteUserCmd, name)
 	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "does not exist")
 	if err != nil {
 		return fmt.Errorf("delete samba user: %w", err)
 	}
 
-	cmd = append(s.cmds.deleteUser, name)
+	cmd = append(deleteUserCmd, name)
 	_, err = transport.RelaxedRun(ctx, s.tr, cmd, "does not exist")
 	if err != nil {
 		return fmt.Errorf("delete linux user: %w", err)
@@ -109,7 +107,7 @@ func (s snippets) configureShare(ctx context.Context, config ShareParameters) (s
 	if err != nil {
 		return "", fmt.Errorf("write '%s': %w", configFile, err)
 	}
-	err = transport.CheckedRun(ctx, s.tr, s.cmds.smbRefresh)
+	err = transport.CheckedRun(ctx, s.tr, sambaRefreshCmd)
 	if err != nil {
 		return "", fmt.Errorf("smb refresh: %w", err)
 	}
@@ -121,7 +119,7 @@ func (s snippets) removeShare(ctx context.Context, token string) error {
 	if err != nil {
 		return fmt.Errorf("remove '%s': %w", token, err)
 	}
-	err = transport.CheckedRun(ctx, s.tr, s.cmds.smbRefresh)
+	err = transport.CheckedRun(ctx, s.tr, sambaRefreshCmd)
 	if err != nil {
 		return fmt.Errorf("smb refresh: %w", err)
 	}

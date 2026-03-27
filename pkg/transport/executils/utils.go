@@ -26,10 +26,7 @@ func (ec *ExecCommands) Read(ctx context.Context, path string, trim bool) ([]byt
 	}
 
 	cmd := []string{"cat", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd)
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
 		return nil, err
 	}
@@ -52,10 +49,7 @@ func (ec *ExecCommands) Write(ctx context.Context, path string, data []byte) err
 	}
 
 	cmd := []string{"tee", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithStdinBytes(data), transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithStdinBytes(data), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -71,10 +65,7 @@ func (ec *ExecCommands) Ls(ctx context.Context, path string) ([]string, error) {
 	}
 
 	cmd := []string{"/bin/ls", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd)
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +84,7 @@ func (ec *ExecCommands) Move(ctx context.Context, source string, dest string) er
 	}
 
 	cmd := []string{"mv", source, dest}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -115,13 +103,10 @@ func (ec *ExecCommands) Mkdir(ctx context.Context, path string, parents bool) er
 	}
 
 	cmd := []string{"mkdir", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
 	if parents {
 		cmd = append(cmd, "-p")
 	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -140,10 +125,7 @@ func (ec *ExecCommands) RmDirRecursive(ctx context.Context, path string) error {
 	}
 
 	cmd := []string{"rm", "-r", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -162,10 +144,7 @@ func (ec *ExecCommands) RmDir(ctx context.Context, path string) error {
 	}
 
 	cmd := []string{"rmdir", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -184,10 +163,7 @@ func (ec *ExecCommands) RmFile(ctx context.Context, path string) error {
 	}
 
 	cmd := []string{"rm", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -209,10 +185,7 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 	// -n      Don't add newline
 	// can't use proper --canonicalize and --no-newline because we need to support busybox version of readlink
 	cmd := []string{"readlink", "-f", "-n", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd)
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
 		return transport.StatResult{}, fmt.Errorf("readlink: %w", err)
 	}
@@ -238,10 +211,7 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 	// -c FMT  Use the specified format
 	// can't use proper --printf because we need to support busybox version of stat
 	cmd = []string{"stat", realPath, "-c", "%F"}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err = ec.tr.RunCommand(ctx, cmd)
+	runResult, err = ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
 		return transport.StatResult{}, fmt.Errorf("stat: %w", err)
 	}
@@ -287,6 +257,8 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 		result.Type = transport.FtBlock
 	case "regular file", "regular empty file":
 		result.Type = transport.FtFile
+	case "fifo":
+		result.Type = transport.FtFifo
 	}
 	return result, nil
 }
@@ -334,10 +306,7 @@ func (ec *ExecCommands) CreateSymlink(ctx context.Context, link string, target s
 	}
 
 	cmd := []string{"ln", "--symbolic", "--no-target-directory", target, link}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return err
 	}
@@ -353,15 +322,19 @@ func (ec *ExecCommands) MkFifo(ctx context.Context, path string) (alreadyExists 
 	}
 
 	cmd := []string{"mkfifo", path}
-	if ec.sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithoutStdout())
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
 	if err != nil {
 		return false, err
 	}
 	if runResult.ExitCode != 0 {
 		if strings.Contains(string(runResult.Stderr), "File exists") {
+			sr, err := ec.Stat(ctx, path)
+			if err != nil {
+				return true, err
+			}
+			if !sr.IsFifo() {
+				return true, fmt.Errorf("file already exists but it has different type: %v", sr.Type)
+			}
 			return true, nil
 		}
 		return false, transport.FormatRunError(runResult)

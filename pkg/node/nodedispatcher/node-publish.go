@@ -40,8 +40,12 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 		return nil, fmt.Errorf("node volume info: FolderPath is empty")
 	}
 
-	fsnip := fsutils.New(tr, conf.DevFolder)
-	err = fsnip.EnsureBindMount(ctx, nvi.FolderPath, req.TargetPath)
+	fsnip := fsutils.New(tr)
+	var bindOpts []fsutils.BindMountOption
+	// if nvi.ManagedOps.AllowIdMap {
+	// 	bindOpts = append(bindOpts, fsutils.WithMapUsersDefault(), fsutils.WithMapGroup("0", "0"), fsutils.WithMapGroup("10000", req.VolumeCapability.GetMount().VolumeMountGroup))
+	// }
+	err = fsnip.EnsureBindMount(ctx, nvi.FolderPath, req.TargetPath, bindOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureBindMount: %w", err)
 	}

@@ -12,7 +12,6 @@ const mainVolumeModule = "volume.json"
 
 type VolumeInfo struct {
 	ConnectorId   string                `json:"mount_id"`
-	TransportId   string                `json:"transport_id"`
 	VolumeContext map[string]string     `json:"volume_context"`
 	AddressIds    []string              `json:"address_ids"`
 	StorageType   string                `json:"storage_type"`

@@ -10,24 +10,18 @@ import (
 )
 
 type share struct {
-	tr   transport.Transport
-	cmds commands
-	gp   globalParams
+	tr transport.Transport
+	gp globalParams
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
 	return &share{
-		tr:   tr,
-		cmds: cmds,
-		gp:   gp,
+		tr: tr,
+		gp: gp,
 	}, nil
 }
 
@@ -45,7 +39,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("parse params: %w", err)
 	}
 
-	snip := newNfsSnippets(sh.tr, sh.cmds)
+	snip := newNfsSnippets(sh.tr)
 
 	mountPath, err := req.Volume.GetLocalPath(ctx)
 	if err != nil {
@@ -76,7 +70,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newNfsSnippets(sh.tr, sh.cmds)
+	snip := newNfsSnippets(sh.tr)
 
 	return snip.removeNfsShare(ctx, c.ExportsFile)
 }

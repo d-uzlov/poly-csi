@@ -12,22 +12,16 @@ import (
 type share struct {
 	tr   transport.Transport
 	gp   globalParams
-	cmds commands
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
 	return &share{
 		tr:   tr,
 		gp:   gp,
-		cmds: cmds,
 	}, nil
 }
 
@@ -40,7 +34,7 @@ func (sh *share) GetCapabilities() shares.Capabilities {
 }
 
 func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	if !sh.cmds.ready(ctx, sh.tr) {
+	if !testReady(ctx, sh.tr) {
 		return "", fmt.Errorf("targetcli is not ready")
 	}
 	p, err := parseParams(req.StaticParams, req.MutableParams)
@@ -59,7 +53,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	iqn := fmt.Sprintf("%s:%s", sh.gp.iqnBase, req.ShareId)
 
-	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr)
 
 	backstoreName := iqn
 	err = snip.configureBackstore(ctx, backstoreName, devicePath)
@@ -111,7 +105,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 }
 
 func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	if !sh.cmds.ready(ctx, sh.tr) {
+	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("targetcli is not ready")
 	}
 
@@ -120,7 +114,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr)
 
 	err = snip.deleteTarget(ctx, iscsiTargetConfig{
 		iqn: c.Iqn,

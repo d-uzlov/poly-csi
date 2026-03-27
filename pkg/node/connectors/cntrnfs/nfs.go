@@ -52,6 +52,9 @@ func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectReques
 	if err != nil {
 		return nil, err
 	}
+	if mi == nil {
+		return nil, fmt.Errorf("mount succeeded but fs info is nil")
+	}
 	if !strings.HasPrefix(mi.FsType, "nfs") {
 		return nil, fmt.Errorf("fs is already mounted with different fs type: %s != nfs, at mountpoint %s", mi.FsType, mi.MountPoint)
 	}

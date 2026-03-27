@@ -9,30 +9,11 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-type commands struct {
-	readyCmd []string
-	saveCmd  []string
-}
+var readyCmd = []string{"nvmet_ready"}
+var saveCmd = []string{"nvmet_save"}
 
-func parseCommands(src map[string][]string) (commands, error) {
-	saveCmd := src["nvmet_save"]
-	if len(saveCmd) == 0 {
-		return commands{}, fmt.Errorf("missing command 'nvmet_save'")
-	}
-	readyCmd := src["nvmet_ready"]
-
-	return commands{
-		saveCmd:  saveCmd,
-		readyCmd: readyCmd,
-	}, nil
-}
-
-func (c commands) ready(ctx context.Context, tr transport.Transport) bool {
-	if len(c.readyCmd) == 0 {
-		return true
-	}
-
-	runResult, err := tr.RunCommand(ctx, c.readyCmd)
+func testReady(ctx context.Context, tr transport.Transport) bool {
+	runResult, err := tr.RunCommand(ctx, readyCmd)
 	if err != nil {
 		return false
 	}
@@ -42,12 +23,8 @@ func (c commands) ready(ctx context.Context, tr transport.Transport) bool {
 	return true
 }
 
-func (c commands) save(ctx context.Context, tr transport.Transport) error {
-	if len(c.saveCmd) == 0 {
-		return fmt.Errorf("save command is not defined")
-	}
-
-	runResult, err := tr.RunCommand(ctx, c.saveCmd)
+func saveState(ctx context.Context, tr transport.Transport) error {
+	runResult, err := tr.RunCommand(ctx, saveCmd)
 	if err != nil {
 		return err
 	}

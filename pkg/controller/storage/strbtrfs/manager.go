@@ -16,12 +16,8 @@ type manager struct {
 	snip btrfs.Snippets
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
-	snip := btrfs.NewSnippets(tr, cmds.btrfsCmd)
+func New(tr transport.Transport, globalParams map[string]string) (storage.StorageManager, error) {
+	snip := btrfs.NewSnippets(tr)
 	return &manager{
 		tr:   tr,
 		snip: snip,

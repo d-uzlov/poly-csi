@@ -2,10 +2,7 @@ package cntrnvme
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"time"
 
 	"meoe.io/poly-csi/pkg/logs"
@@ -62,22 +59,21 @@ func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectReque
 	}
 
 	namespaceDevicePath := m.devFolder + "/" + namespaceDevice
-	deviceFound := false
-	for range 10 {
-		_, err = os.Stat(namespaceDevicePath)
-		if err == nil {
-			deviceFound = true
-			break
+	err = transport.Retry(time.Millisecond * 100, time.Second, func() error {
+		sr, err := m.tr.Cmds().Stat(ctx, namespaceDevicePath)
+		if err != nil {
+			return fmt.Errorf("failed to check namespaceDevicePath: %w", err)
 		}
-		logs.FromCtx(ctx).Warn("waiting for nvme device to show up", "device", namespaceDevicePath)
-		if errors.Is(err, fs.ErrNotExist) {
-			time.Sleep(time.Millisecond * 100)
-		} else {
-			return nil, fmt.Errorf("check device %s: %w", namespaceDevicePath, err)
+		if sr.FileExists {
+			return fmt.Errorf("file does not exist")
 		}
-	}
-	if !deviceFound {
-		return nil, fmt.Errorf("nvme device not found: %s", namespaceDevicePath)
+		if !sr.IsBlock() {
+			return fmt.Errorf("file is not a block device")
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("nvme device '%s' is not found: %w", namespaceDevicePath, err)
 	}
 
 	return &connectors.ConnectResult{

@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/shares/truenas"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/strzfszvol"
 	"meoe.io/poly-csi/pkg/transport"
@@ -15,22 +14,16 @@ import (
 type share struct {
 	tr   transport.Transport
 	gp   globalParams
-	cmds truenas.Commands
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
-	cmds, err := truenas.ParseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
 	return &share{
 		tr:   tr,
 		gp:   gp,
-		cmds: cmds,
 	}, nil
 }
 
@@ -56,7 +49,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	iqn := fmt.Sprintf("%s:%s", sh.gp.iqnBase, req.ShareId)
 
-	snip := newSnippets(sh.tr, sh.cmds.Midclt)
+	snip := newSnippets(sh.tr)
 
 	err = snip.setupTarget(ctx, tnIscsiRequest{
 		extentName: uuid.New().String(),
@@ -85,7 +78,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newSnippets(sh.tr, sh.cmds.Midclt)
+	snip := newSnippets(sh.tr)
 
 	err = snip.removeIscsiTarget(ctx, c.Iqn)
 	if err != nil {

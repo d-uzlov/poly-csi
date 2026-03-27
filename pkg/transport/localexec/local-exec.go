@@ -22,8 +22,9 @@ type Config struct {
 }
 
 type localExecWrapper struct {
-	isRoot bool
-	config Config
+	isRoot   bool
+	config   Config
+	commands map[string][]string
 }
 
 func New(config Config) transport.Transport {
@@ -52,6 +53,10 @@ func (s *localExecWrapper) SudoCmds() transport.Commands {
 	return executils.New(s, true)
 }
 
+func (s *localExecWrapper) SetCommands(commands map[string][]string) {
+	s.commands = commands
+}
+
 func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ...transport.ExecOption) (transport.CommandResult, error) {
 	if ctx.Err() != nil {
 		return transport.CommandResult{}, ctx.Err()
@@ -66,6 +71,15 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 	}
 	if options.Timeout == 0 {
 		options.Timeout = defaultTimeout
+	}
+
+	realCmd := s.commands[cmd[0]]
+	if len(realCmd) != 0 {
+		cmd = append(realCmd, cmd[1:]...)
+	}
+
+	if options.Sudo && !s.isRoot {
+		cmd = append([]string{"sudo"}, cmd...)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)

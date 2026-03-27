@@ -75,7 +75,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	case authTypeNqn:
 		authType = cntrnvme.AuthTypeNqn
 
-		cmd := append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
+		cmd := append(nvmetKeeperCmd, "host", "create", nvmet.Host{
 			Nqn:      hostNqn,
 			NeedAuth: false,
 		}.Json())
@@ -86,7 +86,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	case authTypeChapProvision:
 		authType = cntrnvme.AuthTypeDhChap
 
-		cmd := []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
+		cmd := []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
 		hostKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
@@ -94,7 +94,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		if hostKey == "" {
 			return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
 		}
-		cmd = []string{"sudo", "nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
+		cmd = []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
 		controllerKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
@@ -108,7 +108,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			ControllerKey: controllerKey,
 		}
 
-		cmd = append(sh.cmds.nvmetKeeperCmd, "host", "create", nvmet.Host{
+		cmd = append(nvmetKeeperCmd, "host", "create", nvmet.Host{
 			Nqn:           hostNqn,
 			NeedAuth:      true,
 			HostKey:       hostKey,
@@ -122,7 +122,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		}
 	}
 
-	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "allow", c.Nqn, hostNqn)
+	cmd := append(nvmetKeeperCmd, "subsys", "allow", c.Nqn, hostNqn)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("subsys allow: %w", err)
@@ -155,7 +155,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 		return fmt.Errorf("parse publish data: %w", err)
 	}
 
-	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "disallow", c.Nqn, pd.HostNqn)
+	cmd := append(nvmetKeeperCmd, "subsys", "disallow", c.Nqn, pd.HostNqn)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys disallow: %w", err)

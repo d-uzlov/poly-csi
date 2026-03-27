@@ -9,14 +9,14 @@ import (
 )
 
 func (s *Snippets) Send(ctx context.Context, sourceSnapshot string, targetFile string, timeout time.Duration) error {
-	cmd := append(s.zfsCmd,
+	cmd := append(zfsCmd,
 		"send",
 		"--large-block",
 		sourceSnapshot,
 	)
 	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdoutFile(targetFile), transport.WithTimeout(timeout))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("zfs send: %w", err)
 	}
 	if runResult.ExitCode != 0 {
 		return transport.FormatRunError(runResult)
@@ -25,13 +25,13 @@ func (s *Snippets) Send(ctx context.Context, sourceSnapshot string, targetFile s
 }
 
 func (s *Snippets) Receive(ctx context.Context, targetSnapshot string, sourceFile string, timeout time.Duration) error {
-	cmd := append(s.zfsCmd,
+	cmd := append(zfsCmd,
 		"receive",
 		targetSnapshot,
 	)
 	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("zfs receive: %w", err)
 	}
 	if runResult.ExitCode != 0 {
 		return transport.FormatRunError(runResult)

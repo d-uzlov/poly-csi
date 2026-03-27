@@ -29,7 +29,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
@@ -147,7 +147,7 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.Commands, mh.srv.Conf.GlobalParams)
+	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
@@ -159,17 +159,19 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 		}
 
 		// nothing to do if publish data is empty
-		if pds != "" {
-			err = shrInstance.Unpublish(ctx, mh.vi.ShareData, pds)
-			if err != nil {
-				return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
-			}
-			logger.Info("share.Unpublish: success")
+		if pds == "" {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
 
-			err = mh.wrapper.DeletePublishData(ctx, req.NodeId)
-			if err != nil {
-				return nil, fmt.Errorf("db: delete publish context: %w", err)
-			}
+		err = shrInstance.Unpublish(ctx, mh.vi.ShareData, pds)
+		if err != nil {
+			return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
+		}
+		logger.Info("share.Unpublish: success")
+
+		err = mh.wrapper.DeletePublishData(ctx, req.NodeId)
+		if err != nil {
+			return nil, fmt.Errorf("db: delete publish context: %w", err)
 		}
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}

@@ -20,18 +20,18 @@ const (
 	VolumeManagerLvmThick   = "lvm-thick"
 )
 
-func StorageFromType(tr transport.Transport, vmType string, commands map[string][]string, globalParams map[string]string) (storage.StorageManager, error) {
+func StorageFromType(tr transport.Transport, vmType string, globalParams map[string]string) (storage.StorageManager, error) {
 	switch vmType {
 	case VolumeManagerZfsDataset:
-		return strzfsdataset.New(tr, commands, globalParams)
+		return strzfsdataset.New(tr, globalParams)
 	case VolumeManagerZfsZvol:
-		return strzfszvol.New(tr, commands, globalParams)
+		return strzfszvol.New(tr, globalParams)
 	case VolumeManagerFolder:
-		return strfolder.New(tr, commands, globalParams), nil
+		return strfolder.New(tr, globalParams), nil
 	case VolumeManagerBtrfs:
-		return strbtrfs.New(tr, commands, globalParams)
+		return strbtrfs.New(tr, globalParams)
 	case VolumeManagerLvmThick:
-		return strlvm.New(tr, commands, globalParams)
+		return strlvm.New(tr, globalParams)
 	}
 	return nil, fmt.Errorf("unknown storage type: %s", vmType)
 }

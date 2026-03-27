@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/shares/truenas"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
@@ -13,18 +12,12 @@ import (
 )
 
 type share struct {
-	tr   transport.Transport
-	cmds truenas.Commands
+	tr transport.Transport
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
-	cmds, err := truenas.ParseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	return &share{
-		tr:   tr,
-		cmds: cmds,
+		tr: tr,
 	}, nil
 }
 
@@ -37,7 +30,7 @@ func (sh *share) GetCapabilities() shares.Capabilities {
 }
 
 func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	snip := newNfsSnippets(sh.tr, sh.cmds.Midclt)
+	snip := newNfsSnippets(sh.tr)
 
 	mountPath, err := req.Volume.GetLocalPath(ctx)
 	if err != nil {
@@ -87,7 +80,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := newNfsSnippets(sh.tr, sh.cmds.Midclt)
+	snip := newNfsSnippets(sh.tr)
 
 	return snip.removeNfsShare(ctx, c.Folder)
 }

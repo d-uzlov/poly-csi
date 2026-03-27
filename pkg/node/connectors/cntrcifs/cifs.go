@@ -59,6 +59,9 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	if err != nil {
 		return nil, err
 	}
+	if mi == nil {
+		return nil, fmt.Errorf("mount succeeded but fs info is nil")
+	}
 	if mi.FsType != "cifs" {
 		return nil, fmt.Errorf("fs is already mounted with different fs type: %s != cifs, at mountpoint %s", mi.FsType, mi.MountPoint)
 	}

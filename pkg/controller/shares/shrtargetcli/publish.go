@@ -50,7 +50,7 @@ func parsePublishData(serialized string) (publishData, error) {
 }
 
 func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	if !sh.cmds.ready(ctx, sh.tr) {
+	if !testReady(ctx, sh.tr) {
 		return nil, fmt.Errorf("targetcli is not ready")
 	}
 
@@ -85,7 +85,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		}, nil
 	}
 
-	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr)
 
 	err = snip.createClient(ctx, c.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
@@ -143,7 +143,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 }
 
 func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
-	if !sh.cmds.ready(ctx, sh.tr) {
+	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("targetcli is not ready")
 	}
 
@@ -156,7 +156,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 		return fmt.Errorf("parse publish data: %w", err)
 	}
 
-	snip := newTargetcliSnippets(sh.tr, sh.cmds.targetcliCmd)
+	snip := newTargetcliSnippets(sh.tr)
 
 	err = snip.deleteClientAcl(ctx, c.Iqn, pd.HostIqn)
 	if err != nil {

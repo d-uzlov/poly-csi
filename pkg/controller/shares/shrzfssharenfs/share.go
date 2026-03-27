@@ -15,17 +15,11 @@ import (
 
 type share struct {
 	tr   transport.Transport
-	cmds commands
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	return &share{
 		tr:   tr,
-		cmds: cmds,
 	}, nil
 }
 
@@ -53,7 +47,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("get local path: %w", err)
 	}
 
-	snip := zfs.NewSnippets(sh.tr, sh.cmds.zfsCmd)
+	snip := zfs.NewSnippets(sh.tr)
 
 	err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
 	if err != nil {
@@ -99,7 +93,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	snip := zfs.NewSnippets(sh.tr, sh.cmds.zfsCmd)
+	snip := zfs.NewSnippets(sh.tr)
 
 	return snip.SetShareNfs(ctx, c.Dataset, "off")
 }

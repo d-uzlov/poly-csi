@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Snippets) SetQuota(ctx context.Context, path string, quota int64) error {
-	cmd := append(s.btrfsCmd, "qgroup", "limit", fmt.Sprintf("%d", quota), path)
+	cmd := append(btrfsCmd, "qgroup", "limit", fmt.Sprintf("%d", quota), path)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", cmd, err)
@@ -19,7 +19,7 @@ func (s *Snippets) SetQuota(ctx context.Context, path string, quota int64) error
 }
 
 func (s *Snippets) GetQuotaInfo(ctx context.Context, path string) (*QuotaEntry, error) {
-	cmd := append(s.btrfsCmd, "--format=json", "qgroup", "show", path, "-f")
+	cmd := append(btrfsCmd, "--format=json", "qgroup", "show", path, "-f")
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", cmd, err)

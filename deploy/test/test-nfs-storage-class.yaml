@@ -16,8 +16,17 @@ parameters:
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nfs
   dispatch.addressNames: storage
+
   zfs.parentDataset: tulip/test-guid
+
+  init.on: controller
+  init.blockFormat: mkfs.ext4
+  init.ownerUser: '0'
+  init.ownerGroup: '10000'
+  init.rootDirMode: '777'
+
   nfs.shareOptions: rw,no_subtree_check,no_root_squash
+
   fsType: nfs4
 
 mountOptions:

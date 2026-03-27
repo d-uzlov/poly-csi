@@ -5,21 +5,6 @@ import (
 	"strings"
 )
 
-type commands struct {
-	btrfsCmd []string
-}
-
-func parseCommands(src map[string][]string) (commands, error) {
-	result := commands{}
-
-	result.btrfsCmd = src["btrfs"]
-	if len(result.btrfsCmd) == 0 {
-		result.btrfsCmd = []string{"sudo", "btrfs"}
-	}
-
-	return result, nil
-}
-
 type params struct {
 	parentPath    string
 	customOptions string

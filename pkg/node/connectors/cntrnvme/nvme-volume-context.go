@@ -76,9 +76,11 @@ func ParsePublishContext(public map[string]string, secret []byte) (PublicContext
 	}
 
 	var resSecret SecretContext
-	err = json.Unmarshal(secret, &resSecret)
-	if err != nil {
-		return PublicContext{}, SecretContext{}, fmt.Errorf("secret: %w", err)
+	if len(secret) != 0 {
+		err = json.Unmarshal(secret, &resSecret)
+		if err != nil {
+			return PublicContext{}, SecretContext{}, fmt.Errorf("secret: %w", err)
+		}
 	}
 
 	return resPublic, resSecret, nil

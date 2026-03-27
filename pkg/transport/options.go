@@ -3,6 +3,8 @@ package transport
 import "time"
 
 type ExecParams struct {
+	// Sudo requests transport to run command as root
+	Sudo bool
 	// StdinBytes sets command stdin from content.
 	StdinBytes []byte
 	// StdinFile uses file on the target machine as stdin for the command.
@@ -19,6 +21,13 @@ type ExecParams struct {
 }
 
 type ExecOption func(o *ExecParams)
+
+// see ExecParams.Sudo
+func WithSudo(value bool) ExecOption {
+	return func(o *ExecParams) {
+		o.Sudo = value
+	}
+}
 
 // WithStdinString is equivalent to WithStdinBytes([]byte(value))
 func WithStdinString(value string) ExecOption {

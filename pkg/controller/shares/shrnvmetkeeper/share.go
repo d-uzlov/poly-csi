@@ -12,22 +12,16 @@ import (
 
 type share struct {
 	tr   transport.Transport
-	cmds commandsConfig
 	gp   globalParams
 }
 
-func New(tr transport.Transport, commands map[string][]string, globalParams map[string]string) (shares.ShareManager, error) {
-	cmds, err := parseCommands(commands)
-	if err != nil {
-		return nil, fmt.Errorf("parse commands: %w", err)
-	}
+func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
 	return &share{
 		tr:   tr,
-		cmds: cmds,
 		gp:   gp,
 	}, nil
 }
@@ -58,7 +52,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		allowAnyHost = true
 	}
 
-	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
+	cmd := append(nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
 		Nqn:          nqn,
 		AllowAnyHost: allowAnyHost,
 	}.Json())
@@ -67,7 +61,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("subsys create: %w", err)
 	}
 
-	cmd = append(sh.cmds.nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
+	cmd = append(nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
 		Nqn:        nqn,
 		Nsid:       "1",
 		DevicePath: devicePath,
@@ -78,7 +72,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 		return "", fmt.Errorf("namespace create: %w", err)
 	}
 
-	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "attach", nqn, p.NvmetPortName)
+	cmd = append(nvmetKeeperCmd, "subsys", "attach", nqn, p.NvmetPortName)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return "", fmt.Errorf("subsys attach: %w", err)
@@ -105,13 +99,13 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 		return fmt.Errorf("parse share data: %w", err)
 	}
 
-	cmd := append(sh.cmds.nvmetKeeperCmd, "subsys", "detach", c.Nqn, c.Port)
+	cmd := append(nvmetKeeperCmd, "subsys", "detach", c.Nqn, c.Port)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys detach: %w", err)
 	}
 
-	cmd = append(sh.cmds.nvmetKeeperCmd, "subsys", "delete", c.Nqn)
+	cmd = append(nvmetKeeperCmd, "subsys", "delete", c.Nqn)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys delete: %w", err)

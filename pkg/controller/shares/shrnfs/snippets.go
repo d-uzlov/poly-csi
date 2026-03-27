@@ -21,13 +21,11 @@ type nfsClientOptions struct {
 
 type nfsSnippets struct {
 	tr   transport.Transport
-	cmds commands
 }
 
-func newNfsSnippets(tr transport.Transport, cmds commands) nfsSnippets {
+func newNfsSnippets(tr transport.Transport) nfsSnippets {
 	return nfsSnippets{
 		tr:   tr,
-		cmds: cmds,
 	}
 }
 
@@ -49,7 +47,7 @@ func (s nfsSnippets) configureNfsShare(ctx context.Context, share nfsShareConfig
 	if err != nil {
 		return "", fmt.Errorf("write '%s': %w", exportsFile, err)
 	}
-	err = transport.CheckedRun(ctx, s.tr, s.cmds.reloadCmd)
+	err = transport.CheckedRun(ctx, s.tr, nfsReloadCmd)
 	if err != nil {
 		return "", fmt.Errorf("nfs reload: %w", err)
 	}
@@ -61,7 +59,7 @@ func (s nfsSnippets) removeNfsShare(ctx context.Context, token string) error {
 	if err != nil {
 		return fmt.Errorf("remove '%s': %w", token, err)
 	}
-	err = transport.CheckedRun(ctx, s.tr, s.cmds.reloadCmd)
+	err = transport.CheckedRun(ctx, s.tr, nfsReloadCmd)
 	if err != nil {
 		return fmt.Errorf("nfs reload: %w", err)
 	}

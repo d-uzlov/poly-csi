@@ -57,7 +57,7 @@ func parseNum(value string) int64 {
 }
 
 func (s *Snippets) ListVgs(ctx context.Context, name string) ([]VgReport, error) {
-	cmd := append(s.lvmCmd, "vgs", "--reportformat=json", "--units=1b")
+	cmd := append(lvmCmd, "vgs", "--reportformat=json", "--units=1b")
 	if name != "" {
 		cmd = append(cmd, name)
 	}
@@ -77,7 +77,7 @@ func (s *Snippets) ListVgs(ctx context.Context, name string) ([]VgReport, error)
 }
 
 func (s *Snippets) ListLvs(ctx context.Context, vgName string, lvName string) ([]LvReport, error) {
-	cmd := append(s.lvmCmd, "lvs", "--reportformat=json", "--units=1b")
+	cmd := append(lvmCmd, "lvs", "--reportformat=json", "--units=1b")
 	if vgName != "" {
 		if lvName != "" {
 			cmd = append(cmd, s.MakeLvPath(vgName, lvName))
