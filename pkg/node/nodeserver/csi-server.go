@@ -7,9 +7,11 @@ import (
 	"os"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/logs"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/google/uuid"
 	slogctx "github.com/veqryn/slog-context"
 	"google.golang.org/grpc"
 	"meoe.io/poly-csi/pkg/node/nodedispatcher"
@@ -91,8 +93,12 @@ func (s *Server) GoListenAndServe(ctx context.Context, address string, doneCallb
 
 func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res any, err error) {
 	currentConfig := s.node.GetConfig()
-
 	logConfig := currentConfig.GetRpcLogConfig(info.FullMethod)
+
+	callUuid := uuid.NewString()
+	logConfig.ExtraFields["uuid"] = callUuid
+	ctx = uuidctx.NewCtx(ctx, callUuid)
+
 	logger := logConfig.MakeInstance()
 	defer func() {
 		logger.Commit(err == nil)

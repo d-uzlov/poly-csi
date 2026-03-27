@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -110,7 +110,7 @@ func (n *Init) RunFsWithTmpMount(ctx context.Context, cfg InitConfig, devicePath
 		return nil
 	}
 
-	tmpMount := fmt.Sprintf("/tmp/%s", uuid.NewString())
+	tmpMount := fmt.Sprintf("/tmp/%s", uuidctx.FromCtx(ctx))
 	err := n.tr.Cmds().Mkdir(ctx, tmpMount, false)
 	if err != nil {
 		return fmt.Errorf("mkdir for temp mount: %w", err)

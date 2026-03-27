@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/google/uuid"
+
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
+	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
 	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
@@ -144,13 +145,13 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		}, nil
 	}
 
-	uuidString := uuid.NewString()
+	callUuid := uuidctx.FromCtx(ctx)
 
 	success := false
 
 	storageId := req.Name
 	if dispatchParams.StorageIdTemplate != "" {
-		id, err := generateId("storageIdTemplate", dispatchParams.StorageIdTemplate, req.Name, uuidString, req.Parameters)
+		id, err := generateId("storageIdTemplate", dispatchParams.StorageIdTemplate, req.Name, callUuid, req.Parameters)
 		if err != nil {
 			return nil, fmt.Errorf("generate storage id: %w", err)
 		}
@@ -430,7 +431,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 	shareId := req.Name
 	if dispatchParams.ShareIdTemplate != "" {
-		id, err := generateId("shareIdTemplate", dispatchParams.ShareIdTemplate, req.Name, uuidString, req.Parameters)
+		id, err := generateId("shareIdTemplate", dispatchParams.ShareIdTemplate, req.Name, callUuid, req.Parameters)
 		if err != nil {
 			return nil, fmt.Errorf("generate share id: %w", err)
 		}
@@ -468,7 +469,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		StorageType: dispatchParams.StorageType,
 		ShareType:   dispatchParams.ShareType,
 		ConnectorId: dispatchParams.ConnectorId,
-		Uuid:        uuidString,
+		Uuid:        callUuid,
 	}
 	err = vc.Validate()
 	if err != nil {
@@ -489,7 +490,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("serialize storage volume: %w", err)
 	}
 
-	dbEntry, err := srv.dbInstance.CreateEntry(ctx, req.Name, uuidString)
+	dbEntry, err := srv.dbInstance.CreateEntry(ctx, req.Name, callUuid)
 	if err != nil {
 		return nil, fmt.Errorf("create db entry: %w", err)
 	}
