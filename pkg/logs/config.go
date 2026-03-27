@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	LogLevel        string            `yaml:"logLevel"`
+	EchoArgs        bool              `yaml:"echoArgs"`
 	EchoCommands    bool              `yaml:"echoCommands"`
 	ConfirmMicroOps bool              `yaml:"confirmMicroOps"`
 	SkipOnSuccess   bool              `yaml:"skipOnSuccess"`
@@ -38,6 +39,9 @@ func (c Config) Combine(another Config) Config {
 		result.LogLevel = another.LogLevel
 	}
 
+	if another.EchoArgs {
+		result.EchoArgs = another.EchoArgs
+	}
 	if another.EchoCommands {
 		result.EchoCommands = another.EchoCommands
 	}

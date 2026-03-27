@@ -107,6 +107,7 @@ func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInf
 	ctx = logs.NewCtx(ctx, logger)
 
 	logger.Info("GRPC request", "request", req)
+	logger.Args("created request logger", "config", logConfig)
 
 	resp, err := handler(ctx, req)
 	if err != nil {

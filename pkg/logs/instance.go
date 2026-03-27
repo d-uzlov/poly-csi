@@ -28,6 +28,7 @@ const (
 	requestInfo
 	requestWarn
 	requestError
+	requestArgs
 )
 
 type LogRequest struct {
@@ -86,11 +87,15 @@ func (c *Instance) request(req LogRequest) {
 
 func (c *Instance) executeRequest(req LogRequest) {
 	switch req.Action {
-	case requestSuccessMicroOp:
-		if c.config.EchoCommands {
+	case requestArgs:
+		if c.config.EchoArgs {
 			c.logger.Debug(req.Msg, req.Args...)
 		}
 	case requestCommand:
+		if c.config.EchoCommands {
+			c.logger.Debug(req.Msg, req.Args...)
+		}
+	case requestSuccessMicroOp:
 		if c.config.ConfirmMicroOps {
 			c.logger.Debug(req.Msg, req.Args...)
 		}
@@ -103,6 +108,14 @@ func (c *Instance) executeRequest(req LogRequest) {
 	default:
 		c.logger.Error(req.Msg, req.Args...)
 	}
+}
+
+func (c *Instance) Args(msg string, args ...any) {
+	c.request(LogRequest{
+		Action: requestArgs,
+		Msg:    msg,
+		Args:   args,
+	})
 }
 
 func (c *Instance) MicroOp(msg string, args ...any) {
