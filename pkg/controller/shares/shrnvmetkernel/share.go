@@ -12,8 +12,8 @@ import (
 )
 
 type share struct {
-	tr   transport.Transport
-	gp   globalParams
+	tr transport.Transport
+	gp globalParams
 }
 
 func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
@@ -22,8 +22,8 @@ func New(tr transport.Transport, globalParams map[string]string) (shares.ShareMa
 		return nil, fmt.Errorf("parse global params: %w", err)
 	}
 	return &share{
-		tr:   tr,
-		gp:   gp,
+		tr: tr,
+		gp: gp,
 	}, nil
 }
 
@@ -70,7 +70,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	if err != nil {
 		return "", fmt.Errorf("configure namespace: %w", err)
 	}
-	err = snip.AttachNqnToPort(nqn, "1")
+	err = snip.AttachSubsysToPort(nqn, "1")
 	if err != nil {
 		return "", fmt.Errorf("attach port: %w", err)
 	}

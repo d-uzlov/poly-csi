@@ -137,6 +137,10 @@ func (s Snippets) SetNamespaceEnabled(c Ns) (err error) {
 }
 
 func (s Snippets) ConfigureNamespace(c Ns) (err error) {
+	err = c.Validate()
+	if err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
 	existingNs, err := s.ReadNamespace(c.Nqn, c.Nsid)
 	if err != nil {
 		return fmt.Errorf("read nvme ns: %w", err)

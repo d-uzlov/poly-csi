@@ -26,24 +26,21 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if configFolder == "" {
-			configFolder = "/etc/nvmet_keeper"
-			fmt.Fprintln(os.Stderr, "config-folder is set to default value:", configFolder)
-		}
 		return nil
 	},
 }
 
 func init() {
-	// persistent flag available to all subcommands
-	rootCmd.PersistentFlags().StringVar(&configFolder, "config-folder", "", "path to config folder")
-	rootCmd.PersistentFlags().BoolVar(&useSudo, "use-sudo", false, "run commands with sudo")
+	// flags that should be available to all subcommands
+	rootCmd.PersistentFlags().StringVar(&configFolder, "config-folder", "/etc/nvmet_keeper", "path to config folder")
+	// users must invoke nvmet_keeper using sudo instead of requesting per-operation sudo
+	// rootCmd.PersistentFlags().BoolVar(&useSudo, "use-sudo", false, "run commands with sudo")
 
-	// register subcommands
 	rootCmd.AddCommand(portCmd)
 	rootCmd.AddCommand(subsysCmd)
 	rootCmd.AddCommand(namespaceCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(hostCmd)
 	rootCmd.AddCommand(stateCmd)
+	rootCmd.AddCommand(compareCmd)
 }

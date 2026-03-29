@@ -11,7 +11,7 @@ type Port struct {
 	AddressFamily string `json:"address_family"`
 	ListenAddr    string `json:"listen_addr"`
 	ListenPort    int    `json:"listen_port"`
-	Type          string `json:"type"`
+	TransportType string `json:"transport_type"`
 }
 
 func (c Port) Validate() error {
@@ -27,8 +27,8 @@ func (c Port) Validate() error {
 	if c.ListenPort == 0 {
 		return fmt.Errorf("listen_port is empty")
 	}
-	if c.Type == "" {
-		return fmt.Errorf("type is empty")
+	if c.TransportType == "" {
+		return fmt.Errorf("transport_type is empty")
 	}
 	return nil
 }
@@ -83,13 +83,17 @@ func (s Snippets) ReadPort(name string) (*Port, error) {
 		AddressFamily: string(addrFam),
 		ListenAddr:    string(listenAddr),
 		ListenPort:    listenPort,
-		Type:          string(transportType),
+		TransportType: string(transportType),
 	}, nil
 }
 
 func (s Snippets) ConfigurePort(c Port) error {
+	err := c.Validate()
+	if err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", c.Name)
-	err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
+	err = s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
 	}
@@ -110,9 +114,9 @@ func (s Snippets) ConfigurePort(c Port) error {
 		return fmt.Errorf("write %d to %s/addr_trsvcid (listening port): %w", c.ListenPort, path, err)
 	}
 	attrPath = fmt.Sprintf("%s/addr_trtype", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.Type))
+	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.TransportType))
 	if err != nil {
-		return fmt.Errorf("write '%s' to %s/addr_trtype: %w", c.Type, path, err)
+		return fmt.Errorf("write '%s' to %s/addr_trtype: %w", c.TransportType, path, err)
 	}
 	return nil
 }
@@ -127,7 +131,7 @@ func (s Snippets) ListPortAttachments(port string) ([]string, error) {
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) AttachNqnToPort(nqn string, nvmePort string) error {
+func (s Snippets) AttachSubsysToPort(nqn string, nvmePort string) error {
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", nqn)
 	link := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", nvmePort, nqn)
 	stat, err := s.tr.Cmds().Stat(s.ctx, link)

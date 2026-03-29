@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
@@ -85,6 +86,9 @@ func (k *ConfigStorage) listHosts(ctx context.Context) ([]nvmet.Host, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal '%s' as json: %w", v, err)
 		}
+		// value restoration for cases when older version saved corrupted config
+		host.HostKey = strings.TrimSpace(host.HostKey)
+		host.ControllerKey = strings.TrimSpace(host.ControllerKey)
 		hosts = append(hosts, host)
 	}
 	return hosts, nil
@@ -102,6 +106,13 @@ func (k *ConfigStorage) listSubsystems(ctx context.Context) ([]savedSubsys, erro
 	var subsystems []savedSubsys
 	for _, v := range subsystemsList {
 		path := fmt.Sprintf("%s/subsystems/%s/subsys.json", k.configFolder, v)
+		sr, err := cmds.Stat(ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("stat '%s': %w", path, err)
+		}
+		if !sr.FileExists {
+			continue
+		}
 		stdout, err := cmds.Read(ctx, path, false)
 		if err != nil {
 			return nil, fmt.Errorf("read '%s': %w", path, err)

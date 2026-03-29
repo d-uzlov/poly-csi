@@ -94,8 +94,12 @@ func (s Snippets) ReadSubsys(nqn string) (*Subsys, error) {
 }
 
 func (s Snippets) ConfigureSubsys(c Subsys) error {
+	err := c.Validate()
+	if err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", c.Nqn)
-	err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
+	err = s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
 	}

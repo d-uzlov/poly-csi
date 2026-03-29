@@ -3,6 +3,7 @@ package nvmet
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type Host struct {
@@ -53,12 +54,21 @@ func (c Host) Validate() error {
 	if c.Nqn == "" {
 		return fmt.Errorf("nqn is empty")
 	}
+	if c.Nqn != strings.TrimSpace(c.Nqn) {
+		return fmt.Errorf("nqn has spaces")
+	}
 	if c.NeedAuth {
 		if c.HostKey == "" {
 			return fmt.Errorf("host_key is empty")
 		}
+		if c.HostKey != strings.TrimSpace(c.HostKey) {
+			return fmt.Errorf("host_key has spaces")
+		}
 		if c.ControllerKey == "" {
 			return fmt.Errorf("controller_key is empty")
+		}
+		if c.ControllerKey != strings.TrimSpace(c.ControllerKey) {
+			return fmt.Errorf("controller_key has spaces")
 		}
 		if c.HashType == "" {
 			return fmt.Errorf("hash_type is empty")
@@ -125,9 +135,13 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
 	}
 	attrPath = fmt.Sprintf("%s/dhchap_dhgroup", path)
-	group, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
+	dhGroup, err := s.tr.Cmds().Read(s.ctx, attrPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", attrPath, err)
+	}
+	dhGroupS := string(dhGroup)
+	if dhGroupS == "null" {
+		dhGroupS = ""
 	}
 
 	needAuth := false
@@ -141,13 +155,17 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 		HostKey:       string(dhChapKey),
 		ControllerKey: string(dhChapControllerKey),
 		HashType:      string(hashType),
-		DhGroup:       string(group),
+		DhGroup:       dhGroupS,
 	}, nil
 }
 
 func (s Snippets) ConfigureHost(c Host) error {
+	err := c.Validate()
+	if err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", c.Nqn)
-	err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
+	err = s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
 	}
