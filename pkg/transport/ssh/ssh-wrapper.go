@@ -41,6 +41,7 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		ctx:      ctx,
 		config:   config,
 		sshLogId: fmt.Sprintf("%s@%s", config.Username, config.ServerAddress),
+		commands: transport.NewExecReplacement(map[string][]string{}),
 	}
 
 	result.logger = slogctx.FromCtx(ctx).With("ssh-target", result.sshLogId)

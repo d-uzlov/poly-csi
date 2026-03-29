@@ -33,6 +33,7 @@ func New(config Config) transport.Transport {
 	result := &localExecWrapper{
 		isRoot: isRoot,
 		config: config,
+		commands: transport.NewExecReplacement(map[string][]string{}),
 	}
 
 	return result
