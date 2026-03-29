@@ -16,7 +16,7 @@ func (s *Snippets) CreateZvol(ctx context.Context, path string, config ZvolConfi
 		"create", path,
 		"-V", fmt.Sprintf("%d", config.Size),
 	)
-	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists")
+	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists", transport.WithSudo(true))
 	if err != nil {
 		return false, fmt.Errorf("zfs create: %w", err)
 	}

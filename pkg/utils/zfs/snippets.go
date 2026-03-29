@@ -21,7 +21,7 @@ func NewSnippets(tr transport.Transport) Snippets {
 
 func (s *Snippets) DestroyDataset(ctx context.Context, path string) (recovered bool, err error) {
 	cmd := append(zfsCmd, "destroy", path)
-	recovered, err = transport.RelaxedRun(ctx, s.tr, cmd, "dataset does not exist")
+	recovered, err = transport.RelaxedRun(ctx, s.tr, cmd, "dataset does not exist", transport.WithSudo(true))
 	if err != nil {
 		return false, fmt.Errorf("zfs destroy: %w", err)
 	}

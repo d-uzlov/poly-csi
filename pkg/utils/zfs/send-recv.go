@@ -29,7 +29,7 @@ func (s *Snippets) Receive(ctx context.Context, targetSnapshot string, sourceFil
 		"receive",
 		targetSnapshot,
 	)
-	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithSudo(true), transport.WithStdinFile(sourceFile), transport.WithTimeout(timeout))
 	if err != nil {
 		return fmt.Errorf("zfs receive: %w", err)
 	}

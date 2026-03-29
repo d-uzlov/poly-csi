@@ -6,6 +6,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -41,6 +42,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	if err != nil {
 		return "", fmt.Errorf("parse params: %w", err)
 	}
+	logs.FromCtx(ctx).Args("args: nvmet share", "params", p)
 	err = p.validate()
 	if err != nil {
 		return "", fmt.Errorf("validate params: %w", err)
@@ -55,6 +57,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 
 	snip := newTargetcliSnippets(sh.tr)
 
+	// todo seems like backstore names should be short, not iqn
 	backstoreName := iqn
 	err = snip.configureBackstore(ctx, backstoreName, devicePath)
 	if err != nil {

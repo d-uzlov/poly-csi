@@ -155,14 +155,14 @@ func (n *Init) RunFs(ctx context.Context, cfg InitConfig, fsPath string) error {
 		cmd = []string{"chgrp", cfg.OwnerGroup, fsPath}
 	}
 	if len(cmd) != 0 {
-		err = transport.CheckedRun(ctx, n.tr, cmd)
+		err = transport.CheckedRun(ctx, n.tr, cmd, transport.WithSudo(true))
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd[0], err)
 		}
 	}
 
 	cmd = []string{"chmod", cfg.RootDirMode, fsPath}
-	err = transport.CheckedRun(ctx, n.tr, cmd)
+	err = transport.CheckedRun(ctx, n.tr, cmd, transport.WithSudo(true))
 	if err != nil {
 		return fmt.Errorf("chmod: %w", err)
 	}

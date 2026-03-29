@@ -22,7 +22,7 @@ func (s *Snippets) CreateDataset(ctx context.Context, path string, config Datase
 		"-o", fmt.Sprintf("reservation=%d", config.Reservation),
 		"-o", fmt.Sprintf("refreservation=%d", config.RefReservation),
 	)
-	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists")
+	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists", transport.WithSudo(true))
 	if err != nil {
 		return false, fmt.Errorf("zfs create: %w", err)
 	}

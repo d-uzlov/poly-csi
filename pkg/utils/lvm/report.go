@@ -61,9 +61,9 @@ func (s *Snippets) ListVgs(ctx context.Context, name string) ([]VgReport, error)
 	if name != "" {
 		cmd = append(cmd, name)
 	}
-	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd, transport.WithSudo(true))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("list vgs: %w", err)
 	}
 	var rc ReportContainer
 	err = json.Unmarshal([]byte(stdout), &rc)
@@ -85,9 +85,9 @@ func (s *Snippets) ListLvs(ctx context.Context, vgName string, lvName string) ([
 			cmd = append(cmd, vgName)
 		}
 	}
-	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
+	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd, transport.WithSudo(true))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("list lvs: %w", err)
 	}
 	var rc ReportContainer
 	err = json.Unmarshal([]byte(stdout), &rc)

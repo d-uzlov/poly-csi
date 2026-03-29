@@ -30,8 +30,10 @@ type FsInfo struct {
 
 func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, error) {
 	// can't use '-o json' here because busybox does not support it
-	cmd := []string{"blkid", devicePath}
-	runResult, err := s.tr.RunCommand(ctx, cmd)
+	// on blkid from util-linux '--probe' disables cache
+	// on busybox '--probe' is ignored, but cache is never used
+	cmd := []string{"blkid", "--probe", devicePath}
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithSudo(true))
 	if err != nil {
 		return nil, fmt.Errorf("blkid failed: %w", err)
 	}
@@ -108,21 +110,6 @@ func (s *FsSnippets) EnsureMounted(ctx context.Context, sourcePath string, targe
 	}
 	// mi can be nil, it's up to caller to check for it
 	return mi, nil
-}
-
-func (s *FsSnippets) FormatFs(ctx context.Context, devicePath string, fsType string, formatOptions []string) error {
-	switch fsType {
-	// TODO more filesystem options
-	case "ext4":
-		// TODO use format options
-		cmd := []string{"mkfs.ext4", devicePath}
-		err := transport.CheckedRun(ctx, s.tr, cmd)
-		if err != nil {
-			return fmt.Errorf("format: %w", err)
-		}
-		return nil
-	}
-	return fmt.Errorf("filesystem %s is not supported", fsType)
 }
 
 func (s *FsSnippets) findBlockDevice(ctx context.Context, minMaj string) (string, error) {
@@ -215,7 +202,7 @@ func (s *FsSnippets) EnsureBindMount(ctx context.Context, sourcePath string, tar
 	if idMap != "" {
 		cmd = append(cmd, "-o", "X-mount.idmap="+idMap)
 	}
-	err = transport.CheckedRun(ctx, s.tr, cmd)
+	err = transport.CheckedRun(ctx, s.tr, cmd, transport.WithSudo(true))
 	if err != nil {
 		return fmt.Errorf("mount: %w", err)
 	}
@@ -238,7 +225,7 @@ func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 	// -f      Force umount (i.e., unreachable NFS server)
 	// can't use proper full-word options because busybox does not support them
 	cmd := []string{"umount", "-r", targetPath}
-	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithSudo(true), transport.WithTimeout(time.Second))
 	if err != nil {
 		return fmt.Errorf("unmount 1: %w", err)
 	}
@@ -248,7 +235,7 @@ func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 
 	logs.FromCtx(ctx).Warn("umount failed, will try 'umount --force'", "error", transport.FormatRunError(runResult))
 	cmd = []string{"umount", "-r", "-f", targetPath}
-	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
+	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithSudo(true), transport.WithTimeout(time.Second))
 	if err != nil {
 		return fmt.Errorf("unmount 2: %w", err)
 	}
@@ -258,7 +245,7 @@ func (s *FsSnippets) Unmount(ctx context.Context, targetPath string) error {
 
 	logs.FromCtx(ctx).Warn("umount --force failed, will try 'umount --force --lazy'", "error", transport.FormatRunError(runResult))
 	cmd = []string{"umount", "-r", "-f", "-l", targetPath}
-	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithTimeout(time.Second))
+	runResult, err = s.tr.RunCommand(ctx, cmd, transport.WithSudo(true), transport.WithTimeout(time.Second))
 	if err != nil {
 		return fmt.Errorf("unmount 3: %w", err)
 	}

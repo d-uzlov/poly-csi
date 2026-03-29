@@ -6,6 +6,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -42,6 +43,7 @@ func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest)
 	if err != nil {
 		return "", fmt.Errorf("parse params: %w", err)
 	}
+	logs.FromCtx(ctx).Args("args: nvmet share", "params", p)
 
 	devicePath, err := req.Volume.GetLocalPath(ctx)
 	if err != nil {
