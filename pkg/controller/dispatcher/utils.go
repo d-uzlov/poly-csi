@@ -116,7 +116,7 @@ func (d *Dispatcher) getSnapshotHandle(ctx context.Context, snapshotId string) (
 		return nil, fmt.Errorf("server[id=%s].db: get entry: %w", srvId, err)
 	}
 	if dbEntry == nil {
-		return nil, nil
+		return &snapshotManagementHandle{}, nil
 	}
 	wrapper := voldbwrapper.New(dbEntry)
 	si, err := wrapper.GetSnapshot(ctx, snapshotName)
