@@ -22,12 +22,12 @@ func (s *sshWrapper) SudoCmds() transport.Commands {
 	return executils.New(s, true)
 }
 
-func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...transport.ExecOption) (transport.CommandResult, error) {
+func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...transport.ExecOption) (transport.RunResult, error) {
 	if ctx.Err() != nil {
-		return transport.CommandResult{}, ctx.Err()
+		return transport.RunResult{}, ctx.Err()
 	}
 	if len(cmd) == 0 {
-		return transport.CommandResult{}, fmt.Errorf("cmd is empty")
+		return transport.RunResult{}, fmt.Errorf("cmd is empty")
 	}
 
 	options := transport.ExecParams{}
@@ -38,14 +38,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 		options.Timeout = defaultTimeout
 	}
 
-	realCmd := s.commands[cmd[0]]
-	if len(realCmd) != 0 {
-		cmd = append(realCmd, cmd[1:]...)
-	}
-
-	if options.Sudo {
-		cmd = append([]string{"sudo"}, cmd...)
-	}
+	cmd = append(s.commands.Lookup(cmd[0], options.Sudo), cmd[1:]...)
 
 	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
@@ -55,7 +48,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 
 	client := s.GetClient()
 	if client == nil {
-		return transport.CommandResult{}, fmt.Errorf("ssh client is not initialized")
+		return transport.RunResult{}, fmt.Errorf("ssh client is not initialized")
 	}
 	session, err := client.NewSession()
 	if err != nil {
@@ -64,7 +57,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 			// client should be automatically recreated by the background thread
 			go client.Close()
 		}
-		return transport.CommandResult{}, fmt.Errorf("create ssh session: %w", err)
+		return transport.RunResult{}, fmt.Errorf("create ssh session: %w", err)
 	}
 	defer session.Close()
 
@@ -89,7 +82,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 
 	err = session.Start(cmdString)
 	if err != nil {
-		return transport.CommandResult{}, fmt.Errorf("start process: %w", err)
+		return transport.RunResult{}, fmt.Errorf("start process: %w", err)
 	}
 
 	// adding a buffer of size 1 to be able to send without blocking even if main thread stopped reading
@@ -103,10 +96,10 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 	case <-ctx.Done():
 		_ = session.Signal(ssh.SIGTERM)
 		// TODO do we need to wait until command actually finishes?
-		return transport.CommandResult{}, ctx.Err()
+		return transport.RunResult{}, ctx.Err()
 	case err := <-commandDoneCh:
 		if err == nil {
-			return transport.CommandResult{
+			return transport.RunResult{
 				Stdout:   stdoutBuf.Bytes(),
 				Stderr:   stderrBuf.Bytes(),
 				ExitCode: 0,
@@ -115,7 +108,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 
 		var exitErr *ssh.ExitError
 		if ok := errors.As(err, &exitErr); ok {
-			return transport.CommandResult{
+			return transport.RunResult{
 				Stdout:   stdoutBuf.Bytes(),
 				Stderr:   stderrBuf.Bytes(),
 				ExitCode: exitErr.ExitStatus(),
@@ -126,6 +119,6 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 			go client.Close()
 		}
 
-		return transport.CommandResult{}, fmt.Errorf("run: %w", err)
+		return transport.RunResult{}, fmt.Errorf("run: %w", err)
 	}
 }

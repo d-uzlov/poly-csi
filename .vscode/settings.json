@@ -3,6 +3,7 @@
     "addr_adrfam",
     "addr_trtype",
     "addropt",
+    "alpanum",
     "authmethod",
     "automaxprocs",
     "backstore",

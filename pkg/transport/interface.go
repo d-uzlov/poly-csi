@@ -11,17 +11,17 @@ type Transport interface {
 	Cleanup()
 	// SetCommands sets command overrides
 	// It's not thread-safe.
-	SetCommands(commands map[string][]string)
+	SetCommands(commands *ExecReplacement)
 	// RunCommand runs specified command to completion
 	// Safe to run in parallel.
-	RunCommand(ctx context.Context, cmd []string, opts ...ExecOption) (CommandResult, error)
+	RunCommand(ctx context.Context, cmd []string, opts ...ExecOption) (RunResult, error)
 	// Cmds creates Commands object with optimized common commands
 	// Safe to run in parallel.
 	Cmds() Commands
 	SudoCmds() Commands
 }
 
-type CommandResult struct {
+type RunResult struct {
 	Stdout   []byte
 	Stderr   []byte
 	ExitCode int
@@ -78,7 +78,6 @@ type FsSizeInfo struct {
 }
 
 func (r StatResult) IsDirectory() bool { return r.Type == FtDirectory }
-
-func (r StatResult) IsBlock() bool { return r.Type == FtBlock }
-func (r StatResult) IsFile() bool  { return r.Type == FtFile }
-func (r StatResult) IsFifo() bool  { return r.Type == FtFifo }
+func (r StatResult) IsBlock() bool     { return r.Type == FtBlock }
+func (r StatResult) IsFile() bool      { return r.Type == FtFile }
+func (r StatResult) IsFifo() bool      { return r.Type == FtFifo }

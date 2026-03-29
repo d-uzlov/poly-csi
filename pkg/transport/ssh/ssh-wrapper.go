@@ -29,7 +29,7 @@ type sshWrapper struct {
 	client          *ssh.Client
 	sshLogId        string
 	logger          *slog.Logger
-	commands        map[string][]string
+	commands        *transport.ExecReplacement
 }
 
 func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
@@ -121,7 +121,7 @@ func (s *sshWrapper) watchClient(ctx context.Context) {
 	s.logger.Debug("context cancelled, stopping ssh watcher")
 }
 
-func (s *sshWrapper) SetCommands(commands map[string][]string) {
+func (s *sshWrapper) SetCommands(commands *transport.ExecReplacement) {
 	s.commands = commands
 }
 

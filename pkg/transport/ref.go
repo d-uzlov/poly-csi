@@ -49,7 +49,7 @@ func RelaxedRun(ctx context.Context, tr Transport, cmd []string, allowStderr str
 }
 
 // FormatRunError creates a human-readable error from CommandResult
-func FormatRunError(r CommandResult) error {
+func FormatRunError(r RunResult) error {
 	if len(r.Stderr) != 0 {
 		stderr := strings.TrimSpace(string(r.Stderr))
 		return fmt.Errorf("exit code %d: stderr: %s", r.ExitCode, stderr)

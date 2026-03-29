@@ -53,11 +53,14 @@ type ServerConfig struct {
 	AddressList  []AddressOption     `yaml:"addressList"`
 }
 
+const alpanumDashRegex = `^[-a-zA-Z0-9]*$`
+const alpanumRegex = `^[a-zA-Z0-9]*$`
+
 func (c *ServerConfig) Validate() (errorList []string, warningList []string) {
 	if c.Name == "" {
 		errorList = append(errorList, "name: field is empty")
 	}
-	if ok := regexp.MustCompile(`^[-a-zA-Z0-9]*$`).MatchString(c.Name); !ok {
+	if ok := regexp.MustCompile(alpanumDashRegex).MatchString(c.Name); !ok {
 		errorList = append(errorList, "name: field must contain only alphanumeric symbols or '-'")
 	}
 	if c.StableId == "" {
@@ -66,7 +69,7 @@ func (c *ServerConfig) Validate() (errorList []string, warningList []string) {
 	if len(c.StableId) != 10 {
 		errorList = append(errorList, "stableId: field length is not 10")
 	}
-	if ok := regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(c.StableId); !ok {
+	if ok := regexp.MustCompile(alpanumRegex).MatchString(c.StableId); !ok {
 		errorList = append(errorList, "stableId: field must contain only alphanumeric symbols")
 	}
 	if c.ExecType == "" {
@@ -88,7 +91,7 @@ func (c *AddressOption) Validate() (errorList []string, warningList []string) {
 	if c.Name == "" {
 		errorList = append(errorList, "name: field is empty")
 	}
-	if ok := regexp.MustCompile(`^[-a-zA-Z0-9]*$`).MatchString(c.Name); !ok {
+	if ok := regexp.MustCompile(alpanumDashRegex).MatchString(c.Name); !ok {
 		errorList = append(errorList, "name: field must contain only alphanumeric symbols or '-'")
 	}
 	if c.StableId == "" {
@@ -97,7 +100,7 @@ func (c *AddressOption) Validate() (errorList []string, warningList []string) {
 	if len(c.StableId) != 10 {
 		errorList = append(errorList, "stableId: field length is not 10")
 	}
-	if ok := regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(c.StableId); !ok {
+	if ok := regexp.MustCompile(alpanumRegex).MatchString(c.StableId); !ok {
 		errorList = append(errorList, "stableId: field must contain only alphanumeric symbols")
 	}
 	if c.Address == "" {
