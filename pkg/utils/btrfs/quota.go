@@ -11,9 +11,9 @@ import (
 
 func (s *Snippets) SetQuota(ctx context.Context, path string, quota int64) error {
 	cmd := append(btrfsCmd, "qgroup", "limit", fmt.Sprintf("%d", quota), path)
-	err := transport.CheckedRun(ctx, s.tr, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd, transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return err
 	}
 	return nil
 }
@@ -22,7 +22,7 @@ func (s *Snippets) GetQuotaInfo(ctx context.Context, path string) (*QuotaEntry, 
 	cmd := append(btrfsCmd, "--format=json", "qgroup", "show", path, "-f")
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("show quota: %w", err)
 	}
 
 	var result BtrfsJsonResult

@@ -2,7 +2,6 @@ package btrfs
 
 import (
 	"context"
-	"fmt"
 
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -18,7 +17,7 @@ func (s *Snippets) FilesystemUsage(ctx context.Context, path string) error {
 	cmd := append(btrfsCmd, "--format=json", "filesystem", "df", path)
 	err := transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return err
 	}
 	return nil
 }

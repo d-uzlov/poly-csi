@@ -137,6 +137,8 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 	if err != nil {
 		return nil, fmt.Errorf("btrfs receive: %w", err)
 	}
+	
+	receivedVolPath := containerPath+"/"+volumeName
 
 	vol := newVolume(containerPath, m.snip)
 
@@ -145,26 +147,30 @@ func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.Cr
 		if success {
 			return
 		}
+		if receivedVolPath != vol.getMainVolume() {
+			_, err := m.snip.SubvolumeDelete(ctx, receivedVolPath)
+			if err != nil {
+				logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
+			} else {
+				logs.FromCtx(ctx).MicroOp("deleted received subvol")
+			}
+		}
 		err = vol.Delete(ctx)
 		if err != nil {
 			logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
 		} else {
-			logs.FromCtx(ctx).Info("deleted received subvol")
-		}
-		if containerPath+"/"+volumeName != vol.getMainVolume() {
-			_, err := m.snip.SubvolumeDelete(ctx, containerPath+"/"+volumeName)
-			if err != nil {
-				logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
-			} else {
-				logs.FromCtx(ctx).Info("deleted received subvol")
-			}
+			logs.FromCtx(ctx).MicroOp("deleted received subvol")
 		}
 	}()
 
-	if containerPath+"/"+volumeName != vol.getMainVolume() {
-		err = m.tr.SudoCmds().Move(ctx, containerPath+"/"+volumeName, vol.getMainVolume())
+	if receivedVolPath != vol.getMainVolume() {
+		err = m.snip.SubvolumeClone(ctx, receivedVolPath, vol.getMainVolume())
 		if err != nil {
-			return nil, fmt.Errorf("move received dataset: %w", err)
+			return nil, fmt.Errorf("clone received subvol: %w", err)
+		}
+		_, err = m.snip.SubvolumeDelete(ctx, receivedVolPath)
+		if err != nil {
+			return nil, fmt.Errorf("delete received subvol: %w", err)
 		}
 	}
 
