@@ -16,38 +16,39 @@ type targetcliSnippets struct {
 
 func newTargetcliSnippets(tr transport.Transport) targetcliSnippets {
 	return targetcliSnippets{
-		tr:           tr,
+		tr: tr,
 	}
 }
 
 func (s targetcliSnippets) save(ctx context.Context) error {
 	cmd := append(targetcliCmd, "/", "saveconfig")
-	err := transport.CheckedRun(ctx, s.tr, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd, transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		// no need for annotations
+		return err
 	}
 	return nil
 }
 
 func (s targetcliSnippets) configureBackstore(ctx context.Context, name string, device string) error {
 	cmd := append(targetcliCmd, "/backstores/block", "create", name, device)
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "Storage object block/test-zvol exists")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "Storage object block/test-zvol exists", transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("create backstore '%s' for '%s': %w", name, device, err)
 	}
-	cmd = append(targetcliCmd, "/backstores/block/"+name, "set", "attribute", "emulate_tpu=1")
-	err = transport.CheckedRun(ctx, s.tr, cmd)
+	err = s.setAttribute(ctx, "/backstores/block/"+name, "attribute", "emulate_tpu", "1")
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		// no need for annotations
+		return err
 	}
 	return nil
 }
 
 func (s targetcliSnippets) deleteBackstore(ctx context.Context, name string) error {
 	cmd := append(targetcliCmd, "/backstores/block", "delete", name)
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "No storage object named")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "No storage object named", transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("delete backstore '%s': %w", name, err)
 	}
 	return nil
 }
@@ -57,14 +58,11 @@ type iscsiTargetConfig struct {
 	backstoreName string
 	auth          bool
 	demo          bool
-	// user/pass should be set per-client, not on target. Delete?
-	user string
-	pass string
 }
 
 func (s targetcliSnippets) readAttribute(ctx context.Context, path string, group string, name string) (string, error) {
 	cmd := append(targetcliCmd, path, "get", group, name)
-	runResult, err := s.tr.RunCommand(ctx, cmd)
+	runResult, err := s.tr.RunCommand(ctx, cmd, transport.WithSudo(true))
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +71,7 @@ func (s targetcliSnippets) readAttribute(ctx context.Context, path string, group
 			return "", nil
 		}
 		err = transport.FormatRunError(runResult)
-		return "", fmt.Errorf("%s: %w", cmd, err)
+		return "", fmt.Errorf("read %s/%s at '%s': %w", group, name, path, err)
 	}
 
 	value, hasPrefix := strings.CutPrefix(strings.TrimSpace(string(runResult.Stdout)), name+"=")
@@ -83,72 +81,67 @@ func (s targetcliSnippets) readAttribute(ctx context.Context, path string, group
 	return value, nil
 }
 
+func (s targetcliSnippets) setAttribute(ctx context.Context, path string, group string, name string, value string) error {
+	cmd := append(targetcliCmd, path, "set", group, fmt.Sprintf("%s=%s", name, value))
+	err := transport.CheckedRun(ctx, s.tr, cmd, transport.WithSudo(true))
+	if err != nil {
+		return fmt.Errorf("set %s/%s='%s' at '%s': %w", group, name, value, path, err)
+	}
+	return nil
+}
+
+func (s targetcliSnippets) setAttributes(ctx context.Context, path string, group string, values map[string]string) error {
+	for k, v := range values {
+		err := s.setAttribute(ctx, path, group, k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s targetcliSnippets) configureTarget(ctx context.Context, subsysConfig iscsiTargetConfig) error {
 	cmd := append(targetcliCmd, "/iscsi", "create", subsysConfig.iqn)
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "This Target already exists in configFS")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "This Target already exists in configFS", transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("create target '%s': %w", subsysConfig.iqn, err)
 	}
 
-	auth := "0"
+	tpgAttributes := map[string]string{
+		"authentication":          "0",
+		"generate_node_acls":      "0",
+		"demo_mode_write_protect": "0",
+		"cache_dynamic_acls":      "1",
+	}
+
 	if subsysConfig.auth {
-		auth = "1"
+		tpgAttributes["authentication"] = "1"
+	}
+	if subsysConfig.demo {
+		tpgAttributes["generate_node_acls"] = "1"
 	}
 
 	tpgPath := fmt.Sprintf("/iscsi/%s/tpg1", subsysConfig.iqn)
-	cmd = append(targetcliCmd, tpgPath, "set", "attribute", "authentication="+auth)
-	err = transport.CheckedRun(ctx, s.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
-	}
 
-	generateAcls := "0"
-	if subsysConfig.demo {
-		generateAcls = "1"
-	}
-	cmd = append(targetcliCmd, tpgPath, "set", "attribute", "generate_node_acls="+generateAcls)
-	err = transport.CheckedRun(ctx, s.tr, cmd)
+	err = s.setAttributes(ctx, tpgPath, "attribute", tpgAttributes)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
-	}
-	cmd = append(targetcliCmd, tpgPath, "set", "attribute", "demo_mode_write_protect=0")
-	err = transport.CheckedRun(ctx, s.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
-	}
-	cmd = append(targetcliCmd, tpgPath, "set", "attribute", "cache_dynamic_acls=1")
-	err = transport.CheckedRun(ctx, s.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("configure tpg attributes: %w", err)
 	}
 
 	cmd = append(targetcliCmd, tpgPath+"/luns", "create", "/backstores/block/"+subsysConfig.backstoreName)
-	_, err = transport.RelaxedRun(ctx, s.tr, cmd, "already exists")
+	_, err = transport.RelaxedRun(ctx, s.tr, cmd, "already exists", transport.WithSudo(true))
 	if err != nil {
-		return err
-	}
-
-	if subsysConfig.user != "" && subsysConfig.pass != "" {
-		cmd = append(targetcliCmd, tpgPath, "set", "auth", "userid="+subsysConfig.user)
-		err = transport.CheckedRun(ctx, s.tr, cmd)
-		if err != nil {
-			return fmt.Errorf("%s '/iscsi/%s/tpg1' set auth userid: %w", targetcliCmd, subsysConfig.iqn, err)
-		}
-		cmd = append(targetcliCmd, tpgPath, "set", "auth", "password="+subsysConfig.pass)
-		err = transport.CheckedRun(ctx, s.tr, cmd)
-		if err != nil {
-			return fmt.Errorf("%s '/iscsi/%s/tpg1' set auth password: %w", targetcliCmd, subsysConfig.iqn, err)
-		}
+		return fmt.Errorf("connect backstore '%s' to '%s': %w", subsysConfig.backstoreName, tpgPath, err)
 	}
 
 	return nil
 }
 
-func (s targetcliSnippets) deleteTarget(ctx context.Context, subsysConfig iscsiTargetConfig) error {
-	cmd := append(targetcliCmd, "/iscsi", "delete", subsysConfig.iqn)
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "No such Target in configfs")
+func (s targetcliSnippets) deleteTarget(ctx context.Context, iqn string) error {
+	cmd := append(targetcliCmd, "/iscsi", "delete", iqn)
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "No such Target in configfs", transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("delete target '%s': %w", iqn, err)
 	}
 	return nil
 }
@@ -200,44 +193,37 @@ func (s targetcliSnippets) readClientAcl(ctx context.Context, targetIqn string, 
 
 func (s targetcliSnippets) createClient(ctx context.Context, targetIqn string, clientIqn string) error {
 	cmd := append(targetcliCmd, fmt.Sprintf("/iscsi/%s/tpg1/acls", targetIqn), "create", clientIqn)
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "This NodeACL already exists in configFS")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "This NodeACL already exists in configFS", transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("create client: %w", err)
 	}
 	return nil
 }
 
 func (s targetcliSnippets) setupClientAcl(ctx context.Context, targetIqn string, clientIqn string, acl chapAcl) error {
 	path := fmt.Sprintf("/iscsi/%s/tpg1/acls/%s", targetIqn, clientIqn)
-	cmd := append(targetcliCmd, path, "set", "auth", "userid="+acl.userId)
-	err := transport.CheckedRun(ctx, s.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s '%s' set auth userid: %w", targetcliCmd, path, err)
+
+	attributes := map[string]string{
+		"userid":          acl.userId,
+		"password":        acl.password,
+		"mutual_userid":   acl.mutualUserId,
+		"mutual_password": acl.mutualPassword,
 	}
-	cmd = append(targetcliCmd, path, "set", "auth", "password="+acl.password)
-	err = transport.CheckedRun(ctx, s.tr, cmd)
+	
+	err := s.setAttributes(ctx, path, "attribute", attributes)
 	if err != nil {
-		return fmt.Errorf("%s '%s' set auth password: %w", targetcliCmd, path, err)
+		return fmt.Errorf("configure attributes: %w", err)
 	}
-	cmd = append(targetcliCmd, path, "set", "auth", "mutual_userid="+acl.mutualUserId)
-	err = transport.CheckedRun(ctx, s.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s '%s' set auth mutual_userid: %w", targetcliCmd, path, err)
-	}
-	cmd = append(targetcliCmd, path, "set", "auth", "mutual_password="+acl.mutualPassword)
-	err = transport.CheckedRun(ctx, s.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("%s '%s' set auth mutual_password: %w", targetcliCmd, path, err)
-	}
+
 	return nil
 }
 
 func (s targetcliSnippets) deleteClientAcl(ctx context.Context, targetIqn string, clientIqn string) error {
 	path := fmt.Sprintf("/iscsi/%s/tpg1/acls", targetIqn)
 	cmd := append(targetcliCmd, path, "delete", clientIqn)
-	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "No such NodeACL in configfs")
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "No such NodeACL in configfs", transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("delete client '%s' at '%s': %w", clientIqn, targetIqn, err)
 	}
 	return nil
 }

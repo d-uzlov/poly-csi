@@ -116,9 +116,7 @@ func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
 
 	snip := newTargetcliSnippets(sh.tr)
 
-	err = snip.deleteTarget(ctx, iscsiTargetConfig{
-		iqn: c.Iqn,
-	})
+	err = snip.deleteTarget(ctx, c.Iqn)
 	if err != nil {
 		return fmt.Errorf("delete target: %w", err)
 	}
