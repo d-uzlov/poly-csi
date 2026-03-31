@@ -43,7 +43,7 @@ func (s *FsSnippets) FindMount(ctx context.Context, mountedPath string) (*MountI
 	return nil, nil
 }
 
-func parseMountinfoLine(line string) (MountInfo, error) {
+func ParseMountinfoLine(line string) (MountInfo, error) {
 	fields := strings.Fields(line)
 	if len(fields) < 6 {
 		return MountInfo{}, fmt.Errorf("less than 6 fields")
@@ -66,9 +66,10 @@ func parseMountinfoLine(line string) (MountInfo, error) {
 	}
 	i := 6
 	for i < len(fields) {
-		if fields[i] != "-" {
+		if fields[i] == "-" {
 			break
 		}
+		i++
 	}
 	i++
 	if len(fields)-i < 3 {
@@ -87,7 +88,7 @@ func parseMountinfoFile(content string, mountPointFilter string) ([]MountInfo, e
 		if line == "" {
 			continue
 		}
-		info, err := parseMountinfoLine(line)
+		info, err := ParseMountinfoLine(line)
 		if err != nil {
 			return nil, fmt.Errorf("parse '%v': %w", line, err)
 		}
