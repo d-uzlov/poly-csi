@@ -226,12 +226,15 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (string, err
 	return resolvedFile, nil
 }
 
-func (s *nativeCommands) Stat(ctx context.Context, path string) (transport.StatResult, error) {
+func (s *nativeCommands) Stat(ctx context.Context, path string) (result transport.StatResult, err error) {
 	if ctx.Err() != nil {
 		return transport.StatResult{}, ctx.Err()
 	}
 
 	logs.FromCtx(ctx).Command("local exec: running command (optimized)", "cmd", fmt.Sprintf("stat %s", path))
+	defer func() {
+		logs.FromCtx(ctx).Result("local exec: running command (optimized)", "cmd", fmt.Sprintf("stat %s", path), "result", result, "error", err)
+	}()
 
 	realPath, err := s.ReadLink(ctx, path)
 	if err != nil {
@@ -259,7 +262,7 @@ func (s *nativeCommands) Stat(ctx context.Context, path string) (transport.StatR
 		return transport.StatResult{}, fmt.Errorf("os.Stat: %w", err)
 	}
 
-	result := transport.StatResult{
+	result = transport.StatResult{
 		Path:         realPath,
 		FileExists:   true,
 		ParentExists: true,

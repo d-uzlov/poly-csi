@@ -29,6 +29,7 @@ const (
 	requestWarn
 	requestError
 	requestArgs
+	requestResult
 )
 
 type LogRequest struct {
@@ -95,6 +96,10 @@ func (c *Instance) executeRequest(req LogRequest) {
 		if c.config.EchoCommands {
 			c.logger.Debug(req.Msg, req.Args...)
 		}
+	case requestResult:
+		if c.config.EchoResult {
+			c.logger.Debug(req.Msg, req.Args...)
+		}
 	case requestSuccessMicroOp:
 		if c.config.ConfirmMicroOps {
 			c.logger.Debug(req.Msg, req.Args...)
@@ -129,6 +134,14 @@ func (c *Instance) MicroOp(msg string, args ...any) {
 func (c *Instance) Command(msg string, args ...any) {
 	c.request(LogRequest{
 		Action: requestCommand,
+		Msg:    msg,
+		Args:   args,
+	})
+}
+
+func (c *Instance) Result(msg string, args ...any) {
+	c.request(LogRequest{
+		Action: requestResult,
 		Msg:    msg,
 		Args:   args,
 	})

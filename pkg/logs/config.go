@@ -11,6 +11,7 @@ type Config struct {
 	LogLevel        string            `yaml:"logLevel"`
 	EchoArgs        bool              `yaml:"echoArgs"`
 	EchoCommands    bool              `yaml:"echoCommands"`
+	EchoResult      bool              `yaml:"echoResult"`
 	ConfirmMicroOps bool              `yaml:"confirmMicroOps"`
 	SkipOnSuccess   bool              `yaml:"skipOnSuccess"`
 	ExtraFields     map[string]string `yaml:"extraFields"`
@@ -44,6 +45,9 @@ func (c Config) Combine(another Config) Config {
 	}
 	if another.EchoCommands {
 		result.EchoCommands = another.EchoCommands
+	}
+	if another.EchoResult {
+		result.EchoResult = another.EchoResult
 	}
 	if another.ConfirmMicroOps {
 		result.ConfirmMicroOps = another.ConfirmMicroOps
