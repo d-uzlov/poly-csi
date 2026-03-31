@@ -6,6 +6,7 @@
 kl create ns pv-poly
 
 kl apply -f ./deploy/controller/rbac.yaml
+kl apply -f ./deploy/controller/csi-driver.yaml
 
 kl -n pv-poly create configmap --dry-run=client -o yaml controller-config             --from-file config.yaml=./config-controller.yaml | kl apply -f -
 kl -n pv-poly create configmap --dry-run=client -o yaml node-config                   --from-file config.yaml=./deploy/node/config-node.yaml | kl apply -f -

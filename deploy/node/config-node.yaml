@@ -74,6 +74,7 @@ logs:
 
     /csi.v1.Node/NodeStageVolume:
       echoCommands: true
+      echoResult: true
     /csi.v1.Node/NodeUnstageVolume:
       echoCommands: true
     /csi.v1.Node/NodePublishVolume:

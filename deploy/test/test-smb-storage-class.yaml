@@ -16,7 +16,15 @@ parameters:
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: smb
   dispatch.addressNames: storage
+
   zfs.parentDataset: rose/test
+
+  init.on: controller
+  init.blockFormat: mkfs.ext4
+  init.ownerUser: '0'
+  init.ownerGroup: '10000'
+  init.rootDirMode: '777'
+
   fsType: cifs
 
 # mountOptions:
