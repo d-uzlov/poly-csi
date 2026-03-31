@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
@@ -91,14 +92,17 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
+		hostKey = strings.TrimSpace(hostKey)
 		if hostKey == "" {
 			return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
 		}
+
 		cmd = []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
 		controllerKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
+		controllerKey = strings.TrimSpace(controllerKey)
 		if controllerKey == "" {
 			return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
 		}

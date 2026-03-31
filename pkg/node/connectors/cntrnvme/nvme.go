@@ -3,7 +3,6 @@ package cntrnvme
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
@@ -59,22 +58,6 @@ func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectReque
 	}
 
 	namespaceDevicePath := m.devFolder + "/" + namespaceDevice
-	err = transport.Retry(time.Millisecond * 100, time.Second, func() error {
-		sr, err := m.tr.Cmds().Stat(ctx, namespaceDevicePath)
-		if err != nil {
-			return fmt.Errorf("failed to check namespaceDevicePath: %w", err)
-		}
-		if sr.FileExists {
-			return fmt.Errorf("file does not exist")
-		}
-		if !sr.IsBlock() {
-			return fmt.Errorf("file is not a block device")
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("nvme device '%s' is not found: %w", namespaceDevicePath, err)
-	}
 
 	return &connectors.ConnectResult{
 		FolderPath: "",
