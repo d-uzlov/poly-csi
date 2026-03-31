@@ -209,8 +209,8 @@ func (s targetcliSnippets) setupClientAcl(ctx context.Context, targetIqn string,
 		"mutual_userid":   acl.mutualUserId,
 		"mutual_password": acl.mutualPassword,
 	}
-	
-	err := s.setAttributes(ctx, path, "attribute", attributes)
+
+	err := s.setAttributes(ctx, path, "auth", attributes)
 	if err != nil {
 		return fmt.Errorf("configure attributes: %w", err)
 	}
