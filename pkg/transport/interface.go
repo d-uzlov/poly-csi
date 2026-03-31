@@ -40,10 +40,14 @@ type Commands interface {
 	RmDir(ctx context.Context, path string) error
 	// Delete file. Can fail on directories
 	RmFile(ctx context.Context, path string) error
-	// Stat probes info about objects in filesystem
+	// ReadLink reads a path in filesystem, following symlinks.
+	// Returns same filename if last part does not exist.
+	// Returns empty value if parent paths don't exist.
+	ReadLink(ctx context.Context, path string) (string, error)
+	// Stat probes info about ReadLink(path)
 	Stat(ctx context.Context, path string) (StatResult, error)
 	Df(ctx context.Context, path string) (*FsSizeInfo, error)
-	CreateSymlink(ctx context.Context, link string, target string) error
+	EnsureSymlink(ctx context.Context, link string, target string) error
 	MkFifo(ctx context.Context, path string) (alreadyExists bool, err error)
 
 	// Creates and/or capture a lock file in specified location.

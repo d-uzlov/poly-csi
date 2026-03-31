@@ -59,6 +59,20 @@ func (ec *ExecCommands) Write(ctx context.Context, path string, data []byte) err
 	return nil
 }
 
+func (ec *ExecCommands) WriteMove(ctx context.Context, path string, data []byte) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	tmpFile := path + ".~tmp"
+
+	err := ec.Write(ctx, tmpFile, data)
+	if err != nil {
+		return err
+	}
+	return ec.Move(ctx, tmpFile, path)
+}
+
 func (ec *ExecCommands) Ls(ctx context.Context, path string) ([]string, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -81,6 +95,10 @@ func (ec *ExecCommands) Ls(ctx context.Context, path string) ([]string, error) {
 func (ec *ExecCommands) Move(ctx context.Context, source string, dest string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+
+	if source == dest {
+		return nil
 	}
 
 	cmd := []string{"mv", source, dest}
@@ -176,42 +194,55 @@ func (ec *ExecCommands) RmFile(ctx context.Context, path string) error {
 	return nil
 }
 
-func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatResult, error) {
+func (ec *ExecCommands) ReadLink(ctx context.Context, path string) (string, error) {
 	if ctx.Err() != nil {
-		return transport.StatResult{}, ctx.Err()
+		return "", ctx.Err()
 	}
 
-	// -f      Canonicalize by following all symlinks
-	// -n      Don't add newline
+	// -f means follow symlinks and print same filename for non-existent files
+	// -n no newline
 	// can't use proper --canonicalize and --no-newline because we need to support busybox version of readlink
 	cmd := []string{"readlink", "-f", "-n", path}
 	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
-		return transport.StatResult{}, fmt.Errorf("readlink: %w", err)
+		return "", err
 	}
 	if runResult.ExitCode != 0 {
 		if runResult.ExitCode == 1 && len(runResult.Stdout) == 0 && len(runResult.Stderr) == 0 {
 			// it's arguable if we should return nil value or an error here
 			// TODO change interface?
-			return transport.StatResult{
-				Type:         0,
-				Path:         "",
-				FileExists:   false,
-				ParentExists: false,
-			}, nil
+			return "", nil
 		}
-		return transport.StatResult{}, transport.FormatRunError(runResult)
+		return "", transport.FormatRunError(runResult)
 	}
 	if len(runResult.Stdout) == 0 {
-		return transport.StatResult{}, fmt.Errorf("readlink gave empty result")
+		return "", fmt.Errorf("readlink gave empty result")
+	}
+	return string(runResult.Stdout), nil
+}
+
+func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatResult, error) {
+	if ctx.Err() != nil {
+		return transport.StatResult{}, ctx.Err()
 	}
 
-	realPath := string(runResult.Stdout)
+	realPath, err := ec.ReadLink(ctx, path)
+	if err != nil {
+		return transport.StatResult{}, fmt.Errorf("readlink: %w", err)
+	}
+	if realPath == "" {
+		return transport.StatResult{
+			Type:         0,
+			Path:         "",
+			FileExists:   false,
+			ParentExists: false,
+		}, nil
+	}
 
 	// -c FMT  Use the specified format
 	// can't use proper --printf because we need to support busybox version of stat
-	cmd = []string{"stat", realPath, "-c", "%F"}
-	runResult, err = ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
+	cmd := []string{"stat", realPath, "-c", "%F"}
+	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
 		return transport.StatResult{}, fmt.Errorf("stat: %w", err)
 	}
@@ -300,20 +331,32 @@ func (ec *ExecCommands) Df(ctx context.Context, path string) (*transport.FsSizeI
 	}, nil
 }
 
-func (ec *ExecCommands) CreateSymlink(ctx context.Context, link string, target string) error {
+func (ec *ExecCommands) EnsureSymlink(ctx context.Context, link string, target string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	cmd := []string{"ln", "--symbolic", "--no-target-directory", target, link}
-	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo), transport.WithoutStdout())
+	if link == target {
+		return nil
+	}
+
+	sr, err := ec.Stat(ctx, link)
 	if err != nil {
-		return err
+		return fmt.Errorf("check existing link at '%s': %w", link, err)
 	}
-	if runResult.ExitCode != 0 {
-		return transport.FormatRunError(runResult)
+	if sr.FileExists {
+		if sr.Path == link {
+			return fmt.Errorf("path '%s' already contains non-link", link)
+		}
+		if sr.Path != target {
+			return fmt.Errorf("existing link '%s' points to '%s'", link, sr.Path)
+		}
+		// link already points to required path
+		return nil
 	}
-	return nil
+	// link does not exist, need to create it
+	cmd := []string{"ln", "--symbolic", "--no-target-directory", target, link}
+	return transport.CheckedRun(ctx, ec.tr, cmd, transport.WithSudo(ec.sudo))
 }
 
 func (ec *ExecCommands) MkFifo(ctx context.Context, path string) (alreadyExists bool, err error) {

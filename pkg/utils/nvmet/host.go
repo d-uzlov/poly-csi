@@ -184,50 +184,25 @@ func (s Snippets) ConfigureHost(c Host) error {
 		return fmt.Errorf("kernel does not support DH-CHAP: missing file %s", attrPath)
 	}
 
-	attrPath = fmt.Sprintf("%s/dhchap_key", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HostKey))
+	err = s.WriteAttributes(path, map[string]string{
+		"dhchap_key":      c.HostKey,
+		"dhchap_ctrl_key": c.ControllerKey,
+		"dhchap_hash":     c.HashType,
+		"dhchap_dhgroup":  c.DhGroup,
+	})
 	if err != nil {
-		return fmt.Errorf("write %s: %w", attrPath, err)
+		return fmt.Errorf("set attributes: %w", err)
 	}
-	attrPath = fmt.Sprintf("%s/dhchap_ctrl_key", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ControllerKey))
-	if err != nil {
-		return fmt.Errorf("write %s: %w", attrPath, err)
-	}
-	attrPath = fmt.Sprintf("%s/dhchap_hash", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.HashType))
-	if err != nil {
-		return fmt.Errorf("write '%s' to %s: %w", c.HashType, attrPath, err)
-	}
-	attrPath = fmt.Sprintf("%s/dhchap_dhgroup", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DhGroup))
-	if err != nil {
-		return fmt.Errorf("write '%s' to %s: %w", c.DhGroup, attrPath, err)
-	}
+
 	return nil
 }
 
 func (s Snippets) AllowHost(subsysNqn string, hostNqn string) error {
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", hostNqn)
 	link := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/allowed_hosts/%s", subsysNqn, hostNqn)
-	stat, err := s.tr.Cmds().Stat(s.ctx, link)
+	err := s.tr.SudoCmds().EnsureSymlink(s.ctx, link, path)
 	if err != nil {
-		return fmt.Errorf("stat '%s' (checking if host is already configured on nqn): %w", link, err)
-	}
-	if stat.FileExists {
-		if !stat.IsDirectory() {
-			return fmt.Errorf("link '%s' exists but does not point to a directory", link)
-		}
-		if stat.Path != path {
-			return fmt.Errorf("name clash for '%s': we want to attach '%s' but existing link points to '%s'", link, path, stat.Path)
-		}
-		// link already points to required path
-		return nil
-	}
-	// link does not exist, need to create it
-	err = s.tr.SudoCmds().CreateSymlink(s.ctx, link, path)
-	if err != nil {
-		return fmt.Errorf("create link '%s' pointing to '%s': %w", path, link, err)
+		return err
 	}
 	return nil
 }

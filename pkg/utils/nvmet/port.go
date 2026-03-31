@@ -97,27 +97,16 @@ func (s Snippets) ConfigurePort(c Port) error {
 	if err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
 	}
+	err = s.WriteAttributes(path, map[string]string{
+		"addr_adrfam":  c.AddressFamily,
+		"addr_traddr":  c.ListenAddr,
+		"addr_trsvcid": strconv.FormatInt(int64(c.ListenPort), 10),
+		"addr_trtype":  c.TransportType,
+	})
+	if err != nil {
+		return fmt.Errorf("set attributes: %w", err)
+	}
 
-	attrPath := fmt.Sprintf("%s/addr_adrfam", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.AddressFamily))
-	if err != nil {
-		return fmt.Errorf("write '%s' to %s/addr_adrfam: %w", c.AddressFamily, path, err)
-	}
-	attrPath = fmt.Sprintf("%s/addr_traddr", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.ListenAddr))
-	if err != nil {
-		return fmt.Errorf("write '%s' to %s/addr_traddr (listening address): %w", c.ListenAddr, path, err)
-	}
-	attrPath = fmt.Sprintf("%s/addr_trsvcid", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(strconv.FormatInt(int64(c.ListenPort), 10)))
-	if err != nil {
-		return fmt.Errorf("write %d to %s/addr_trsvcid (listening port): %w", c.ListenPort, path, err)
-	}
-	attrPath = fmt.Sprintf("%s/addr_trtype", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.TransportType))
-	if err != nil {
-		return fmt.Errorf("write '%s' to %s/addr_trtype: %w", c.TransportType, path, err)
-	}
 	return nil
 }
 
@@ -134,24 +123,9 @@ func (s Snippets) ListPortAttachments(port string) ([]string, error) {
 func (s Snippets) AttachSubsysToPort(nqn string, nvmePort string) error {
 	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", nqn)
 	link := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", nvmePort, nqn)
-	stat, err := s.tr.Cmds().Stat(s.ctx, link)
+	err := s.tr.SudoCmds().EnsureSymlink(s.ctx, link, path)
 	if err != nil {
-		return fmt.Errorf("stat '%s' (checking if nqn is already configured on port): %w", link, err)
-	}
-	if stat.FileExists {
-		if !stat.IsDirectory() {
-			return fmt.Errorf("link '%s' exists but does not point to a directory", link)
-		}
-		if stat.Path != path {
-			return fmt.Errorf("name clash for '%s': we want to attach '%s' but existing link points to '%s'", link, path, stat.Path)
-		}
-		// link already points to required path
-		return nil
-	}
-	// link does not exist, need to create it
-	err = s.tr.SudoCmds().CreateSymlink(s.ctx, link, path)
-	if err != nil {
-		return fmt.Errorf("create link '%s' pointing to '%s': %w", path, link, err)
+		return err
 	}
 	return nil
 }

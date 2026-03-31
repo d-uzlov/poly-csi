@@ -151,7 +151,7 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 	if existingNs == nil {
 		err := s.tr.SudoCmds().Mkdir(s.ctx, path, false)
 		if err != nil {
-			return fmt.Errorf("mkdir '%s': %w", path, err)
+			return fmt.Errorf("create ns '%s': %w", path, err)
 		}
 
 		existingNs, err = s.ReadNamespace(c.Nqn, c.Nsid)
@@ -174,12 +174,8 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 		if c.Enabled {
 			enable = "1"
 		}
-		attrPath := fmt.Sprintf("%s/enable", path)
-		// we are in defer, we can just set err
-		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
-		if err != nil {
-			err = fmt.Errorf("write %s to '%s/enable': %w", enable, path, err)
-		}
+		// we are in defer, we can just set err to fail the function
+		err = s.WriteAttribute(path, "enable", enable)
 	}()
 
 	// if all parameters already match, don't need to do anything
@@ -191,32 +187,20 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 
 	// need to disable NS before configuring it
 	if existingNs.Enabled {
-		attrPath := fmt.Sprintf("%s/enable", path)
-		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte("0"))
+		err = s.WriteAttribute(path, "enable", "0")
 		if err != nil {
-			return fmt.Errorf("write 0 to '%s/enable': %w", path, err)
+			return fmt.Errorf("disable ns before changes: %w", err)
 		}
 		existingNs.Enabled = false
 	}
 
-	attrPath := fmt.Sprintf("%s/device_path", path)
-	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DevicePath))
+	err = s.WriteAttributes(path, map[string]string{
+		"device_path":  c.DevicePath,
+		"device_uuid":  c.DeviceUuid,
+		"device_nguid": c.DeviceGuid,
+	})
 	if err != nil {
-		return fmt.Errorf("write '%s' to '%s': %w", c.DevicePath, attrPath, err)
-	}
-	if c.DeviceUuid != "" {
-		attrPath = fmt.Sprintf("%s/device_uuid", path)
-		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceUuid))
-		if err != nil {
-			return fmt.Errorf("write '%s' to '%s': %w", c.DeviceUuid, attrPath, err)
-		}
-	}
-	if c.DeviceGuid != "" {
-		attrPath = fmt.Sprintf("%s/device_nguid", path)
-		err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(c.DeviceGuid))
-		if err != nil {
-			return fmt.Errorf("write '%s' to '%s': %w", c.DeviceGuid, attrPath, err)
-		}
+		return fmt.Errorf("set attributes: %w", err)
 	}
 	return nil
 }
