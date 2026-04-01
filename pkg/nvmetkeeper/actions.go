@@ -7,20 +7,20 @@ import (
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
-func (k *NvmetKeeper) DeletePort(ctx context.Context, name string) error {
+func (k *NvmetKeeper) PortDelete(ctx context.Context, portName string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
-	err := snip.DeletePort(name)
+	err := snip.DeletePort(portName)
 	if err != nil {
 		return fmt.Errorf("delete port: %w", err)
 	}
-	err = k.str.deletePortConfig(ctx, name)
+	err = k.str.deletePortConfig(ctx, portName)
 	if err != nil {
 		return fmt.Errorf("delete port config: %w", err)
 	}
 	return nil
 }
 
-func (k *NvmetKeeper) CreatePort(ctx context.Context, c nvmet.Port) error {
+func (k *NvmetKeeper) PortCreate(ctx context.Context, c nvmet.Port) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 	p, err := snip.ReadPort(c.Name)
 	if err != nil {
@@ -44,52 +44,52 @@ func (k *NvmetKeeper) CreatePort(ctx context.Context, c nvmet.Port) error {
 	return nil
 }
 
-func (k *NvmetKeeper) DeleteSubsys(ctx context.Context, nqn string) error {
+func (k *NvmetKeeper) SubsysDelete(ctx context.Context, subsysNqn string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
-	hostList, err := snip.ListHostAttachments(nqn)
+	hostList, err := snip.ListHostAttachments(subsysNqn)
 	if err != nil {
-		return fmt.Errorf("list namespaces for '%s': %w", nqn, err)
+		return fmt.Errorf("list namespaces for '%s': %w", subsysNqn, err)
 	}
 	for _, v := range hostList {
-		err = snip.DisallowHost(nqn, v)
+		err = snip.DisallowHost(subsysNqn, v)
 		if err != nil {
-			return fmt.Errorf("delete host attachment '%s/%s': %w", nqn, v, err)
+			return fmt.Errorf("delete host attachment '%s/%s': %w", subsysNqn, v, err)
 		}
-		err = k.str.deleteHostAttachment(ctx, nqn, v)
+		err = k.str.deleteHostAttachment(ctx, subsysNqn, v)
 		if err != nil {
-			return fmt.Errorf("delete host attachment '%s/%s': %w", nqn, v, err)
+			return fmt.Errorf("delete host attachment '%s/%s': %w", subsysNqn, v, err)
 		}
 	}
 
-	nsList, err := snip.ListNamespaces(nqn)
+	nsList, err := snip.ListNamespaces(subsysNqn)
 	if err != nil {
-		return fmt.Errorf("list namespaces for '%s': %w", nqn, err)
+		return fmt.Errorf("list namespaces for '%s': %w", subsysNqn, err)
 	}
 	for _, v := range nsList {
-		err = snip.DeleteNamespace(nqn, v)
+		err = snip.DeleteNamespace(subsysNqn, v)
 		if err != nil {
-			return fmt.Errorf("delete namespace '%s/%s': %w", nqn, v, err)
+			return fmt.Errorf("delete namespace '%s/%s': %w", subsysNqn, v, err)
 		}
-		err = k.str.deleteNamespace(ctx, nqn, v)
+		err = k.str.deleteNamespace(ctx, subsysNqn, v)
 		if err != nil {
-			return fmt.Errorf("delete namespace '%s/%s': %w", nqn, v, err)
+			return fmt.Errorf("delete namespace '%s/%s': %w", subsysNqn, v, err)
 		}
 	}
 
-	err = snip.DeleteSubsys(nqn)
+	err = snip.DeleteSubsys(subsysNqn)
 	if err != nil {
-		return fmt.Errorf("delete subsystem '%s': %w", nqn, err)
+		return fmt.Errorf("delete subsystem '%s': %w", subsysNqn, err)
 	}
-	err = k.str.deleteSubsystem(ctx, nqn)
+	err = k.str.deleteSubsystem(ctx, subsysNqn)
 	if err != nil {
-		return fmt.Errorf("delete subsys '%s': %w", nqn, err)
+		return fmt.Errorf("delete subsys '%s': %w", subsysNqn, err)
 	}
 
 	return nil
 }
 
-func (k *NvmetKeeper) CreateSubsystem(ctx context.Context, s nvmet.Subsys) error {
+func (k *NvmetKeeper) SubsysCreate(ctx context.Context, s nvmet.Subsys) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	existingSubsys, err := snip.ReadSubsys(s.Nqn)
@@ -115,7 +115,7 @@ func (k *NvmetKeeper) CreateSubsystem(ctx context.Context, s nvmet.Subsys) error
 	return nil
 }
 
-func (k *NvmetKeeper) CreateNamespace(ctx context.Context, n nvmet.Ns) error {
+func (k *NvmetKeeper) NamespaceCreate(ctx context.Context, n nvmet.Ns) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	existingNs, err := snip.ReadNamespace(n.Nqn, n.Nsid)
@@ -146,37 +146,37 @@ func (k *NvmetKeeper) CreateNamespace(ctx context.Context, n nvmet.Ns) error {
 	return nil
 }
 
-func (k *NvmetKeeper) AttachNqnToPort(ctx context.Context, nqn string, port string) error {
+func (k *NvmetKeeper) PortSubsysAttach(ctx context.Context, subsysNqn string, portName string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
-	err := snip.AttachSubsysToPort(nqn, port)
+	err := snip.AttachSubsysToPort(subsysNqn, portName)
 	if err != nil {
 		return fmt.Errorf("AttachNqnToPort: %w", err)
 	}
 
-	err = k.str.saveSubsystemAttachment(ctx, nqn, port)
+	err = k.str.saveSubsystemAttachment(ctx, subsysNqn, portName)
 	if err != nil {
 		return fmt.Errorf("saveSubsystemAttachment: %w", err)
 	}
 	return nil
 }
 
-func (k *NvmetKeeper) DetachPortFromNqn(ctx context.Context, nqn string, port string) error {
+func (k *NvmetKeeper) PortDetachSubsys(ctx context.Context, subsysNqn string, port string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
-	err := snip.DetachNqnFromPort(nqn, port)
+	err := snip.DetachNqnFromPort(subsysNqn, port)
 	if err != nil {
 		return fmt.Errorf("DetachNqnFromPort: %w", err)
 	}
 
-	err = k.str.deleteSubsystemAttachment(ctx, nqn, port)
+	err = k.str.deleteSubsystemAttachment(ctx, subsysNqn, port)
 	if err != nil {
 		return fmt.Errorf("deleteSubsystemAttachment: %w", err)
 	}
 	return nil
 }
 
-func (k *NvmetKeeper) CreateHost(ctx context.Context, n nvmet.Host) error {
+func (k *NvmetKeeper) HostCreate(ctx context.Context, n nvmet.Host) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
 	existingHost, err := snip.ReadHost(n.Nqn)
@@ -203,30 +203,30 @@ func (k *NvmetKeeper) CreateHost(ctx context.Context, n nvmet.Host) error {
 	return nil
 }
 
-func (k *NvmetKeeper) AllowHost(ctx context.Context, nqn string, host string) error {
+func (k *NvmetKeeper) SubsysAllowHost(ctx context.Context, subsysNqn string, hostNqn string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
-	err := snip.AllowHost(nqn, host)
+	err := snip.AllowHost(subsysNqn, hostNqn)
 	if err != nil {
 		return fmt.Errorf("AllowHost: %w", err)
 	}
 
-	err = k.str.saveHostAttachment(ctx, nqn, host)
+	err = k.str.saveHostAttachment(ctx, subsysNqn, hostNqn)
 	if err != nil {
 		return fmt.Errorf("save attachment: %w", err)
 	}
 	return nil
 }
 
-func (k *NvmetKeeper) DisallowHost(ctx context.Context, nqn string, host string) error {
+func (k *NvmetKeeper) SubsysDisallowHost(ctx context.Context, subsysNqn string, hostNqn string) error {
 	snip := nvmet.NewSnippets(ctx, k.tr, k.useSudo)
 
-	err := snip.DisallowHost(nqn, host)
+	err := snip.DisallowHost(subsysNqn, hostNqn)
 	if err != nil {
 		return fmt.Errorf("DisallowHost: %w", err)
 	}
 
-	err = k.str.deleteHostAttachment(ctx, nqn, host)
+	err = k.str.deleteHostAttachment(ctx, subsysNqn, hostNqn)
 	if err != nil {
 		return fmt.Errorf("save attachment: %w", err)
 	}

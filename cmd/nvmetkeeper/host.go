@@ -44,7 +44,7 @@ When need_auth=true, all host_key, controller_key, hash_type, dh_group must be s
 - - ffdhe6144
 - - ffdhe8192
 `,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -62,7 +62,7 @@ When need_auth=true, all host_key, controller_key, hash_type, dh_group must be s
 		if err != nil {
 			return fmt.Errorf("input validation: %w", err)
 		}
-		err = k.CreateHost(ctx, c)
+		err = k.HostCreate(ctx, c)
 		if err != nil {
 			return fmt.Errorf("CreatePort: %w", err)
 		}

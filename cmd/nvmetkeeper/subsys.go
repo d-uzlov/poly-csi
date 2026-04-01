@@ -34,7 +34,7 @@ var subsysCreateCmd = &cobra.Command{
 nvmet_keeper subsys create '{"nqn":"nqn.2014-08.org.com.example:subsys","model":"","serial":"","allow_any_host":false}'
 model and serial can be arbitrary strings. When left empty, Linux kernel will set model=Linux and generate a unique value for serial
 `,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -52,7 +52,7 @@ model and serial can be arbitrary strings. When left empty, Linux kernel will se
 		if err != nil {
 			return fmt.Errorf("input validation: %w", err)
 		}
-		err = k.CreateSubsystem(ctx, c)
+		err = k.SubsysCreate(ctx, c)
 		if err != nil {
 			return fmt.Errorf("CreateSubsys: %w", err)
 		}
@@ -62,10 +62,10 @@ model and serial can be arbitrary strings. When left empty, Linux kernel will se
 }
 
 var subsysDeleteCmd = &cobra.Command{
-	Use:   "delete <nqn>",
-	Short: "delete nvmet subsys by nqn",
+	Use:     "delete <nqn>",
+	Short:   "delete nvmet subsys by nqn",
 	Example: `nvmet_keeper subsys delete nqn.2014-08.org.com.example:subsys`,
-	Args:  cobra.ExactArgs(1),
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -75,7 +75,7 @@ var subsysDeleteCmd = &cobra.Command{
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		name := args[0]
-		err := k.DeleteSubsys(ctx, name)
+		err := k.SubsysDelete(ctx, name)
 		if err != nil {
 			return fmt.Errorf("DeleteSubsys: %w", err)
 		}
@@ -85,10 +85,10 @@ var subsysDeleteCmd = &cobra.Command{
 }
 
 var subsysAttachCmd = &cobra.Command{
-	Use:   "attach nqn port_name",
-	Short: "Attach subsys to given port",
+	Use:     "attach nqn port_name",
+	Short:   "Attach subsys to given port",
 	Example: `nvmet_keeper subsys attach nqn.2014-08.org.com.example:subsys 2020`,
-	Args:  cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -101,7 +101,7 @@ var subsysAttachCmd = &cobra.Command{
 		name := args[0]
 		port := args[1]
 
-		err := k.AttachNqnToPort(ctx, name, port)
+		err := k.PortSubsysAttach(ctx, name, port)
 		if err != nil {
 			return fmt.Errorf("AttachNqnToPort: %w", err)
 		}
@@ -111,10 +111,10 @@ var subsysAttachCmd = &cobra.Command{
 }
 
 var subsysDetachCmd = &cobra.Command{
-	Use:   "detach nqn port_name",
-	Short: "Detach subsys from given port",
+	Use:     "detach nqn port_name",
+	Short:   "Detach subsys from given port",
 	Example: `nvmet_keeper subsys detach nqn.2014-08.org.com.example:subsys 2020`,
-	Args:  cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -127,7 +127,7 @@ var subsysDetachCmd = &cobra.Command{
 		name := args[0]
 		port := args[1]
 
-		err := k.DetachPortFromNqn(ctx, name, port)
+		err := k.PortDetachSubsys(ctx, name, port)
 		if err != nil {
 			return fmt.Errorf("DetachPortFromNqn: %w", err)
 		}
@@ -137,10 +137,10 @@ var subsysDetachCmd = &cobra.Command{
 }
 
 var subsysAllowHostCmd = &cobra.Command{
-	Use:   "allow nqn host_nqn",
-	Short: "Allow a host to access subsystem",
+	Use:     "allow nqn host_nqn",
+	Short:   "Allow a host to access subsystem",
 	Example: `nvmet_keeper subsys allow nqn.2014-08.org.com.example:subsys nqn.2014-08.org.com.example:machine`,
-	Args:  cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -153,7 +153,7 @@ var subsysAllowHostCmd = &cobra.Command{
 		name := args[0]
 		hostNqn := args[1]
 
-		err := k.AllowHost(ctx, name, hostNqn)
+		err := k.SubsysAllowHost(ctx, name, hostNqn)
 		if err != nil {
 			return fmt.Errorf("AllowHost: %w", err)
 		}
@@ -163,10 +163,10 @@ var subsysAllowHostCmd = &cobra.Command{
 }
 
 var subsysDisallowHostCmd = &cobra.Command{
-	Use:   "disallow nqn host_nqn",
-	Short: "Disallow a host to access subsystem",
+	Use:     "disallow nqn host_nqn",
+	Short:   "Disallow a host to access subsystem",
 	Example: `nvmet_keeper subsys disallow nqn.2014-08.org.com.example:subsys nqn.2014-08.org.com.example:machine`,
-	Args:  cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -179,7 +179,7 @@ var subsysDisallowHostCmd = &cobra.Command{
 		name := args[0]
 		hostNqn := args[1]
 
-		err := k.DisallowHost(ctx, name, hostNqn)
+		err := k.SubsysDisallowHost(ctx, name, hostNqn)
 		if err != nil {
 			return fmt.Errorf("DisallowHost: %w", err)
 		}

@@ -85,13 +85,13 @@ func (s Snippets) ListHosts() ([]string, error) {
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) ListHostAttachments(nqn string) ([]string, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/allowed_hosts", nqn)
+func (s Snippets) ListHostAttachments(subsysNqn string) ([]string, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/allowed_hosts", subsysNqn)
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) ReadHost(name string) (*Host, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", name)
+func (s Snippets) ReadHost(hostNqn string) (*Host, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", hostNqn)
 	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("stat '%s': %w", path, err)
@@ -114,7 +114,7 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 	if !stat.FileExists {
 		// this server does not support auth
 		return &Host{
-			Nqn:      name,
+			Nqn:      hostNqn,
 			NeedAuth: false,
 		}, nil
 	}
@@ -150,7 +150,7 @@ func (s Snippets) ReadHost(name string) (*Host, error) {
 	}
 
 	return &Host{
-		Nqn:           name,
+		Nqn:           hostNqn,
 		NeedAuth:      needAuth,
 		HostKey:       string(dhChapKey),
 		ControllerKey: string(dhChapControllerKey),
@@ -216,8 +216,8 @@ func (s Snippets) DisallowHost(subsysNqn string, hostNqn string) error {
 	return nil
 }
 
-func (s Snippets) DeleteHost(name string) error {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", name)
+func (s Snippets) DeleteHost(hostNqn string) error {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/hosts/%s", hostNqn)
 	err := s.tr.SudoCmds().RmDir(s.ctx, path)
 	if err != nil {
 		return fmt.Errorf("rmdir '%s': %w", path, err)

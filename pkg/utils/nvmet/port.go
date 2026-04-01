@@ -38,8 +38,8 @@ func (s Snippets) ListPorts() ([]string, error) {
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) ReadPort(name string) (*Port, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", name)
+func (s Snippets) ReadPort(portName string) (*Port, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", portName)
 	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("stat '%s': %w", path, err)
@@ -79,7 +79,7 @@ func (s Snippets) ReadPort(name string) (*Port, error) {
 	}
 
 	return &Port{
-		Name:          name,
+		Name:          portName,
 		AddressFamily: string(addrFam),
 		ListenAddr:    string(listenAddr),
 		ListenPort:    listenPort,
@@ -110,19 +110,19 @@ func (s Snippets) ConfigurePort(c Port) error {
 	return nil
 }
 
-func (s Snippets) DeletePort(name string) error {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", name)
+func (s Snippets) DeletePort(portName string) error {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s", portName)
 	return s.tr.SudoCmds().RmDir(s.ctx, path)
 }
 
-func (s Snippets) ListPortAttachments(port string) ([]string, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/", port)
+func (s Snippets) ListPortAttachments(portName string) ([]string, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/", portName)
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) AttachSubsysToPort(nqn string, nvmePort string) error {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", nqn)
-	link := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", nvmePort, nqn)
+func (s Snippets) AttachSubsysToPort(subsysNqn string, portName string) error {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", subsysNqn)
+	link := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", portName, subsysNqn)
 	err := s.tr.SudoCmds().EnsureSymlink(s.ctx, link, path)
 	if err != nil {
 		return err
@@ -130,7 +130,7 @@ func (s Snippets) AttachSubsysToPort(nqn string, nvmePort string) error {
 	return nil
 }
 
-func (s Snippets) DetachNqnFromPort(nqn string, nvmePort string) error {
-	portsLink := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", nvmePort, nqn)
+func (s Snippets) DetachNqnFromPort(subsysNqn string, portName string) error {
+	portsLink := fmt.Sprintf("/sys/kernel/config/nvmet/ports/%s/subsystems/%s", portName, subsysNqn)
 	return s.tr.SudoCmds().RmFile(s.ctx, portsLink)
 }

@@ -53,7 +53,7 @@ type can theoretically be any NVMe transport type value supported by Linux, but 
 		if err != nil {
 			return fmt.Errorf("input validation: %w", err)
 		}
-		err = k.CreatePort(ctx, c)
+		err = k.PortCreate(ctx, c)
 		if err != nil {
 			return fmt.Errorf("CreatePort: %w", err)
 		}
@@ -63,10 +63,10 @@ type can theoretically be any NVMe transport type value supported by Linux, but 
 }
 
 var portDeleteCmd = &cobra.Command{
-	Use:   "delete <port_name>",
-	Short: "delete nvmet port by name",
+	Use:     "delete <port_name>",
+	Short:   "delete nvmet port by name",
 	Example: `nvmet_keeper port delete 2020`,
-	Args:  cobra.ExactArgs(1),
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -76,7 +76,7 @@ var portDeleteCmd = &cobra.Command{
 		saveState := true
 		k := nvmetkeeper.New(localExec, configFolder, useSudo, saveState)
 		name := args[0]
-		err := k.DeletePort(ctx, name)
+		err := k.PortDelete(ctx, name)
 		if err != nil {
 			return fmt.Errorf("DeletePort: %w", err)
 		}

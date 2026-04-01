@@ -35,7 +35,7 @@ nvmet_keeper namespace create '{"nqn":"nqn.2014-08.org.com.example:subsys","nsid
 - nsid is namespace index, starting from 1
 - device_uuid and device_guid are optional. By default Linux will generate unique UUID values for them.
 `,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
@@ -53,7 +53,7 @@ nvmet_keeper namespace create '{"nqn":"nqn.2014-08.org.com.example:subsys","nsid
 		if err != nil {
 			return fmt.Errorf("input validation: %w", err)
 		}
-		err = k.CreateNamespace(ctx, c)
+		err = k.NamespaceCreate(ctx, c)
 		if err != nil {
 			return fmt.Errorf("CreateNamespace: %w", err)
 		}

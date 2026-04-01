@@ -54,19 +54,19 @@ func CheckNamespaceEquivalent(requested Ns, existing Ns) bool {
 	return true
 }
 
-func (s Snippets) ListNamespaces(nqn string) ([]string, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces", nqn)
+func (s Snippets) ListNamespaces(subsysNqn string) ([]string, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces", subsysNqn)
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s", nqn, nsid)
+func (s Snippets) ReadNamespace(subsysNqn string, nsid string) (*Ns, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s", subsysNqn, nsid)
 	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("check if folder '%s' exists: %w", path, err)
 	}
 	if !stat.ParentExists {
-		return nil, fmt.Errorf("folder /sys/kernel/config/nvmet/subsystems/%s/namespaces does not exist", nqn)
+		return nil, fmt.Errorf("folder /sys/kernel/config/nvmet/subsystems/%s/namespaces does not exist", subsysNqn)
 	}
 	if !stat.FileExists {
 		// ns does not exist in nvmet
@@ -108,7 +108,7 @@ func (s Snippets) ReadNamespace(nqn string, nsid string) (*Ns, error) {
 	}
 
 	return &Ns{
-		Nqn:        nqn,
+		Nqn:        subsysNqn,
 		Nsid:       nsid,
 		DevicePath: string(devicePath),
 		DeviceUuid: string(deviceUuid),
@@ -127,7 +127,6 @@ func (s Snippets) SetNamespaceEnabled(c Ns) (err error) {
 	}
 
 	attrPath := fmt.Sprintf("%s/enable", path)
-	// we are in defer, we can just set err
 	err = s.tr.SudoCmds().Write(s.ctx, attrPath, []byte(enable))
 	if err != nil {
 		err = fmt.Errorf("write %s to '%s/enable': %w", enable, path, err)
@@ -205,8 +204,8 @@ func (s Snippets) ConfigureNamespace(c Ns) (err error) {
 	return nil
 }
 
-func (s Snippets) DeleteNamespace(nqn string, nsid string) error {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s/", nqn, nsid)
+func (s Snippets) DeleteNamespace(subsysNqn string, nsid string) error {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/namespaces/%s/", subsysNqn, nsid)
 	err := s.tr.SudoCmds().RmDir(s.ctx, path)
 	if err != nil {
 		return fmt.Errorf("remove %s: %w", path, err)

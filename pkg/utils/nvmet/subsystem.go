@@ -50,8 +50,8 @@ func (s Snippets) ListSubsys() ([]string, error) {
 	return s.tr.Cmds().Ls(s.ctx, path)
 }
 
-func (s Snippets) ReadSubsys(nqn string) (*Subsys, error) {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", nqn)
+func (s Snippets) ReadSubsys(subsysNqn string) (*Subsys, error) {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s", subsysNqn)
 	stat, err := s.tr.Cmds().Stat(s.ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("check if folder '%s' exists: %w", path, err)
@@ -86,7 +86,7 @@ func (s Snippets) ReadSubsys(nqn string) (*Subsys, error) {
 	}
 
 	return &Subsys{
-		Nqn:          nqn,
+		Nqn:          subsysNqn,
 		Model:        string(model),
 		Serial:       string(serial),
 		AllowAnyHost: allowAnyHost,
@@ -130,8 +130,8 @@ func (s Snippets) ConfigureSubsys(c Subsys) error {
 	return nil
 }
 
-func (s Snippets) DeleteSubsys(nqn string) error {
-	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/", nqn)
+func (s Snippets) DeleteSubsys(subsysNqn string) error {
+	path := fmt.Sprintf("/sys/kernel/config/nvmet/subsystems/%s/", subsysNqn)
 	err := s.tr.SudoCmds().RmDir(s.ctx, path)
 	if err != nil {
 		return fmt.Errorf("rmdir %s: %w", path, err)

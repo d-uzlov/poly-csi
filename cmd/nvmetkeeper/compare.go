@@ -100,9 +100,9 @@ var compareSubsysCmd = &cobra.Command{
 }
 
 var compareAllCmd = &cobra.Command{
-	Use:     "all",
-	Short:   "Compare current nvmet state with values saved in config",
-	Args:    cobra.ExactArgs(0),
+	Use:   "all",
+	Short: "Compare current nvmet state with values saved in config",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()

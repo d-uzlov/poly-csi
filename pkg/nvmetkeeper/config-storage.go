@@ -239,14 +239,14 @@ func (k *ConfigStorage) saveNamespace(ctx context.Context, c nvmet.Ns) error {
 	return nil
 }
 
-func (k *ConfigStorage) deleteNamespace(ctx context.Context, nqn string, nsid string) error {
+func (k *ConfigStorage) deleteNamespace(ctx context.Context, subsysNqn string, nsid string) error {
 	if !k.saveState {
 		return nil
 	}
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/namespaces/%s.json", k.configFolder, nqn, nsid)
+	path := fmt.Sprintf("%s/subsystems/%s/namespaces/%s.json", k.configFolder, subsysNqn, nsid)
 	err := sudoCmds.RmFile(ctx, path)
 	if err != nil {
 		return fmt.Errorf("rm %s: %w", path, err)
@@ -279,14 +279,14 @@ func (k *ConfigStorage) saveSubsystem(ctx context.Context, c nvmet.Subsys) error
 	return nil
 }
 
-func (k *ConfigStorage) deleteSubsystem(ctx context.Context, nqn string) error {
+func (k *ConfigStorage) deleteSubsystem(ctx context.Context, subsysNqn string) error {
 	if !k.saveState {
 		return nil
 	}
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/subsys.json", k.configFolder, nqn)
+	path := fmt.Sprintf("%s/subsystems/%s/subsys.json", k.configFolder, subsysNqn)
 	err := sudoCmds.RmFile(ctx, path)
 	if err != nil {
 		return fmt.Errorf("rm %s: %w", path, err)
@@ -294,14 +294,14 @@ func (k *ConfigStorage) deleteSubsystem(ctx context.Context, nqn string) error {
 	return nil
 }
 
-func (k *ConfigStorage) saveSubsystemAttachment(ctx context.Context, nqn string, port string) error {
+func (k *ConfigStorage) saveSubsystemAttachment(ctx context.Context, subsysNqn string, port string) error {
 	if !k.saveState {
 		return nil
 	}
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/attachments", k.configFolder, nqn)
+	path := fmt.Sprintf("%s/subsystems/%s/attachments", k.configFolder, subsysNqn)
 	err := sudoCmds.Mkdir(ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("create folder '%s': %w", path, err)
@@ -316,14 +316,14 @@ func (k *ConfigStorage) saveSubsystemAttachment(ctx context.Context, nqn string,
 	return nil
 }
 
-func (k *ConfigStorage) deleteSubsystemAttachment(ctx context.Context, nqn string, port string) error {
+func (k *ConfigStorage) deleteSubsystemAttachment(ctx context.Context, subsysNqn string, port string) error {
 	if !k.saveState {
 		return nil
 	}
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/attachments/%s", k.configFolder, nqn, port)
+	path := fmt.Sprintf("%s/subsystems/%s/attachments/%s", k.configFolder, subsysNqn, port)
 	err := sudoCmds.RmFile(ctx, path)
 	if err != nil {
 		return fmt.Errorf("rm %s: %w", path, err)
@@ -358,20 +358,20 @@ func (k *ConfigStorage) saveHost(ctx context.Context, c nvmet.Host) error {
 	return nil
 }
 
-func (k *ConfigStorage) saveHostAttachment(ctx context.Context, nqn string, host string) error {
+func (k *ConfigStorage) saveHostAttachment(ctx context.Context, subsysNqn string, hostNqn string) error {
 	if !k.saveState {
 		return nil
 	}
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/hosts", k.configFolder, nqn)
+	path := fmt.Sprintf("%s/subsystems/%s/hosts", k.configFolder, subsysNqn)
 	err := sudoCmds.Mkdir(ctx, path, false)
 	if err != nil {
 		return fmt.Errorf("create folder '%s': %w", path, err)
 	}
 
-	path = fmt.Sprintf("%s/subsystems/%s/hosts/%s", k.configFolder, nqn, host)
+	path = fmt.Sprintf("%s/subsystems/%s/hosts/%s", k.configFolder, subsysNqn, hostNqn)
 	err = sudoCmds.Write(ctx, path, nil)
 	if err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
@@ -380,14 +380,14 @@ func (k *ConfigStorage) saveHostAttachment(ctx context.Context, nqn string, host
 	return nil
 }
 
-func (k *ConfigStorage) deleteHostAttachment(ctx context.Context, nqn string, host string) error {
+func (k *ConfigStorage) deleteHostAttachment(ctx context.Context, subsysNqn string, hostNqn string) error {
 	if !k.saveState {
 		return nil
 	}
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/hosts/%s", k.configFolder, nqn, host)
+	path := fmt.Sprintf("%s/subsystems/%s/hosts/%s", k.configFolder, subsysNqn, hostNqn)
 	err := sudoCmds.RmFile(ctx, path)
 	if err != nil {
 		return fmt.Errorf("rm %s: %w", path, err)

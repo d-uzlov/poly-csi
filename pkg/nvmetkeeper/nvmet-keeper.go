@@ -27,7 +27,7 @@ func (k *NvmetKeeper) RestoreConfig(ctx context.Context) error {
 		return fmt.Errorf("list saved ports: %w", err)
 	}
 	for _, v := range ports {
-		err = k.CreatePort(ctx, v)
+		err = k.PortCreate(ctx, v)
 		if err != nil {
 			return fmt.Errorf("create port %s: %w", v.Name, err)
 		}
@@ -38,7 +38,7 @@ func (k *NvmetKeeper) RestoreConfig(ctx context.Context) error {
 		return fmt.Errorf("list saved hosts: %w", err)
 	}
 	for _, v := range hosts {
-		err = k.CreateHost(ctx, v)
+		err = k.HostCreate(ctx, v)
 		if err != nil {
 			return fmt.Errorf("create host %s: %w", v.Nqn, err)
 		}
@@ -49,20 +49,26 @@ func (k *NvmetKeeper) RestoreConfig(ctx context.Context) error {
 		return fmt.Errorf("list saved subsystems: %w", err)
 	}
 	for _, v := range subsystems {
-		err = k.CreateSubsystem(ctx, v.subsys)
+		err = k.SubsysCreate(ctx, v.subsys)
 		if err != nil {
 			return fmt.Errorf("create subsys %s: %w", v.subsys.Nqn, err)
 		}
 		for _, n := range v.namespaces {
-			err = k.CreateNamespace(ctx, n)
+			err = k.NamespaceCreate(ctx, n)
 			if err != nil {
 				return fmt.Errorf("create namespace %s/%s: %w", n.Nqn, n.Nsid, err)
 			}
 		}
 		for _, a := range v.attachedPorts {
-			err = k.AttachNqnToPort(ctx, v.subsys.Nqn, a)
+			err = k.PortSubsysAttach(ctx, v.subsys.Nqn, a)
 			if err != nil {
 				return fmt.Errorf("attach '%s' to port %s: %w", v.subsys.Nqn, a, err)
+			}
+		}
+		for _, a := range v.attachedHosts {
+			err = k.SubsysAllowHost(ctx, v.subsys.Nqn, a)
+			if err != nil {
+				return fmt.Errorf("allow host '%s' to access subsys %s: %w", a, v.subsys.Nqn, err)
 			}
 		}
 	}

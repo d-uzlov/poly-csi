@@ -22,10 +22,10 @@ func init() {
 }
 
 var configSaveMergeCmd = &cobra.Command{
-	Use:   "save-merge",
-	Short: "read current state of nvmet kernel config and save it as files in config folder, create new config files as needed, keep unused files as is",
+	Use:     "save-merge",
+	Short:   "read current state of nvmet kernel config and save it as files in config folder, create new config files as needed, keep unused files as is",
 	Example: `There is no "reset-config"-style command. If you want to bulk-reset whole config, consider clearing out the config folder.`,
-	Args:  cobra.NoArgs,
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
