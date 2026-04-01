@@ -172,12 +172,15 @@ func (s *nativeCommands) RmFile(ctx context.Context, path string) error {
 	return nil
 }
 
-func (s *nativeCommands) ReadLink(ctx context.Context, path string) (string, error) {
+func (s *nativeCommands) ReadLink(ctx context.Context, path string) (result string, err error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
 
 	logs.FromCtx(ctx).Command("local exec: running command (optimized)", "cmd", fmt.Sprintf("readlink %s", path))
+	defer func() {
+		logs.FromCtx(ctx).Result("local exec: running command (optimized)", "cmd", fmt.Sprintf("readlink %s", path), "result", result, "error", err)
+	}()
 
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -205,7 +208,7 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (string, err
 
 	// os.Readlink does not like it when file is not a symlink, need to check it first
 	file := filepath.Join(resolvedDir, filename)
-	info, err = os.Stat(file)
+	info, err = os.Lstat(file)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return file, nil
@@ -216,14 +219,22 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (string, err
 		return file, nil
 	}
 
-	resolvedFile, err := os.Readlink(file)
+	resolvedLink, err := os.Readlink(file)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return file, nil
 		}
 		return "", fmt.Errorf("os.Readlink: %w", err)
 	}
-	return resolvedFile, nil
+	if filepath.IsAbs(resolvedLink) {
+		return resolvedLink, nil
+	}
+
+	resolvedAbs, err := filepath.Abs(filepath.Join(resolvedDir, resolvedLink))
+	if err != nil {
+		return "", err
+	}
+	return resolvedAbs, nil
 }
 
 func (s *nativeCommands) Stat(ctx context.Context, path string) (result transport.StatResult, err error) {
