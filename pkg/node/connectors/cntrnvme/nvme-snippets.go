@@ -88,7 +88,16 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 		}()
 	}
 
-	cmd := append(snip.cmd, "connect", "--hostnqn", hostNqn, "--hostid", hostId, "--transport", nvmeTransport, "--traddr", address, "--trsvcid", port, "--nqn", targetNqn)
+	cmd := append(snip.cmd,
+		"connect",
+		"--hostnqn", hostNqn,
+		"--hostid", hostId,
+		"--transport", nvmeTransport,
+		"--traddr", address,
+		"--trsvcid", port,
+		"--nqn", targetNqn,
+		"--ctrl-loss-tmo=-1",
+	)
 	if ioQueues != "" {
 		cmd = append(cmd, "--nr-io-queues", ioQueues)
 	}
