@@ -9,7 +9,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/addropt"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport/localexec"
+	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
@@ -30,25 +34,81 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	// mp := conf.getMultipath(tr)
+	mp := conf.getMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath)
+	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.findConnectorById(connectorId, tr) })
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
-	if nvi.FolderPath == "" {
-		return nil, fmt.Errorf("node volume info: FolderPath is empty")
+
+	connector := conf.findConnectorById(nvi.ConnectorId, tr)
+	if connector == nil {
+		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
 
-	fsnip := fsutils.New(tr)
-	var bindOpts []fsutils.BindMountOption
-	// if nvi.ManagedOps.AllowIdMap {
-	// 	bindOpts = append(bindOpts, fsutils.WithMapUsersDefault(), fsutils.WithMapGroup("0", "0"), fsutils.WithMapGroup("10000", req.VolumeCapability.GetMount().VolumeMountGroup))
-	// }
-	err = fsnip.EnsureBindMount(ctx, nvi.FolderPath, req.TargetPath, bindOpts...)
+	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
 	if err != nil {
-		return nil, fmt.Errorf("EnsureBindMount: %w", err)
+		return nil, fmt.Errorf("ExtractSecretFromMap: %w", err)
 	}
+
+	addressOptions, err := addropt.Parse(req.PublishContext)
+	if err != nil {
+		return nil, fmt.Errorf("parse address options from publish context: %w", err)
+	}
+
+	caps, err := connector.Capabilities(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get connector capabilities: %w", err)
+	}
+
+	mountParams := req.VolumeCapability.GetMount()
+
+	switch caps.ConnectType {
+	case connectors.ConnectTypeBlock, connectors.ConnectTypeFolder:
+		switch {
+		case mountParams != nil:
+			if nvi.FsMountPath == "" {
+				return nil, fmt.Errorf("node volume info: FsMountPath is empty")
+			}
+			fsnip := fsutils.New(tr)
+			var bindOpts []fsutils.BindMountOption
+			// if nvi.ManagedOps.AllowIdMap {
+			// 	bindOpts = append(bindOpts, fsutils.WithMapUsersDefault(), fsutils.WithMapGroup("0", "0"), fsutils.WithMapGroup("10000", req.VolumeCapability.GetMount().VolumeMountGroup))
+			// }
+			err = fsnip.EnsureBindMount(ctx, nvi.FsMountPath, req.TargetPath, bindOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("EnsureBindMount: %w", err)
+			}
+			logs.FromCtx(ctx).MicroOp("connector.Connect: success")
+		case req.VolumeCapability.GetBlock() != nil:
+			return nil, fmt.Errorf("block mounting is not implemented")
+		default:
+			return nil, fmt.Errorf("unknown mount mode")
+		}
+
+	case connectors.ConnectTypePublishFolder:
+		if mountParams == nil {
+			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
+		}
+
+		err = nvi.publishFolderMount(ctx, connectors.ConnectRequest{
+			FsMountPath:             req.TargetPath,
+			AddressOptions:          addressOptions,
+			VolumeContext:           req.VolumeContext,
+			PublishContext:          req.PublishContext,
+			AccessMount:             mountParams,
+			PublishSecret:           secretPlaintext,
+			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("publishFolderMount: %w", err)
+		}
+		logs.FromCtx(ctx).MicroOp("publishFolderMount: success")
+
+	default:
+		return nil, fmt.Errorf("unknown capabilities.ConnectType: '%s'", caps.ConnectType)
+	}
+
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -74,5 +134,6 @@ func (n *Node) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVo
 	if err != nil {
 		return nil, fmt.Errorf("remove publish dir: %w", err)
 	}
+
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

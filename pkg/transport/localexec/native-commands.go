@@ -272,11 +272,17 @@ func (s *nativeCommands) Stat(ctx context.Context, path string) (result transpor
 		}
 		return transport.StatResult{}, fmt.Errorf("os.Stat: %w", err)
 	}
+	sysStat, ok := stat.Sys().(*syscall.Stat_t)
+	if !ok {
+		return transport.StatResult{}, fmt.Errorf("os.Stat: not a posix filesystem")
+	}
 
 	result = transport.StatResult{
 		Path:         realPath,
 		FileExists:   true,
 		ParentExists: true,
+		Uid:          fmt.Sprintf("%d", sysStat.Uid),
+		Gid:          fmt.Sprintf("%d", sysStat.Gid),
 	}
 
 	mode := stat.Mode()
@@ -356,6 +362,14 @@ func (s *nativeCommands) CreateLock(ctx context.Context, lockFile string, maxDur
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	// TODO add optimized implementation for CreateLock
+	// TODO add optimized implementation
 	return executils.New(s.tr, false).CreateLock(ctx, lockFile, maxDuration)
+}
+
+func (s *nativeCommands) Chown(ctx context.Context, path string, user string, group string, recursive bool) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	// TODO add optimized implementation
+	return executils.New(s.tr, false).Chown(ctx, path, user, group, recursive)
 }

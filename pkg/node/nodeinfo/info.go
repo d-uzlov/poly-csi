@@ -10,7 +10,7 @@ import (
 
 type NodeInfo struct {
 	Id           string                                  `json:"id"`
-	PublicKey    *encrypt.RsaPublicKey                   `json:"public_key"`
+	PublicKey    encrypt.RsaPublicKey                   `json:"public_key"`
 	Connectors   map[string]connectors.ConnectorNodeInfo `json:"connectors"`
 	Ips          []string                                `json:"ips"`
 }
@@ -19,8 +19,9 @@ func (ni *NodeInfo) Validate() error {
 	if ni.Id == "" {
 		return fmt.Errorf("node id is empty")
 	}
-	if ni.PublicKey == nil {
-		return fmt.Errorf("public key is not set")
+	err := ni.PublicKey.Validate()
+	if err != nil {
+		return fmt.Errorf("public key: %w", err)
 	}
 	return nil
 }
@@ -58,7 +59,10 @@ func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
 			if err != nil {
 				return nil, fmt.Errorf("parse node public key: %w", err)
 			}
-			result.PublicKey = pk
+			if pk == nil {
+				return nil, fmt.Errorf("parse node public key: nil")
+			}
+			result.PublicKey = *pk
 			continue
 		case "ips":
 			result.Ips = strings.Fields(v)

@@ -110,6 +110,13 @@ func ParsePublicRsaPem(keyBytes []byte) (*RsaPublicKey, error) {
 	return nil, fmt.Errorf("unknown private key type: %T", keyAny)
 }
 
+func (e RsaPublicKey) Validate() error {
+	if e.public == nil {
+		return fmt.Errorf("not initialized")
+	}
+	return nil
+}
+
 func (e RsaPublicKey) Hash() string {
 	hash := sha256.Sum256(e.SerializePem())
 	return base64.StdEncoding.EncodeToString(hash[:])

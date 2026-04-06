@@ -39,7 +39,7 @@ func (s snippets) setupTarget(ctx context.Context, target tnIscsiRequest) error 
 		cmd := append(midcltCmd, "call", "iscsi.extent.create", requestObject)
 		_, err := transport.RelaxedRun(ctx, s.tr, cmd, "Disk currently in use by extent "+target.extentName)
 		if err != nil {
-			return fmt.Errorf("%s: %w", cmd, err)
+			return fmt.Errorf("iscsi.extent.create: %w", err)
 		}
 		tnExtents, err = s.getIscsiExtents(ctx, target.zvol)
 		if err != nil {
@@ -59,7 +59,7 @@ func (s snippets) setupTarget(ctx context.Context, target tnIscsiRequest) error 
 	cmd := append(midcltCmd, "call", "iscsi.target.create", requestObject)
 	_, err = transport.RelaxedRun(ctx, s.tr, cmd, "Target with this name already exists")
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsi.target.create: %w", err)
 	}
 	tnTarget, err := s.getIscsiTarget(ctx, target.iqn)
 	if err != nil {
@@ -73,7 +73,7 @@ func (s snippets) setupTarget(ctx context.Context, target tnIscsiRequest) error 
 	cmd = append(midcltCmd, "call", "iscsi.targetextent.create", requestObject)
 	_, err = transport.RelaxedRun(ctx, s.tr, cmd, "Extent is already in use")
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsi.targetextent.create: %w", err)
 	}
 
 	return nil
@@ -90,7 +90,7 @@ func (s snippets) getIscsiExtents(ctx context.Context, zvol string) ([]tnExtentI
 	cmd := append(midcltCmd, "call", "iscsi.extent.query", requestObject)
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("iscsi.extent.query: %w", err)
 	}
 
 	var result []tnExtentInfo
@@ -120,7 +120,7 @@ func (s snippets) getIscsiTarget(ctx context.Context, name string) (*tnTargetInf
 	cmd := append(midcltCmd, "call", "iscsi.target.query", requestObject)
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("iscsi.target.query: %w", err)
 	}
 
 	var shareList []tnTargetInfo
@@ -149,7 +149,7 @@ func (s snippets) getIscsiInitiatorGroups(ctx context.Context, iqn string) ([]tn
 	cmd := append(midcltCmd, "call", "iscsi.initiator.query", requestObject)
 	stdout, err := transport.CheckedRunStdout(ctx, s.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("iscsi.initiator.query: %w", err)
 	}
 
 	var result []tnInitiatorGroupInfo
@@ -199,7 +199,7 @@ func (s snippets) detachGroup(ctx context.Context, targetIqn string, clientIqn s
 	cmd := append(midcltCmd, "call", "iscsi.target.update", fmt.Sprintf("%d", id), string(encoded))
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsi.target.update: %w", err)
 	}
 	return nil
 }
@@ -221,7 +221,7 @@ func (s snippets) attachGroup(ctx context.Context, targetIqn string, clientIqn s
 		cmd := append(midcltCmd, "call", "iscsi.initiator.create", requestObject)
 		err = transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
-			return fmt.Errorf("%s: %w", cmd, err)
+			return fmt.Errorf("iscsi.initiator.create: %w", err)
 		}
 		groups, err := s.getIscsiInitiatorGroups(ctx, clientIqn)
 		if err != nil {
@@ -257,7 +257,7 @@ func (s snippets) attachGroup(ctx context.Context, targetIqn string, clientIqn s
 	cmd := append(midcltCmd, "call", "iscsi.target.update", fmt.Sprintf("%d", id), string(encoded))
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsi.target.update: %w", err)
 	}
 	return nil
 }
@@ -274,7 +274,7 @@ func (s snippets) removeIscsiTarget(ctx context.Context, iqn string) error {
 	cmd := append(midcltCmd, "call", "iscsi.target.delete", fmt.Sprintf("%d", tnTarget.Id))
 	err = transport.CheckedRun(ctx, s.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("%s: %w", cmd, err)
+		return fmt.Errorf("iscsi.target.delete: %w", err)
 	}
 	return nil
 }
@@ -288,7 +288,7 @@ func (s snippets) removeIscsiExtents(ctx context.Context, zvol string) error {
 		cmd := append(midcltCmd, "call", "iscsi.extent.delete", fmt.Sprintf("%d", v.Id))
 		err = transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
-			return fmt.Errorf("%s: %w", cmd, err)
+			return fmt.Errorf("iscsi.extent.delete: %w", err)
 		}
 	}
 

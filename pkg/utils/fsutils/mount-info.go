@@ -22,7 +22,7 @@ func (s *FsSnippets) FindMount(ctx context.Context, mountedPath string) (*MountI
 	if err != nil {
 		return nil, fmt.Errorf("check mount path: %w", err)
 	}
-	if !sr.ParentExists || !sr.FileExists {
+	if !sr.FileExists {
 		return nil, nil
 	}
 	const mountinfoPath = "/proc/self/mountinfo"

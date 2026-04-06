@@ -2,10 +2,7 @@ package nodedispatcher
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -21,6 +18,8 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
+
+const stageFolderMount = "/fs_mount"
 
 func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (res *csi.NodeStageVolumeResponse, err error) {
 	if req.VolumeId == "" {
@@ -49,37 +48,28 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
 	}
 
-	pcSecretEnc := req.PublishContext["_secret"]
-	var pcSecretPlaintext []byte
-	if pcSecretEnc != "" {
-		aesSecret, err := encrypt.ExtractAesSecret(req.PublishContext, conf.Encrypt.NodeKey)
-		if err != nil {
-			return nil, fmt.Errorf("publish_context: extract aes secret: %w", err)
-		}
-		ciphertext, err := base64.StdEncoding.DecodeString(pcSecretEnc)
-		if err != nil {
-			return nil, fmt.Errorf("publish_context: extract secret value: %w", err)
-		}
-		pcSecretPlaintext, err = encrypt.DecryptAes(aesSecret, ciphertext)
-		if err != nil {
-			return nil, fmt.Errorf("publish_context: decrypt secret value: %w", err)
-		}
-	}
-
-	var initConfig volumeinit.InitConfig
-	err = serialmaps.Parse(req.PublishContext, volumeinit.PreferredPrefix, &initConfig)
+	caps, err := connector.Capabilities(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("parse init config: %w", err)
+		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}
 
-	nvi := newVolumeHandle(req.StagingTargetPath)
+	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId)
 	defer func() {
-		if conf.DisableCleanupOnFailure {
-			return
+		saveErr := nvi.writeToDisk()
+		if err == nil {
+			err = saveErr
+			saveErr = nil
+		}
+		if saveErr != nil {
+			logger.Error("failed to write volume metadata to disk", "error", saveErr.Error())
 		}
 		if err != nil {
+			if conf.DisableCleanupOnFailure {
+				logger.Warn("detected failure, but skipping cleanup due to config")
+				return
+			}
 			logger.Warn("detected failure, running cleanup")
-			cleanupErr := nvi.cleanup(ctx, tr, mp, connector)
+			cleanupErr := nvi.cleanup(ctx)
 			if cleanupErr != nil {
 				// TODO retry cleanup in background?
 				logger.Error("failed to cleanup partially initialized volume", "error", cleanupErr.Error())
@@ -87,56 +77,75 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}()
 
+	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
+	if err != nil {
+		return nil, fmt.Errorf("ExtractSecretFromMap: %w", err)
+	}
+
 	addressOptions, err := addropt.Parse(req.PublishContext)
 	if err != nil {
 		return nil, fmt.Errorf("parse address options from publish context: %w", err)
 	}
 
-	err = nvi.connect(ctx, vc.ConnectorId, connector, connectors.ConnectRequest{
-		AddressOptions: addressOptions,
-		VolumeContext:  req.VolumeContext,
-		PublishContext: req.PublishContext,
-		// StagingTargetPath:    "", // StagingTargetPath is set automatically
-		AccessBlock:             req.VolumeCapability.GetBlock(),
-		AccessMount:             req.VolumeCapability.GetMount(),
-		CsiSecrets:              req.Secrets,
-		PublishSecret:           pcSecretPlaintext,
-		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("connect via connector[id=%s]: %w", vc.ConnectorId, err)
-	}
-	if len(nvi.intermediateDeviceList) != 0 {
-		for _, v := range nvi.intermediateDeviceList {
-			sr, err := tr.Cmds().Stat(ctx, v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to check device path at %s: %w", v, err)
-			}
-			if !sr.FileExists {
-				return nil, fmt.Errorf("checking device path at %s: file does not exist", v)
-			}
-			if !sr.IsBlock() {
-				return nil, fmt.Errorf("checking device path at %s: file is not a block device", v)
-			}
+	mountParams := req.VolumeCapability.GetMount()
+
+	switch caps.ConnectType {
+	case connectors.ConnectTypeBlock:
+		err = nvi.stageBlock(ctx, connectors.ConnectRequest{
+			FsMountPath:             "",
+			AddressOptions:          addressOptions,
+			VolumeContext:           req.VolumeContext,
+			PublishContext:          req.PublishContext,
+			AccessMount:             nil,
+			PublishSecret:           secretPlaintext,
+			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("stageBlock: %w", err)
 		}
-	}
-	logger.MicroOp("connector.Connect: success")
+		switch {
+		case mountParams != nil:
+			var initConfig volumeinit.InitConfig
+			err = serialmaps.Parse(req.PublishContext, volumeinit.PreferredPrefix, &initConfig)
+			if err != nil {
+				return nil, fmt.Errorf("parse init config: %w", err)
+			}
+			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags, initConfig)
+			if err != nil {
+				return nil, fmt.Errorf("stageBlockMount: %w", err)
+			}
+			logger.MicroOp("stageBlockMount: success")
+		case req.VolumeCapability.GetBlock() != nil:
+			return nil, fmt.Errorf("block mounting is not implemented")
+		default:
+			return nil, fmt.Errorf("unknown mount mode")
+		}
 
-	mountRequest := req.VolumeCapability.GetMount()
-	if mountRequest == nil {
-		return nil, fmt.Errorf("block mounting is not implemented")
-	}
+	case connectors.ConnectTypeFolder:
+		if mountParams == nil {
+			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
+		}
 
-	err = nvi.ensureFolderPath(ctx, tr, conf.DevFolder, mp, mountRequest, initConfig)
-	if err != nil {
-		return nil, fmt.Errorf("connector[id=%s]: ensure folder path exists: %w", vc.ConnectorId, err)
-	}
-	logger.MicroOp("ensure folder path: success")
-
-	// nvi.Initialized = true
-	err = nvi.writeMetadataToDisk()
-	if err != nil {
-		return nil, fmt.Errorf("writeMetadataToDisk: %w", err)
+		err = nvi.stageFolderMount(ctx, connectors.ConnectRequest{
+			FsMountPath:             req.StagingTargetPath + stageFolderMount,
+			AddressOptions:          addressOptions,
+			VolumeContext:           req.VolumeContext,
+			PublishContext:          req.PublishContext,
+			AccessMount:             mountParams,
+			PublishSecret:           secretPlaintext,
+			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("stageFolderMount: %w", err)
+		}
+		logs.FromCtx(ctx).MicroOp("stageFolderMount: success")
+	case connectors.ConnectTypePublishFolder:
+		if mountParams == nil {
+			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
+		}
+		// nothing to do at stage
+	default:
+		return nil, fmt.Errorf("unknown capabilities.ConnectType: '%s'", caps.ConnectType)
 	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
@@ -155,54 +164,21 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.getMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath)
+	nvi, err := TryParseMountInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.findConnectorById(connectorId, tr) })
 	if err != nil {
-		// volume info is missing, but CO thinks volume is still staged
-		// let's try to remove staging path, but only if it's an empty folder
-		// This way we can at least allow cluster administrator to manually cleanup all related resources
-		err = os.Remove(req.StagingTargetPath)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("volume is stuck: local info is missing but staging path is not empty: %s", req.StagingTargetPath)
+		return nil, fmt.Errorf("ParseMountInfo: %w", err)
+	}
+	if nvi != nil {
+		err = nvi.cleanup(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("cleanup: %w", err)
 		}
-		return &csi.NodeUnstageVolumeResponse{}, nil
-	}
-	if nvi == nil {
-		// TODO try to remove empty staging path before returning an error?
-		return nil, fmt.Errorf("node volume info is not found")
 	}
 
-	connector := conf.findConnectorById(nvi.ConnectorId, tr)
-	if connector == nil {
-		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
-	}
-
-	err = nvi.cleanup(ctx, tr, mp, connector)
-	if err != nil {
-		return nil, fmt.Errorf("cleanup: %w", err)
-	}
-
-	dirEntries, err := os.ReadDir(req.StagingTargetPath)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			logs.FromCtx(ctx).Warn("staging path unexpectedly disappeared")
-			return &csi.NodeUnstageVolumeResponse{}, nil
-		}
-		return nil, fmt.Errorf("check remaining files in staging path: %w", err)
-	}
-	if len(dirEntries) != 1 {
-		return nil, fmt.Errorf("staging path contains unexpected files")
-	}
-	err = DeleteMountInfo(req.StagingTargetPath)
-	if err != nil {
-		return nil, fmt.Errorf("DeleteMountInfo: %w", err)
-	}
-	// It's a dangerous place to call os.Remove.
-	// We have already deleted mount info, so if we fail, the volume will become stuck.
-	// But the only way for this to happen is if a new file was created between os.ReadDir and here.
-	// This is an exceptional situation, and node administrator must manage it manually.
 	err = os.Remove(req.StagingTargetPath)
 	if err != nil {
 		return nil, fmt.Errorf("remove staging dir: %w", err)
 	}
+
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }

@@ -69,40 +69,40 @@ func NewNode(tr transport.Transport) Init {
 	}
 }
 
-func (n *Init) RunBlock(ctx context.Context, cfg InitConfig, devicePath string) (err error) {
+func (n *Init) RunBlock(ctx context.Context, cfg InitConfig, devicePath string) (changed bool, err error) {
 	if cfg.On != n.place {
-		return nil
+		return false, nil
 	}
 
 	fsnip := fsutils.New(n.tr)
 
 	fsInfo, err := fsnip.GetBlkid(ctx, devicePath)
 	if err != nil {
-		return fmt.Errorf("GetBlkid: %w", err)
+		return false, fmt.Errorf("GetBlkid: %w", err)
 	}
 
 	if fsInfo != nil {
 		logs.FromCtx(ctx).MicroOp("will not format over existing fs", "device", devicePath, "fs-type", fsInfo.FsType)
-		return nil
+		return false, nil
 	}
 
 	logs.FromCtx(ctx).MicroOp("fs info is not found, will format fs", "device", devicePath)
 	if cfg.BlockFormat == "" {
-		return fmt.Errorf("block format command is not set")
+		return false, fmt.Errorf("block format command is not set")
 	}
 
 	if cfg.BlockFormat == "" {
-		return fmt.Errorf("missing block format command")
+		return false, fmt.Errorf("missing block format command")
 	}
 	var cmd = []string{cfg.BlockFormat}
 	cmd = append(cmd, devicePath)
 	err = transport.CheckedRun(ctx, n.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("format: %w", err)
+		return false, fmt.Errorf("format: %w", err)
 	}
 	logs.FromCtx(ctx).MicroOp("fs format success", "device", devicePath)
 
-	return nil
+	return true, nil
 }
 
 func (n *Init) RunFsWithTmpMount(ctx context.Context, cfg InitConfig, devicePath string) error {
@@ -122,14 +122,13 @@ func (n *Init) RunFsWithTmpMount(ctx context.Context, cfg InitConfig, devicePath
 		}
 	}()
 
-	fs := fsutils.New(n.tr)
-	_, err = fs.EnsureMounted(ctx, devicePath, tmpMount, "", nil)
+	fsnip := fsutils.New(n.tr)
+	_, err = fsnip.EnsureMounted(ctx, devicePath, tmpMount, "", nil)
 	if err != nil {
 		return fmt.Errorf("tmp mount: %w", err)
 	}
 	defer func() {
-		fs := fsutils.New(n.tr)
-		deferErr := fs.Unmount(ctx, tmpMount)
+		deferErr := fsnip.Unmount(ctx, tmpMount)
 		if err == nil {
 			err = fmt.Errorf("cleanup tmp mount: %w", deferErr)
 		} else {
@@ -147,17 +146,20 @@ func (n *Init) RunFs(ctx context.Context, cfg InitConfig, fsPath string) error {
 
 	var cmd []string
 	var err error
-	if cfg.OwnerUser != "-" && cfg.OwnerGroup != "-" {
-		cmd = []string{"chown", fmt.Sprintf("%s:%s", cfg.OwnerUser, cfg.OwnerGroup), fsPath}
-	} else if cfg.OwnerUser != "-" {
-		cmd = []string{"chown", cfg.OwnerUser, fsPath}
-	} else if cfg.OwnerGroup != "-" {
-		cmd = []string{"chgrp", cfg.OwnerGroup, fsPath}
+	fsnip := fsutils.New(n.tr)
+
+	user := ""
+	group := ""
+	if cfg.OwnerUser != "-" {
+		user = cfg.OwnerUser
 	}
-	if len(cmd) != 0 {
-		err = transport.CheckedRun(ctx, n.tr, cmd, transport.WithSudo(true))
+	if cfg.OwnerGroup != "-" {
+		group = cfg.OwnerGroup
+	}
+	if user != "" || group != "" {
+		err = fsnip.ChownHeuristic(ctx, fsPath, user, group)
 		if err != nil {
-			return fmt.Errorf("%s: %w", cmd[0], err)
+			return fmt.Errorf("chown: %w", err)
 		}
 	}
 

@@ -49,6 +49,7 @@ type Commands interface {
 	Df(ctx context.Context, path string) (*FsSizeInfo, error)
 	EnsureSymlink(ctx context.Context, link string, target string) error
 	MkFifo(ctx context.Context, path string) (alreadyExists bool, err error)
+	Chown(ctx context.Context, path string, user string, group string, recursive bool) error
 
 	// Creates and/or capture a lock file in specified location.
 	// When it returns, lock file will contain lease info, which must be released via a provided callback.
@@ -73,6 +74,8 @@ type StatResult struct {
 	Path         string
 	FileExists   bool
 	ParentExists bool
+	Uid          string
+	Gid          string
 }
 
 type FsSizeInfo struct {

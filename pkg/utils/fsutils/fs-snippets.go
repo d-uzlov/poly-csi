@@ -28,6 +28,50 @@ type FsInfo struct {
 	FsType    string `json:"type"`
 }
 
+func (s *FsSnippets) WaitForBlockDeviceList(ctx context.Context, devices []string, maxDuration time.Duration, period time.Duration) (result []string) {
+	endTime := time.Now().Add(maxDuration)
+	logger := logs.FromCtx(ctx)
+
+	for _, devicePath := range devices {
+		err := transport.RetryUntil(period, endTime, func() error {
+			sr, err := s.tr.Cmds().Stat(ctx, devicePath)
+			if err != nil {
+				return err
+			}
+			if !sr.FileExists {
+				return fmt.Errorf("file does not exist")
+			}
+			if !sr.IsBlock() {
+				return fmt.Errorf("file is not a block device")
+			}
+			return nil
+		})
+		if err == nil {
+			result = append(result, devicePath)
+		} else {
+			logger.Error("device is not found", "path", devicePath, "error", err)
+		}
+	}
+
+	return result
+}
+
+func (s *FsSnippets) WaitForBlockDevice(ctx context.Context, device string, maxDuration time.Duration, period time.Duration) error {
+	return transport.Retry(period, maxDuration, func() error {
+		sr, err := s.tr.Cmds().Stat(ctx, device)
+		if err != nil {
+			return err
+		}
+		if !sr.FileExists {
+			return fmt.Errorf(" file does not exist")
+		}
+		if !sr.IsBlock() {
+			return fmt.Errorf(" file is not a block device")
+		}
+		return nil
+	})
+}
+
 func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, error) {
 	// can't use '-o json' here because busybox does not support it
 	// on blkid from util-linux '--probe' disables cache
@@ -43,7 +87,7 @@ func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, 
 	}
 	if runResult.ExitCode != 0 {
 		err := transport.FormatRunError(runResult)
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("blkid: %w", err)
 	}
 	// blkid from busybox gives exit code 0, but empty output when device is not formatted
 	if string(runResult.Stdout) == "" {
@@ -142,7 +186,7 @@ func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string, devFolder
 		cmd := []string{"resize2fs", devicePath}
 		err := transport.CheckedRun(ctx, s.tr, cmd)
 		if err != nil {
-			return fmt.Errorf("%s: %w", cmd, err)
+			return fmt.Errorf("resize2fs: %w", err)
 		}
 		return nil
 	}
@@ -279,4 +323,25 @@ func (s *FsSnippets) GetMountStats(targetPath string) (StatsResult, error) {
 		InodesAvailable: int64(stat.Ffree),
 		InodesUsed:      int64(stat.Files) - int64(stat.Ffree),
 	}, nil
+}
+
+func (s *FsSnippets) ChownHeuristic(ctx context.Context, path string, user string, group string) error {
+	sr, err := s.tr.Cmds().Stat(ctx, path)
+	if err != nil {
+		return fmt.Errorf("stat path: %w", err)
+	}
+	if !sr.FileExists {
+		return fmt.Errorf("target path does not exist")
+	}
+	needChanges := false
+	if user != "" && user != sr.Uid {
+		needChanges = true
+	}
+	if group != "" && group != sr.Gid {
+		needChanges = true
+	}
+	if !needChanges {
+		return nil
+	}
+	return s.tr.SudoCmds().Chown(ctx, path, user, group, true)
 }

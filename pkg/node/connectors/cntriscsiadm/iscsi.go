@@ -10,21 +10,27 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-type iscsiadmConnector struct {
+type connector struct {
 	tr        transport.Transport
 	config    Config
 	devFolder string
 }
 
 func New(tr transport.Transport, config Config, devFolder string) connectors.Connector {
-	return &iscsiadmConnector{
+	return &connector{
 		tr:        tr,
 		config:    config,
 		devFolder: devFolder,
 	}
 }
 
-func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (result *connectors.ConnectResult, err error) {
+func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
+	return connectors.Capabilities{
+		ConnectType: connectors.ConnectTypeBlock,
+	}, nil
+}
+
+func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (result *connectors.ConnectResult, err error) {
 	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -156,20 +162,14 @@ func (m *iscsiadmConnector) Connect(ctx context.Context, req connectors.ConnectR
 		logs.FromCtx(ctx).Warn("iscsi: some addresses failed to connect, returning partial list")
 	}
 	return &connectors.ConnectResult{
-		FolderPath: "",
 		Devices:    devices,
-		ManagedOps: connectors.ManagedOperations{
-			MountFs:   true,
-			UnmountFs: true,
-			ExpandFs:  true,
-		},
 		ConnectorData: VolumeData{
 			Iqn: pc.Iqn,
 		},
 	}, nil
 }
 
-func (m *iscsiadmConnector) Disconnect(ctx context.Context, serializedConnectorData string) error {
+func (m *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
 	vd, err := parseVolumeData(serializedConnectorData)
 	if err != nil {
 		return fmt.Errorf("parse serialized connector data: %w", err)
@@ -190,7 +190,7 @@ func (m *iscsiadmConnector) Disconnect(ctx context.Context, serializedConnectorD
 	return nil
 }
 
-func (m *iscsiadmConnector) Expand(ctx context.Context, serializedConnectorData string) error {
+func (m *connector) Expand(ctx context.Context, serializedConnectorData string) error {
 	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
 	// TODO rescan only target devices?
 	err := snip.rescanAll()

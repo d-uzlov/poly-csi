@@ -16,7 +16,7 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 	nodePublicKey := pk.GetPublicKey()
 	info := NodeInfo{
 		Id:         nodeId,
-		PublicKey:  &nodePublicKey,
+		PublicKey:  nodePublicKey,
 		Connectors: map[string]connectors.ConnectorNodeInfo{},
 	}
 

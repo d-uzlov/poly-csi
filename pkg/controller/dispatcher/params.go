@@ -17,6 +17,7 @@ type DispatchParams struct {
 	ConnectorId       string `map:"connectorId"`
 	AddressNames      string `map:"addressNames"`
 	ServerName        string `map:"serverName"`
+	FsGroupPolicy     string `map:"fsGroupPolicy"`
 }
 
 const paramsPrefix = "dispatch."

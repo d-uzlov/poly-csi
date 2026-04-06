@@ -14,7 +14,7 @@ type IscsiPublicInfo struct {
 	HostIqn string `json:"host_iqn"`
 }
 
-func (m *iscsiadmConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	iqn, err := m.parseIqn(m.tr, ctx)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func ParseIscsiInfo(src connectors.ConnectorNodeInfo) (IscsiPublicInfo, error) {
 	return result, nil
 }
 
-func (m *iscsiadmConnector) parseIqn(tr transport.Transport, ctx context.Context) (string, error) {
+func (m *connector) parseIqn(tr transport.Transport, ctx context.Context) (string, error) {
 	initiatorInfo, err := tr.SudoCmds().Read(ctx, m.config.InitiatorNamePath, false)
 	if err != nil {
 		return "", fmt.Errorf("read initiatorname.iscsi: %w", err)

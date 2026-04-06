@@ -2,8 +2,6 @@ package dispatcher
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -96,22 +94,10 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 
 	if pc.Secret != nil {
 		logger.Info("creating encrypted publish secret")
-
-		aesSecret := make([]byte, 32)
-		_, err = rand.Read(aesSecret)
+		err = encrypt.InjectSecretIntoMap(publishContext, ni.PublicKey, pc.Secret)
 		if err != nil {
-			return nil, fmt.Errorf("generate random bytes for aes: %w", err)
+			return nil, fmt.Errorf("inject secret: %w", err)
 		}
-		encrypt.InjectAesSecret(publishContext, *ni.PublicKey, aesSecret)
-		secretJson, err := json.Marshal(pc.Secret)
-		if err != nil {
-			return nil, fmt.Errorf("publish_context: marshal secret: %w", err)
-		}
-		secretJsonEnc, err := encrypt.EncryptAes(aesSecret, string(secretJson))
-		if err != nil {
-			return nil, fmt.Errorf("publish_context: encrypt secret: %w", err)
-		}
-		publishContext["_secret"] = base64.StdEncoding.EncodeToString(secretJsonEnc)
 	}
 
 	_, err = serialmaps.SerializeInto(mh.vi.InitConfig, publishContext, volumeinit.PreferredPrefix)

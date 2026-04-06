@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -16,6 +17,9 @@ import (
 func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
+	}
+	if req.VolumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume path is empty")
 	}
 
 	// logger := logs.FromCtx(ctx)
@@ -28,7 +32,7 @@ func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeSta
 	// req.StagingTargetPath is empty in this call
 	stats, err := fsnip.GetMountStats(req.VolumePath)
 	if err != nil {
-		return nil, fmt.Errorf("get volume stats failed: %w", err)
+		return nil, fmt.Errorf("GetMountStats: %w", err)
 	}
 
 	return &csi.NodeGetVolumeStatsResponse{
@@ -56,16 +60,11 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
 	}
+	if req.VolumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume path is empty")
+	}
 	if req.CapacityRange == nil {
 		return nil, status.Error(codes.InvalidArgument, "capacity missing")
-	}
-
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath)
-	if err != nil {
-		return nil, fmt.Errorf("ParseMountInfo: %w", err)
-	}
-	if nvi.FolderPath == "" {
-		return nil, fmt.Errorf("node volume info: FolderPath is empty")
 	}
 
 	// logger := logs.FromCtx(ctx)
@@ -73,15 +72,18 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.getMultipath(tr)
 
-	connector := conf.findConnectorById(nvi.ConnectorId, tr)
-	if connector == nil {
-		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
-	}
-	err = connector.Expand(ctx, nvi.SerializedConnectorData)
+	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.findConnectorById(connectorId, tr) })
 	if err != nil {
-		return nil, fmt.Errorf("connector.Expand: %w", err)
+		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
-	logs.FromCtx(ctx).MicroOp("connector.Expand: success")
+
+	if nvi.SerializedConnectorData != "" {
+		err = nvi.connector.Expand(ctx, nvi.SerializedConnectorData)
+		if err != nil {
+			return nil, fmt.Errorf("connector.Expand: %w", err)
+		}
+		logs.FromCtx(ctx).MicroOp("connector.Expand: success")
+	}
 	if nvi.SerializedMultipathData != "" {
 		err = mp.Expand(ctx, nvi.SerializedMultipathData)
 		if err != nil {
@@ -92,17 +94,19 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 
 	fsnip := fsutils.New(tr)
 
-	if nvi.ManagedOps.ExpandFs {
-		err = fsnip.ExpandFs(ctx, nvi.FolderPath, conf.DevFolder)
+	// Dispatcher expand manages filesystems mounted from block devices.
+	// Other cases should be handled in connectors.
+	if nvi.MountType == mountTypeBlock {
+		err = fsnip.ExpandFs(ctx, nvi.FsMountPath, conf.DevFolder)
 		if err != nil {
 			return nil, fmt.Errorf("ExpandFs: %w", err)
 		}
 		logs.FromCtx(ctx).MicroOp("ExpandFs: success")
 	}
 
-	stats, err := fsnip.GetMountStats(nvi.FolderPath)
+	stats, err := fsnip.GetMountStats(req.VolumePath)
 	if err != nil {
-		return nil, fmt.Errorf("get volume stats failed: %w", err)
+		return nil, fmt.Errorf("GetMountStats: %w", err)
 	}
 	return &csi.NodeExpandVolumeResponse{
 		CapacityBytes: stats.Capacity,

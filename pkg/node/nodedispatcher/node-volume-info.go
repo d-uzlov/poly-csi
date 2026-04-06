@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"time"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
@@ -17,48 +17,44 @@ import (
 	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
-type NodeVolumeInfo struct {
-	// Initialized indicates whether volume has been fully initialized.
-	// Partially-initialized volumes have this as false.
-	// Initialized bool `json:"initialized"` // TODO make it useful or remove
-
-	// ConnectorId holds id of the connector, to be used on disconnect and other operations.
-	ConnectorId string `json:"connector_id"`
-	// ConnectorPath is a path to a folder,
-	// which was created to allow connector to store data in filesystem
-	// or create mounts.
-	// TODO remove this? connectors should not manually store data in filesystem
-	ConnectorPath string `json:"connector_path"`
-
-	InitDone bool `json:"initDone"`
-	// Folder path is a path to the main volume mount
-	FolderPath string `json:"folder_path"`
-	// SerializedMultipathData contains serialized data returned by multipath module
-	SerializedMultipathData string `json:"multipath_data"`
-	// ManagedOps is copied from connector ConnectResult
-	ManagedOps connectors.ManagedOperations `json:"managed_ops"`
-	// ManagedOps contains serialized data returned by connector connect
-	SerializedConnectorData string `json:"connector_data"`
-
-	parentFolder           string   `json:"-"`
-	intermediateDeviceList []string `json:"-"`
-}
-
-// a bunch of constants defining file names at staging path
 const (
-	metadataFile     = "/mount-info.json"
-	connectorFolder  = "/connector_staging"
-	managedMountPath = "/fs_mount"
+	mountTypeBlock  = "__mount_type_block"
+	mountTypeFolder = "__mount_type_folder"
 )
 
-func newVolumeHandle(parentFolder string) NodeVolumeInfo {
+type NodeVolumeInfo struct {
+	// ConnectorId holds id of the connector, so that deserialization can create an instance.
+	ConnectorId string `json:"connector_id"`
+	MountType   string `json:"mount_type"`
+	FsMountPath string `json:"folder_path"`
+	// TODO we allow for /dev mount changes, we should not save device path here
+	BlockDevicePath         string `json:"block_device_path"`
+	SerializedMultipathData string `json:"multipath_data"`
+	SerializedConnectorData string `json:"connector_data"`
+
+	tr           transport.Transport  `json:"-"`
+	connector    connectors.Connector `json:"-"`
+	mp           multipath.Multipath  `json:"-"`
+	parentFolder string               `json:"-"`
+}
+
+type SavedParams struct {
+}
+
+const metadataFile = "/mount-info.json"
+
+func newVolumeHandle(parentFolder string, tr transport.Transport, connector connectors.Connector, mp multipath.Multipath, connectorId string) NodeVolumeInfo {
 	return NodeVolumeInfo{
 		parentFolder: parentFolder,
+		tr:           tr,
+		connector:    connector,
+		mp:           mp,
+		ConnectorId:  connectorId,
 	}
 }
 
-func ParseNodeVolumeInfo(parentFolder string) (*NodeVolumeInfo, error) {
-	result, err := TryParseMountInfo(parentFolder)
+func ParseNodeVolumeInfo(parentFolder string, tr transport.Transport, mp multipath.Multipath, createConnector func(connectorId string) connectors.Connector) (*NodeVolumeInfo, error) {
+	result, err := TryParseMountInfo(parentFolder, tr, mp, createConnector)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +64,7 @@ func ParseNodeVolumeInfo(parentFolder string) (*NodeVolumeInfo, error) {
 	return result, nil
 }
 
-func TryParseMountInfo(parentFolder string) (*NodeVolumeInfo, error) {
+func TryParseMountInfo(parentFolder string, tr transport.Transport, mp multipath.Multipath, createConnector func(connectorId string) connectors.Connector) (*NodeVolumeInfo, error) {
 	content, err := os.ReadFile(parentFolder + metadataFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -76,19 +72,38 @@ func TryParseMountInfo(parentFolder string) (*NodeVolumeInfo, error) {
 		}
 		return nil, err
 	}
-	var info NodeVolumeInfo
-	err = json.Unmarshal([]byte(content), &info)
+
+	var result NodeVolumeInfo
+	err = json.Unmarshal([]byte(content), &result)
 	if err != nil {
 		return nil, fmt.Errorf("parsing mount info from %s: %w", parentFolder+metadataFile, err)
 	}
-	return &info, nil
+
+	connector := createConnector(result.ConnectorId)
+	if connector == nil {
+		return nil, fmt.Errorf("createConnector '%s': not found", result.ConnectorId)
+	}
+	result.parentFolder = parentFolder
+	result.tr = tr
+	result.connector = connector
+	result.mp = mp
+	return &result, nil
 }
 
-func DeleteMountInfo(stagingPath string) error {
-	return os.Remove(stagingPath + metadataFile)
+func (v *NodeVolumeInfo) deleteFromDisk(ctx context.Context) error {
+	err := os.Remove(v.parentFolder + metadataFile)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			logs.FromCtx(ctx).Warn("underlying file does not exist", "path", v.parentFolder+metadataFile)
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
-func (v *NodeVolumeInfo) writeMetadataToDisk() error {
+func (v *NodeVolumeInfo) writeToDisk() error {
+	// todo do this via transport
 	encoded, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
@@ -96,149 +111,263 @@ func (v *NodeVolumeInfo) writeMetadataToDisk() error {
 	return os.WriteFile(v.parentFolder+metadataFile, encoded, 0660)
 }
 
-func (v *NodeVolumeInfo) connect(ctx context.Context, connectorId string, connector connectors.Connector, req connectors.ConnectRequest) error {
-	v.ConnectorId = connectorId
-	v.ConnectorPath = v.parentFolder + connectorFolder
-	req.StagingTargetPath = v.ConnectorPath
-
-	err := os.MkdirAll(v.ConnectorPath, 0777)
+func (v *NodeVolumeInfo) runConnect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
+	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: request", v.ConnectorId))
+	cr, err := v.connector.Connect(ctx, req)
 	if err != nil {
-		return fmt.Errorf("create folder for connector staging: %w", err)
-	}
-
-	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: request", connectorId))
-	cr, err := connector.Connect(ctx, req)
-	if err != nil {
-		return fmt.Errorf("connect: %w", err)
+		return nil, fmt.Errorf("connect: %w", err)
 	}
 	if cr == nil {
-		return fmt.Errorf("connect: nil result")
+		return nil, fmt.Errorf("connect: nil result")
 	}
-	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: success", connectorId), "devices", cr.Devices, "folder", cr.FolderPath)
+	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: success", v.ConnectorId), "devices", cr.Devices, "mountPath", req.FsMountPath)
 
-	v.ManagedOps = cr.ManagedOps
-
-	if cr.ConnectorData != nil {
-		if cr.SerializedConnectorData != "" {
-			return fmt.Errorf("connector has set both ConnectorData and serializedConnectorData")
-		}
+	if cr.SerializedConnectorData != "" && cr.ConnectorData != nil {
+		return nil, fmt.Errorf("connector has set both ConnectorData and serializedConnectorData")
+	}
+	if cr.SerializedConnectorData != "" {
+		v.SerializedConnectorData = cr.SerializedConnectorData
+	} else if cr.ConnectorData != nil {
 		encoded, err := json.Marshal(cr.ConnectorData)
 		if err != nil {
-			return fmt.Errorf("serialize ConnectorData: %w", err)
+			return nil, fmt.Errorf("serialize ConnectorData: %w", err)
 		}
 		v.SerializedConnectorData = string(encoded)
 	} else {
-		v.SerializedConnectorData = cr.SerializedConnectorData
+		v.SerializedConnectorData = ""
 	}
 
-	if cr.FolderPath != "" {
-		v.FolderPath = cr.FolderPath
-	}
-
-	if len(cr.Devices) != 0 {
-		v.intermediateDeviceList = cr.Devices
-	}
-
-	return nil
+	return cr, nil
 }
 
-func (v *NodeVolumeInfo) ensureFolderPath(ctx context.Context, tr transport.Transport, devFolder string, mp multipath.Multipath, mountRequest *csi.VolumeCapability_MountVolume, initConfig volumeinit.InitConfig) error {
-	if v.FolderPath != "" {
+func (v *NodeVolumeInfo) stageBlock(ctx context.Context, req connectors.ConnectRequest) error {
+	cr, err := v.runConnect(ctx, req)
+	if err != nil {
+		return fmt.Errorf("runConnect: %w", err)
+	}
+	if v.SerializedConnectorData == "" {
+		return fmt.Errorf("connect did not set connector data")
+	}
+
+	if len(cr.Devices) == 0 {
+		return fmt.Errorf("connector did not set device list")
+	}
+
+	fsnip := fsutils.New(v.tr)
+
+	devices := fsnip.WaitForBlockDeviceList(ctx, cr.Devices, time.Second, time.Millisecond*50)
+	if len(devices) == 0 {
+		return fmt.Errorf("connector device list has no valid devices")
+	}
+	logs.FromCtx(ctx).MicroOp("got device list", "devices", devices)
+
+	if len(devices) == 1 {
+		v.BlockDevicePath = devices[0]
 		return nil
 	}
 
-	if !v.ManagedOps.MountFs {
-		return fmt.Errorf("connector did not set FolderPath and did not request automatic mount")
-	}
-
-	// ensureDevicePath will setup multipath if needed
-	devicePath, err := ensureDevicePath(ctx, tr, v, v.intermediateDeviceList, mp)
+	logs.FromCtx(ctx).MicroOp("multipath.Setup: request", "devices", devices)
+	mpData, err := v.mp.Setup(ctx, devices)
 	if err != nil {
-		return fmt.Errorf("ensureDevicePath: %w", err)
+		return fmt.Errorf("multipath.Setup: %w", err)
 	}
-	sr, err := tr.Cmds().Stat(ctx, devicePath)
+	if mpData == "" {
+		return fmt.Errorf("multipath did not set data")
+	}
+	logs.FromCtx(ctx).MicroOp("multipath.Setup: success")
+
+	v.SerializedMultipathData = mpData
+
+	device, err := v.mp.GetDevice(ctx, mpData)
 	if err != nil {
-		return fmt.Errorf("failed to check device path at %s: %w", devicePath, err)
+		return fmt.Errorf("multipath.GetDevice: %w", err)
 	}
-	if !sr.FileExists {
-		return fmt.Errorf("checking device path at %s: file does not exist", devicePath)
+	if device == "" {
+		return fmt.Errorf("multipath did not set device")
 	}
-	if !sr.IsBlock() {
-		return fmt.Errorf("checking device path at %s: file is not a block device", devicePath)
-	}
+	v.BlockDevicePath = device
 
-	mountPath := v.parentFolder + managedMountPath
-
-	fsnip := fsutils.New(tr)
-
-	init := volumeinit.NewNode(tr)
-	err = init.RunBlock(ctx, initConfig, devicePath)
+	err = fsnip.WaitForBlockDevice(ctx, device, time.Second, time.Millisecond*50)
 	if err != nil {
-		return fmt.Errorf("init block device: %w", err)
+		return fmt.Errorf("wait for device: %w", err)
 	}
-	logs.FromCtx(ctx).MicroOp("init block device: success")
-
-	_, err = fsnip.EnsureMounted(ctx, devicePath, mountPath, "", mountRequest.MountFlags)
-	if err != nil {
-		return fmt.Errorf("EnsureMounted: %w", err)
-	}
-	v.FolderPath = mountPath
-	logs.FromCtx(ctx).MicroOp("mount device: success", "device", devicePath, "target-path", mountPath)
-
-	err = init.RunFs(ctx, initConfig, mountPath)
-	if err != nil {
-		return fmt.Errorf("init fs: %w", err)
-	}
-	logs.FromCtx(ctx).MicroOp("init fs: success")
-
-	v.FolderPath = mountPath
 
 	return nil
 }
 
-func (v *NodeVolumeInfo) cleanup(ctx context.Context, tr transport.Transport, mp multipath.Multipath, connector connectors.Connector) error {
+func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string, mountFlags []string, initConfig volumeinit.InitConfig) error {
 	var err error
-	logger := logs.FromCtx(ctx)
 
-	if v.ManagedOps.UnmountFs {
-		err = ensureFolderUnmounted(ctx, v, tr)
-		if err != nil {
-			return fmt.Errorf("ensureFolderUnmounted: %w", err)
-		}
-		logger.MicroOp("ManagedOps: successfully unmounted folder")
+	init := volumeinit.NewNode(v.tr)
+
+	fsnip := fsutils.New(v.tr)
+
+	// TODO save 'changed' into persistent storage
+	// what are my options? what if we format fs, fail, and then the volume gets dismounted and staged at another node
+	// we probably need to wipe the fs in case of a fail, so that another node detects RunBlock changed
+	// but what if the volume was cloned? then formatting would be really bad
+	changed, err := init.RunBlock(ctx, initConfig, v.BlockDevicePath)
+	if err != nil {
+		return fmt.Errorf("init.RunBlock: %w", err)
 	}
 
-	if v.SerializedMultipathData != "" {
-		err = ensureMultipathDisabled(ctx, v, mp)
+	_, err = fsnip.EnsureMounted(ctx, v.BlockDevicePath, targetPath, "", mountFlags)
+	if err != nil {
+		return fmt.Errorf("EnsureMounted: %w", err)
+	}
+	v.FsMountPath = targetPath
+	logs.FromCtx(ctx).MicroOp("mount device: success", "device", v.BlockDevicePath, "target-path", targetPath)
+
+	if changed {
+		err = init.RunFs(ctx, initConfig, v.FsMountPath)
 		if err != nil {
-			return fmt.Errorf("ensureMultipathDisabled: %w", err)
+			return fmt.Errorf("init.RunFs: %w", err)
 		}
-		logger.MicroOp("ManagedOps: multipath disabled OK")
+		logs.FromCtx(ctx).MicroOp("init.RunFs: success")
+	}
+
+	return nil
+}
+
+func (v *NodeVolumeInfo) stageFolderMount(ctx context.Context, req connectors.ConnectRequest) error {
+	err := os.MkdirAll(req.FsMountPath, 0777)
+	if err != nil {
+		return fmt.Errorf("create FsMountPath: %w", err)
+	}
+
+	_, err = v.runConnect(ctx, req)
+	if err != nil {
+		return fmt.Errorf("runConnect: %w", err)
+	}
+	if v.SerializedConnectorData == "" {
+		return fmt.Errorf("connect did not set connector data")
+	}
+
+	fsnip := fsutils.New(v.tr)
+
+	mi, err := fsnip.FindMount(ctx, req.FsMountPath)
+	if err != nil {
+		return fmt.Errorf("check mountpoint: %w", err)
+	}
+	if mi == nil {
+		return fmt.Errorf("check mountpoint: not found")
+	}
+	v.FsMountPath = req.FsMountPath
+
+	return nil
+}
+
+func (v *NodeVolumeInfo) publishFolderMount(ctx context.Context, req connectors.ConnectRequest) error {
+	err := os.MkdirAll(req.FsMountPath, 0777)
+	if err != nil {
+		return fmt.Errorf("create FsMountPath: %w", err)
+	}
+
+	_, err = v.runConnect(ctx, req)
+	if err != nil {
+		return fmt.Errorf("runConnect: %w", err)
+	}
+	if v.SerializedConnectorData != "" {
+		return fmt.Errorf("publish does not support connector data: %w", err)
+	}
+
+	fsnip := fsutils.New(v.tr)
+
+	mi, err := fsnip.FindMount(ctx, req.FsMountPath)
+	if err != nil {
+		return fmt.Errorf("check mountpoint: %w", err)
+	}
+	if mi == nil {
+		return fmt.Errorf("check mountpoint: not found")
+	}
+
+	return nil
+}
+
+func (v *NodeVolumeInfo) cleanupMount(ctx context.Context) (err error) {
+	if v.FsMountPath == "" {
+		return
+	}
+
+	fsnip := fsutils.New(v.tr)
+	err = fsnip.Unmount(ctx, v.FsMountPath)
+	if err != nil {
+		return fmt.Errorf("unmount: %w", err)
+	}
+
+	err = v.tr.Cmds().RmDir(ctx, v.FsMountPath)
+	if err != nil {
+		return fmt.Errorf("remove mount path: %w", err)
+	}
+	v.FsMountPath = ""
+	return nil
+}
+
+func (v *NodeVolumeInfo) cleanup(ctx context.Context) (err error) {
+	defer func() {
+		if err == nil {
+			logs.FromCtx(ctx).MicroOp("cleanup success, deleting underlying file")
+			err = v.deleteFromDisk(ctx)
+			if err != nil {
+				// todo this is a debug log, remove this later
+				logs.FromCtx(ctx).Error("failed to delete from disk", "error", err)
+			}
+		} else {
+			logs.FromCtx(ctx).Error("cleanup failure, saving partial result")
+			deferErr := v.writeToDisk()
+			if deferErr != nil {
+				logs.FromCtx(ctx).Error("failed to save partial result", "error", deferErr)
+			}
+		}
+	}()
+
+	caps, err := v.connector.Capabilities(ctx)
+	if err != nil {
+		return fmt.Errorf("connector.Capabilities: %w", err)
+	}
+
+	switch v.MountType {
+	case mountTypeBlock:
+		err = v.cleanupMount(ctx)
+		if err != nil {
+			return fmt.Errorf("cleanupMount: %w", err)
+		}
+
+		if v.SerializedMultipathData != "" {
+			err = ensureMultipathDisabled(ctx, v, v.mp)
+			if err != nil {
+				return fmt.Errorf("ensureMultipathDisabled: %w", err)
+			}
+			logs.FromCtx(ctx).MicroOp("ManagedOps: multipath disabled OK")
+			v.SerializedMultipathData = ""
+		}
+
+	case mountTypeFolder:
+		// managed unmount should run before disconnect
+		if caps.ManagedUnmount {
+			err = v.cleanupMount(ctx)
+			if err != nil {
+				return fmt.Errorf("cleanupMount: %w", err)
+			}
+		}
+
+	default:
+		// v.MountType is not initialized, nothing to do here
 	}
 
 	if v.SerializedConnectorData != "" {
-		err = connector.Disconnect(ctx, v.SerializedConnectorData)
+		err = v.connector.Disconnect(ctx, v.SerializedConnectorData)
 		if err != nil {
 			return fmt.Errorf("connector.Disconnect: %w", err)
 		}
-		logger.MicroOp("connector.Disconnect: success")
-	} else {
-		logger.MicroOp("connector.Disconnect: skipping because we don't have serialized connector data")
+		logs.FromCtx(ctx).MicroOp("connector.Disconnect: success")
+		v.SerializedConnectorData = ""
 	}
 
-	if v.FolderPath != "" {
-		err = os.Remove(v.FolderPath)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("remove mounted volume folder: %w", err)
-		}
-		v.FolderPath = ""
+	err = v.cleanupMount(ctx)
+	if err != nil {
+		return fmt.Errorf("cleanupMount: %w", err)
 	}
-
-	err = os.Remove(v.ConnectorPath)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("remove connector staging dir: %w", err)
-	}
-	logger.MicroOp("remove connector staging dir: success")
 
 	return nil
 }

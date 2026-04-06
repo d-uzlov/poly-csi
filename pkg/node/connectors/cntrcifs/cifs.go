@@ -21,7 +21,12 @@ func New(tr transport.Transport, devFolder string) connectors.Connector {
 	}
 }
 
-const mountSuffix = "/smb_mount"
+func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
+	return connectors.Capabilities{
+		ConnectType:    connectors.ConnectTypePublishFolder,
+		ManagedUnmount: true,
+	}, nil
+}
 
 func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	return &connectors.ConnectorNodeInfo{}, nil
@@ -54,8 +59,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	if req.AccessMount.FsType != "cifs" {
 		return nil, fmt.Errorf("expected cifs fs type but got %s", req.AccessMount.FsType)
 	}
-	mountTarget := req.StagingTargetPath + mountSuffix
-	mi, err := fsutils.New(c.tr).EnsureMounted(ctx, smbPath, mountTarget, req.AccessMount.FsType, flags)
+	mi, err := fsutils.New(c.tr).EnsureMounted(ctx, smbPath, req.FsMountPath, req.AccessMount.FsType, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -69,14 +73,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, smbPath, mi.MountPoint)
 	}
 
-	return &connectors.ConnectResult{
-		FolderPath: mountTarget,
-		ManagedOps: connectors.ManagedOperations{
-			MountFs:   false,
-			UnmountFs: true,
-			ExpandFs:  false,
-		},
-	}, nil
+	return &connectors.ConnectResult{}, nil
 }
 
 func (c *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {

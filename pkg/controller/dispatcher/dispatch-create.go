@@ -410,7 +410,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		switch strCaps.LocalVolume {
 		case storage.VolDevice:
 			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalVolume)
-			err = init.RunBlock(ctx, initConfig, localPath)
+			_, err = init.RunBlock(ctx, initConfig, localPath)
 			if err != nil {
 				return nil, fmt.Errorf("init block: %w", err)
 			}
@@ -465,11 +465,12 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 	logs.FromCtx(ctx).MicroOp("creating volume context")
 	vc := volumecontext.VolumeContext{
-		ServerName:  dispatchParams.ServerName,
-		StorageType: dispatchParams.StorageType,
-		ShareType:   dispatchParams.ShareType,
-		ConnectorId: dispatchParams.ConnectorId,
-		Uuid:        callUuid,
+		ServerName:    dispatchParams.ServerName,
+		StorageType:   dispatchParams.StorageType,
+		ShareType:     dispatchParams.ShareType,
+		ConnectorId:   dispatchParams.ConnectorId,
+		Uuid:          callUuid,
+		FsGroupMethod: dispatchParams.FsGroupPolicy,
 	}
 	err = vc.Validate()
 	if err != nil {

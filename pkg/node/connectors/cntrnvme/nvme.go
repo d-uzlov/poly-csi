@@ -9,7 +9,7 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-type nvmeConnector struct {
+type connector struct {
 	tr        transport.Transport
 	snip      NvmeSnippets
 	config    Config
@@ -17,7 +17,7 @@ type nvmeConnector struct {
 }
 
 func New(tr transport.Transport, config Config, devFolder string) connectors.Connector {
-	return &nvmeConnector{
+	return &connector{
 		tr:        tr,
 		snip:      newNvmeSnippets(tr, config.NvmeCmd, devFolder, config.ParseKernelLog),
 		config:    config,
@@ -25,7 +25,13 @@ func New(tr transport.Transport, config Config, devFolder string) connectors.Con
 	}
 }
 
-func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
+func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
+	return connectors.Capabilities{
+		ConnectType: connectors.ConnectTypeBlock,
+	}, nil
+}
+
+func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
 	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -60,20 +66,14 @@ func (m *nvmeConnector) Connect(ctx context.Context, req connectors.ConnectReque
 	namespaceDevicePath := m.devFolder + "/" + namespaceDevice
 
 	return &connectors.ConnectResult{
-		FolderPath: "",
 		Devices:    []string{namespaceDevicePath},
-		ManagedOps: connectors.ManagedOperations{
-			MountFs:   true,
-			UnmountFs: true,
-			ExpandFs:  true,
-		},
 		ConnectorData: VolumeData{
 			Nqn: pc.TargetNqn,
 		},
 	}, nil
 }
 
-func (m *nvmeConnector) Disconnect(ctx context.Context, serializedConnectorData string) error {
+func (m *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
 	vd, err := parseVolumeData(serializedConnectorData)
 	if err != nil {
 		return fmt.Errorf("parse serialized connector data: %w", err)
@@ -86,7 +86,7 @@ func (m *nvmeConnector) Disconnect(ctx context.Context, serializedConnectorData 
 	return nil
 }
 
-func (m *nvmeConnector) Expand(ctx context.Context, serializedConnectorData string) error {
+func (m *connector) Expand(ctx context.Context, serializedConnectorData string) error {
 	vd, err := parseVolumeData(serializedConnectorData)
 	if err != nil {
 		return fmt.Errorf("parse serialized connector data: %w", err)

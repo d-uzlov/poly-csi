@@ -18,12 +18,11 @@ func (ec *ExecCommands) CreateLock(ctx context.Context, lockFile string, maxDura
 		lockFile,
 		"sh",
 		"-eu",
-		"-c",
-		lockScript,
+		"/dev/stdin",
 		lockId,
 		lockFile,
 		fmt.Sprintf("%d", maxDuration/time.Nanosecond),
-	})
+	}, transport.WithStdinString(lockScript))
 	if err != nil {
 		return nil, fmt.Errorf("acquire lock: %w", err)
 	}
@@ -42,11 +41,10 @@ func (ec *ExecCommands) ReleaseLock(ctx context.Context, lockFile string, lockId
 		lockFile,
 		"sh",
 		"-eu",
-		"-c",
-		unlockScript,
+		"/dev/stdin",
 		lockId,
 		lockFile,
-	})
+	}, transport.WithStdinString(unlockScript))
 	if err != nil {
 		return fmt.Errorf("release lock: %w", err)
 	}
@@ -58,10 +56,9 @@ func (ec *ExecCommands) ReleaseLock(ctx context.Context, lockFile string, lockId
 }
 
 var lockScript = `
-# parameter index starts from 0 because we are running this as literal commands, so $0 can not be a file name
-want_lock_id=$0
-file=$1
-timeout_nanoseconds=$2
+want_lock_id=$1
+file=$2
+timeout_nanoseconds=$3
 
 now_timestamp=$(date +%s%N)
 
@@ -96,10 +93,8 @@ echo "poly_csi_lock_version_1 $want_lock_id $start_timestamp $end_timestamp" > "
 `
 
 var unlockScript = `
-want_lock_id=$0
-file=$1
-
-now_timestamp=$(date +%s%N)
+want_lock_id=$1
+file=$2
 
 read -r header rest < "$file" || true
 

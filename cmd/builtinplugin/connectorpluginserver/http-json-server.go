@@ -60,10 +60,11 @@ func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, 
 		Handler: mux,
 	}
 
-	s.addHandler(mux, "/get_info", http.MethodGet, s.handleGetInfo)
-	s.addHandler(mux, "/connect", http.MethodPost, s.handleConnect)
-	s.addHandler(mux, "/disconnect", http.MethodPost, s.handleDisconnect)
-	s.addHandler(mux, "/expand", http.MethodPost, s.handleExpand)
+	s.addHandler(mux, cntr.MethodGetCapabilities, s.handleGetCapabilities)
+	s.addHandler(mux, cntr.MethodGetInfo, s.handleGetInfo)
+	s.addHandler(mux, cntr.MethodConnect, s.handleConnect)
+	s.addHandler(mux, cntr.MethodDisconnect, s.handleDisconnect)
+	s.addHandler(mux, cntr.MethodExpand, s.handleExpand)
 
 	serveDoneCh := make(chan struct{})
 
@@ -93,7 +94,7 @@ func (s *Server) getLogger(path string) *logs.Instance {
 	return s.logs.WithFields("method", path).MakeInstanceWithCopy(true)
 }
 
-func (s *Server) addHandler(mux *http.ServeMux, path string, method string, f handlerFunc) {
+func (s *Server) addHandler(mux *http.ServeMux, path string, f handlerFunc) {
 	_, ok := s.handlers[path]
 	if ok {
 		logger := slogctx.FromCtx(s.callCtx)
@@ -101,7 +102,7 @@ func (s *Server) addHandler(mux *http.ServeMux, path string, method string, f ha
 		return
 	}
 	s.handlers[path] = handler{
-		httpMethodType: method,
+		httpMethodType: http.MethodPost,
 		f:              f,
 	}
 	mux.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
@@ -180,6 +181,10 @@ func (s *Server) handle(req *http.Request) (resp cntr.PluginResponse, err error,
 	}, nil, 0
 }
 
+func (s *Server) handleGetCapabilities(ctx context.Context, body []byte) (result any, err error) {
+	return s.connector.Capabilities(s.callCtx)
+}
+
 func (s *Server) handleGetInfo(ctx context.Context, body []byte) (result any, err error) {
 	return s.connector.GetInfo(s.callCtx)
 }
@@ -230,14 +235,30 @@ func (s *Server) handleConnect(ctx context.Context, body []byte) (result any, er
 }
 
 func (s *Server) handleDisconnect(ctx context.Context, body []byte) (result any, err error) {
-	serializedData := string(body)
+	var serializedData string
+
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+
+	if err = dec.Decode(&serializedData); err != nil {
+		return nil, fmt.Errorf("decode request body: %w", err)
+	}
+
 	logs.FromCtx(ctx).EphemeralInfo("parsed request", "serialized-data", serializedData)
 	err = s.connector.Disconnect(ctx, serializedData)
 	return nil, err
 }
 
 func (s *Server) handleExpand(ctx context.Context, body []byte) (result any, err error) {
-	serializedData := string(body)
+	var serializedData string
+
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+
+	if err = dec.Decode(&serializedData); err != nil {
+		return nil, fmt.Errorf("decode request body: %w", err)
+	}
+
 	logs.FromCtx(ctx).EphemeralInfo("parsed request", "serialized-data", serializedData)
 	err = s.connector.Expand(ctx, serializedData)
 	return nil, err

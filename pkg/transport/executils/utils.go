@@ -3,6 +3,7 @@ package executils
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -241,7 +242,10 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 
 	// -c FMT  Use the specified format
 	// can't use proper --printf because we need to support busybox version of stat
-	cmd := []string{"stat", realPath, "-c", "%F"}
+	// %F : file type
+	// %u : numeric user id
+	// %g : numeric group id
+	cmd := []string{"stat", realPath, "-c", "%F\n%u\n%g"}
 	runResult, err := ec.tr.RunCommand(ctx, cmd, transport.WithSudo(ec.sudo))
 	if err != nil {
 		return transport.StatResult{}, fmt.Errorf("stat: %w", err)
@@ -262,8 +266,8 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 		return transport.StatResult{}, fmt.Errorf("stat gave empty result")
 	}
 	lines := strings.Split(statStdout, "\n")
-	if len(lines) != 1 {
-		return transport.StatResult{}, fmt.Errorf("stat gave unexpected result: '%s', expected 1 values but got %d values", string(runResult.Stdout), len(lines))
+	if len(lines) != 3 {
+		return transport.StatResult{}, fmt.Errorf("stat gave unexpected result: '%s', expected 3 values but got %d values", string(runResult.Stdout), len(lines))
 	}
 	fileType := lines[0]
 
@@ -271,6 +275,8 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 		Path:         realPath,
 		FileExists:   true,
 		ParentExists: true,
+		Uid:          lines[1],
+		Gid:          lines[2],
 	}
 	switch fileType {
 	case "directory":
@@ -299,7 +305,7 @@ func (ec *ExecCommands) Df(ctx context.Context, path string) (*transport.FsSizeI
 	// cmd := fmt.Sprintf("df --output=avail --block-size=1 '%s' | tail -n +2", path)
 	stdout, err := transport.CheckedRunStdout(ctx, ec.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", cmd, err)
+		return nil, fmt.Errorf("df: %w", err)
 	}
 	lines := strings.Split(stdout, "\n")
 	if len(lines) != 2 {
@@ -383,4 +389,20 @@ func (ec *ExecCommands) MkFifo(ctx context.Context, path string) (alreadyExists 
 		return false, transport.FormatRunError(runResult)
 	}
 	return false, nil
+}
+
+func (ec *ExecCommands) Chown(ctx context.Context, path string, user string, group string, recursive bool) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if user == "" && group == "" {
+		return fmt.Errorf("user and group are empty")
+	}
+
+	// -L : dereference all symlinks
+	cmd := []string{"chown", "-L", fmt.Sprintf("%s:%s", user, group), path}
+	if recursive {
+		cmd = slices.Insert(cmd, 1, "-R")
+	}
+	return transport.CheckedRun(ctx, ec.tr, cmd, transport.WithSudo(ec.sudo))
 }

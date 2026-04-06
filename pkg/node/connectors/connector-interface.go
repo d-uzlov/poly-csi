@@ -8,38 +8,54 @@ import (
 )
 
 type Connector interface {
+	Capabilities(ctx context.Context) (Capabilities, error)
 	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
 	Connect(ctx context.Context, req ConnectRequest) (*ConnectResult, error)
 	Disconnect(ctx context.Context, serializedData string) error
 	Expand(ctx context.Context, serializedData string) error
 }
 
+type Capabilities struct {
+	// ConnectType specifies the how Connector.Connect should be used.
+	// See constants below for more info
+	ConnectType string `json:"connect_type"`
+
+	// ManagedUnmount requests the caller to call unmount on connected folder before Disconnect.
+	// This is ignored when ConnectType is ConnectTypeBlock.
+	ManagedUnmount bool `json:"managed_unmount"`
+}
+
+// constants for Capabilities.ConnectType
+const (
+	// connect provides block device
+	ConnectTypeBlock         = "__connect_type_block"
+	// connect mounts a folder during staging
+	ConnectTypeFolder        = "__connect_type_folder"
+	// connect mounts a folder during publishing
+	// this also implies that Disconnect is never called, folder will be automatically unmounted.
+	ConnectTypePublishFolder = "__connect_type_publish_folder"
+)
+
 // ConnectRequest is mostly equivalent to csi.NodeStageVolumeRequest
 // except this struct can be (de)serialized without errors
 type ConnectRequest struct {
-	AddressOptions          []addropt.AddressOption           `json:"address_options"`
-	VolumeContext           map[string]string                 `json:"volume_context"`
-	PublishContext          map[string]string                 `json:"publish_context"`
-	StagingTargetPath       string                            `json:"staging_target_path"`
-	AccessBlock             *csi.VolumeCapability_BlockVolume `json:"access_block"`
-	AccessMount             *csi.VolumeCapability_MountVolume `json:"access_mount"`
-	CsiSecrets              map[string]string                 `json:"csi_secrets"`
-	PublishSecret           []byte                            `json:"publish_context_secret"`
-	DisableCleanupOnFailure bool                              `json:"disableCleanupOnFailure"`
+	// FsMountPath is the suggested path for filesystem mount.
+	// When Capabilities.MountType is MountTypeFolder, node dispatcher expects a mountpoint at this path after successful Connector.Connect
+	FsMountPath    string                            `json:"fs_mount_path"`
+	AddressOptions []addropt.AddressOption           `json:"address_options"`
+	VolumeContext  map[string]string                 `json:"volume_context"`
+	PublishContext map[string]string                 `json:"publish_context"`
+	AccessMount    *csi.VolumeCapability_MountVolume `json:"access_mount"`
+	// PublishSecret is a decrypted secret from publish context
+	PublishSecret           []byte `json:"publish_context_secret"`
+	DisableCleanupOnFailure bool   `json:"disableCleanupOnFailure"`
 }
 
 type ConnectResult struct {
-	// FolderPath is path to folder with mounted filesystem.
-	// If ManagedOps.MountFs is set, the value is optional, node dispatcher will try to mount filesystem from device(s).
-	FolderPath string `json:"folder_path"`
-	// Devices is zero, one or several paths in filesystem pointing to devices with volume data.
-	// If FolderPath is not empty, the Devices list should be empty.
-	// If FolderPath is empty, Devices must contain at least one value AND ManagedOps.MountFs must be set.
+	// Devices is the list of block devices representing the volume.
+	// It is only used when Capabilities.ConnectType is ConnectTypeBlock.
 	// When the list contains more than one device, node dispatcher will use multipathd to set up united device.
 	Devices []string `json:"device_path"`
-	// ManagedOps is a set of requests from connector to node dispatcher
-	// which allows connector to skip various generic operations.
-	ManagedOps ManagedOperations `json:"managed_operations"`
 
 	// ConnectorData and SerializedConnectorData are mutually exclusive options for connector data storage.
 	// When ConnectorData is set, dispatcher will try to use JSON serialization to create SerializedConnectorData.
@@ -47,15 +63,4 @@ type ConnectResult struct {
 	// SerializedConnectorData is data passed to later requests to connector.
 	// It can be automatically populated from ConnectorData.
 	SerializedConnectorData string `json:"connector_data"`
-}
-
-type ManagedOperations struct {
-	// request dispatcher to mount DevicePath as folder
-	// implies formatting if filesystem does not exist yet
-	MountFs bool `json:"mount"`
-	// request dispatcher to unmount FolderPath
-	// 	can be used even when MountFs is false
-	UnmountFs bool `json:"unmount"`
-	// request dispatcher to resize filesystem to fit new device size
-	ExpandFs bool `json:"expand"`
 }

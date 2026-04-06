@@ -11,3 +11,11 @@ type PluginResponse struct {
 
 const ResponseStatusError = "error"
 const ResponseStatusOk = "ok"
+
+const (
+	MethodGetCapabilities = "/capabilities"
+	MethodGetInfo         = "/get_info"
+	MethodConnect         = "/connect"
+	MethodDisconnect      = "/disconnect"
+	MethodExpand          = "/expand"
+)

@@ -62,16 +62,24 @@ func FormatRunError(r RunResult) error {
 	return fmt.Errorf("exit code %d: no output", r.ExitCode)
 }
 
-// Retry runs specified command in a loop
-func Retry(period time.Duration, maxTime time.Duration, action func() error) error {
-	startTime := time.Now()
-	var err error
-	for time.Since(startTime) < maxTime {
-		err = action()
+// Retry runs specified command in a loop.
+// See RetryUntil.
+func Retry(period time.Duration, maxDuration time.Duration, action func() error) error {
+	return RetryUntil(period, time.Now().Add(maxDuration), action)
+}
+
+// RetryUntil runs specified command in a loop until specified timeout.
+// It runs the command until it returns nil, or until endTime.
+// If endTime has already been reached, it runs the command once and immediately finishes.
+func RetryUntil(period time.Duration, endTime time.Time, action func() error) error {
+	for time.Now().Before(endTime) {
+		err := action()
 		if err == nil {
 			return nil
 		}
 		time.Sleep(period)
 	}
-	return err
+	// if we are here, it means action returned error previously and we reached timeout
+	// let's run it one last time
+	return action()
 }

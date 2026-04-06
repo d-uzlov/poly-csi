@@ -10,25 +10,30 @@ import (
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
-type nfsConnector struct {
+type connector struct {
 	tr        transport.Transport
 	devFolder string
 }
 
 func New(tr transport.Transport, devFolder string) connectors.Connector {
-	return &nfsConnector{
+	return &connector{
 		tr:        tr,
 		devFolder: devFolder,
 	}
 }
 
-const nfsMountSuffix = "/nfs_mount"
+func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
+	return connectors.Capabilities{
+		ConnectType:    connectors.ConnectTypeFolder,
+		ManagedUnmount: true,
+	}, nil
+}
 
-func (m *nfsConnector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
+func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
 	if req.AccessMount == nil {
 		return nil, fmt.Errorf("nfs does not support block mounting")
 	}
@@ -47,8 +52,7 @@ func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectReques
 
 	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
 
-	mountTarget := req.StagingTargetPath + nfsMountSuffix
-	mi, err := fsutils.New(m.tr).EnsureMounted(ctx, nfsPath, mountTarget, req.AccessMount.FsType, req.AccessMount.MountFlags)
+	mi, err := fsutils.New(m.tr).EnsureMounted(ctx, nfsPath, req.FsMountPath, req.AccessMount.FsType, req.AccessMount.MountFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -62,22 +66,15 @@ func (m *nfsConnector) Connect(ctx context.Context, req connectors.ConnectReques
 		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, nfsPath, mi.MountPoint)
 	}
 
-	return &connectors.ConnectResult{
-		FolderPath: mountTarget,
-		ManagedOps: connectors.ManagedOperations{
-			MountFs:   false,
-			UnmountFs: true,
-			ExpandFs:  false,
-		},
-	}, nil
+	return &connectors.ConnectResult{}, nil
 }
 
-func (m *nfsConnector) Disconnect(ctx context.Context, serializedConnectorData string) error {
+func (m *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
 	// unmount is managed externally
 	return nil
 }
 
-func (m *nfsConnector) Expand(ctx context.Context, serializedConnectorData string) error {
+func (m *connector) Expand(ctx context.Context, serializedConnectorData string) error {
 	// nfs volumes don't need expanding
 	return nil
 }
