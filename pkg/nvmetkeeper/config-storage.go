@@ -286,8 +286,8 @@ func (k *ConfigStorage) deleteSubsystem(ctx context.Context, subsysNqn string) e
 
 	sudoCmds := k.tr.Cmds()
 
-	path := fmt.Sprintf("%s/subsystems/%s/subsys.json", k.configFolder, subsysNqn)
-	err := sudoCmds.RmFile(ctx, path)
+	path := fmt.Sprintf("%s/subsystems/%s/", k.configFolder, subsysNqn)
+	err := sudoCmds.RmDirRecursive(ctx, path)
 	if err != nil {
 		return fmt.Errorf("rm %s: %w", path, err)
 	}
