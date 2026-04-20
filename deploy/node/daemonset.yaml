@@ -26,7 +26,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.3.48
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.3.50
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///var/lib/kubelet/plugins/io.meoe.poly-csi/csi.sock
@@ -102,7 +102,7 @@ spec:
           name: registration-dir
 
       - name: iscsi-connector
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.3.38
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.3.49
         args:
         - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml

@@ -39,7 +39,6 @@ type globalParams struct {
 	transport  string
 	nvmetPort  string
 	listenPort string
-	ioQueues   string
 }
 
 type params struct {

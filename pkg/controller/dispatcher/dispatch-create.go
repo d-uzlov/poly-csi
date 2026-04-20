@@ -378,7 +378,10 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("wait receive: %w", ctx.Err())
 		case err = <-receiveCh:
 			if err != nil {
-				return nil, fmt.Errorf("receive: %w", err)
+				return nil, fmt.Errorf("storage[%s]:receive: %w", dispatchParams.StorageType, err)
+			}
+			if vol == nil {
+				return nil, fmt.Errorf("storage[%s]:receive: nil result", dispatchParams.StorageType)
 			}
 			logger.Info("storage.Receive: success")
 		}
@@ -386,6 +389,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		vol, err = str.CreateVolume(ctx, storageCreateRequest)
 		if err != nil {
 			return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.StorageType, err)
+		}
+		if vol == nil {
+			return nil, fmt.Errorf("storage[%s]:CreateVolume: nil result", dispatchParams.StorageType)
 		}
 		logger.Info("storage.CreateVolume: success")
 	}
@@ -438,7 +444,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		shareId = id
 	}
 
-	shareData, err := shr.CreateShare(ctx, shares.CreateShareRequest{
+	shareHandle, err := shr.CreateShare(ctx, shares.CreateShareRequest{
 		ShareId:       shareId,
 		StaticParams:  req.Parameters,
 		MutableParams: req.MutableParameters,
@@ -449,6 +455,13 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("create share: %w", err)
 	}
+	if shareHandle == nil {
+		return nil, fmt.Errorf("create share: nil result")
+	}
+	err = shareHandle.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate share handle")
+	}
 	logger.Info("share.CreateShare: success")
 	defer func() {
 		if success {
@@ -456,12 +469,16 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		}
 		logger.Info("deleting share on failure")
 		logs.FromCtx(ctx).MicroOp("running share cleanup")
-		err = shr.DeleteShare(ctx, shareData)
+		err = shareHandle.DeleteShare(ctx)
 		if err != nil {
 			logs.FromCtx(ctx).Error("failed to run share cleanup", "error", err.Error())
 			return
 		}
 	}()
+	shareData, err := shareHandle.Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("serialize share")
+	}
 
 	logs.FromCtx(ctx).MicroOp("creating volume context")
 	vc := volumecontext.VolumeContext{
@@ -551,7 +568,18 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 
 	logger.MicroOp("initialized managers", "storage", mh.vi.StorageType, "share", mh.vi.ShareType)
 
-	err = shrInstance.DeleteShare(ctx, mh.vi.ShareData)
+	shareHandle, err := shrInstance.ParseShare(mh.vi.ShareData)
+	if err != nil {
+		return nil, fmt.Errorf("parse share data: %w", err)
+	}
+	if shareHandle == nil {
+		return nil, fmt.Errorf("parse share data: nil result")
+	}
+	err = shareHandle.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate share: %w", err)
+	}
+	err = shareHandle.DeleteShare(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("delete share[%s]: %w", mh.vi.ShareType, err)
 	}

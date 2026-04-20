@@ -2,11 +2,10 @@ package shrzfssharenfs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/controller/storage/strzfsdataset"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
 	"meoe.io/poly-csi/pkg/transport"
@@ -14,86 +13,62 @@ import (
 )
 
 type share struct {
-	tr   transport.Transport
+	tr transport.Transport
+
+	Dataset string `json:"dataset"`
+	Folder  string `json:"folder"`
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
-	return &share{
-		tr:   tr,
-	}, nil
-}
+var _ shares.Share = &share{}
 
-func (sh *share) GetCapabilities() shares.Capabilities {
-	return shares.Capabilities{
-		UnpublishAll: true,
-		LocalVolume:  []string{storage.VolFolder},
-		OpaqueVolume: []string{"zfs-dataset"},
-	}
-}
-
-func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
+func parseShare(data string) (*share, error) {
+	var result share
+	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		return "", fmt.Errorf("parse params: %w", err)
+		return nil, err
 	}
+	return &result, nil
+}
 
-	zfsVol, ok := req.Volume.(*strzfsdataset.Volume)
-	if !ok {
-		return "", fmt.Errorf("storage volume is not a zfs dataset: %T", req.Volume)
-	}
-
-	mountPath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return "", fmt.Errorf("get local path: %w", err)
-	}
-
-	snip := zfs.NewSnippets(sh.tr)
-
-	err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
+func (sh *share) Serialize() (string, error) {
+	encoded, err := json.Marshal(sh)
 	if err != nil {
 		return "", err
 	}
-
-	c := shareContext{
-		Dataset: zfsVol.Path,
-		Folder:  mountPath,
-	}
-	err = c.validate()
-	if err != nil {
-		return "", fmt.Errorf("validate share context: %w", err)
-	}
-
-	return c.serialize(), nil
+	return string(encoded), nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
+func (sh *share) Validate() error {
+	if sh.tr == nil {
+		return fmt.Errorf("transport is nil")
 	}
+	if sh.Dataset == "" {
+		return fmt.Errorf("missing dataset")
+	}
+	if sh.Folder == "" {
+		return fmt.Errorf("missing folder")
+	}
+	return nil
+}
 
+func (sh *share) DeleteShare(ctx context.Context) error {
+	snip := zfs.NewSnippets(sh.tr)
+
+	return snip.SetShareNfs(ctx, sh.Dataset, "off")
+}
+
+func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
 		Public: cntrnfs.PublicContext{
-			Path: c.Folder,
+			Path: sh.Folder,
 		},
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized string) error {
 	return nil
 }
 
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
+func (sh *share) UnpublishAll(ctx context.Context) error {
 	return nil
-}
-
-func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
-	}
-
-	snip := zfs.NewSnippets(sh.tr)
-
-	return snip.SetShareNfs(ctx, c.Dataset, "off")
 }

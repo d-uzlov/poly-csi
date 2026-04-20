@@ -47,12 +47,7 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
-	}
-
+func (sh *share) Publish(ctx context.Context,  mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	iscsiInfo, err := cntriscsiadm.ParseIscsiInfo(mi)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
@@ -60,7 +55,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	snip := newSnippets(sh.tr)
 
-	err = snip.attachGroup(ctx, c.Iqn, iscsiInfo.HostIqn)
+	err = snip.attachGroup(ctx, sh.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
 		return nil, fmt.Errorf("attach iscsi group: %w", err)
 	}
@@ -71,7 +66,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	return &shares.PublishContext{
 		Public: cntriscsiadm.PublicContext{
-			Iqn:       c.Iqn,
+			Iqn:       sh.Iqn,
 			Port:      "3260",
 			Transport: "tcp",
 			AuthType:  cntriscsiadm.AuthNone,
@@ -80,11 +75,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
-	}
+func (sh *share) Unpublish(ctx context.Context, serialized string) error {
 	pd, err := parsePublishData(serialized)
 	if err != nil {
 		return fmt.Errorf("parse publish data: %w", err)
@@ -92,13 +83,13 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 
 	snip := newSnippets(sh.tr)
 
-	err = snip.detachGroup(ctx, c.Iqn, pd.HostIqn)
+	err = snip.detachGroup(ctx, sh.Iqn, pd.HostIqn)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
+func (sh *share) UnpublishAll(ctx context.Context) error {
 	return fmt.Errorf("unimplemented")
 }

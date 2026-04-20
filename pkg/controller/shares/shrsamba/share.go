@@ -2,95 +2,73 @@ package shrsamba
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
-	tr   transport.Transport
-	gp   globalParams
+	tr transport.Transport
+	gp globalParams
+
+	ConfigFile string `json:"config_file"`
+	ShareName  string `json:"share_name"`
+	UserName   string `json:"user_name"`
+	UserPass   string `json:"user_pass"`
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
-	gp, err := parseGlobalParams(globalParams)
+var _ shares.Share = &share{}
+
+func parseShare(data string) (*share, error) {
+	var result share
+	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		return nil, fmt.Errorf("parse global params: %w", err)
+		return nil, err
 	}
-	return &share{
-		tr:   tr,
-		gp:   gp,
-	}, nil
+	return &result, nil
 }
 
-func (sh *share) GetCapabilities() shares.Capabilities {
-	return shares.Capabilities{
-		UnpublishAll: true,
-		LocalVolume:  []string{storage.VolFolder},
-		OpaqueVolume: nil,
-	}
-}
-
-func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	_, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return "", fmt.Errorf("parse params: %w", err)
-	}
-
-	snip := newSambaSnippets(sh.tr, sh.gp)
-
-	shareName := req.ShareId
-	userName := fmt.Sprintf("smb-for-%s", req.ShareId)
-	userPassword := uuid.NewString()
-
-	err = snip.configureUser(ctx, userName, userPassword)
-	if err != nil {
-		return "", fmt.Errorf("configure user: %w", err)
-	}
-
-	mountPath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return "", fmt.Errorf("get local path: %w", err)
-	}
-
-	configFile, err := snip.configureShare(ctx, ShareParameters{
-		ShareName: shareName,
-		Path:      mountPath,
-		User:      userName,
-	})
+func (sh *share) Serialize() (string, error) {
+	encoded, err := json.Marshal(sh)
 	if err != nil {
 		return "", err
 	}
-
-	sc := shareContext{
-		ConfigFile: configFile,
-		ShareName:  shareName,
-		UserName:   userName,
-		UserPass:   userPassword,
-	}
-	if sc.validate() != nil {
-		return "", fmt.Errorf("validate result: %w", err)
-	}
-	return sc.serialize(), nil
+	return string(encoded), nil
 }
 
-func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
+func (sh *share) Validate() error {
+	if sh.tr == nil {
+		return fmt.Errorf("transport is nil")
 	}
+	if sh.gp.sambaConfigDir == "" {
+		return fmt.Errorf("missing samba config dir")
+	}
+	if sh.ConfigFile == "" {
+		return fmt.Errorf("missing config_file")
+	}
+	if sh.ShareName == "" {
+		return fmt.Errorf("missing share_name")
+	}
+	if sh.UserName == "" {
+		return fmt.Errorf("missing user_name")
+	}
+	if sh.UserPass == "" {
+		return fmt.Errorf("missing user_pass")
+	}
+	return nil
+}
 
+func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := newSambaSnippets(sh.tr, sh.gp)
 
-	err = snip.removeShare(ctx, c.ConfigFile)
+	err := snip.removeShare(ctx, sh.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("remove share config: %w", err)
 	}
 
-	err = snip.deleteUser(ctx, c.UserName)
+	err = snip.deleteUser(ctx, sh.UserName)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}

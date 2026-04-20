@@ -240,7 +240,14 @@ func (v *NodeVolumeInfo) stageFolderMount(ctx context.Context, req connectors.Co
 		return fmt.Errorf("runConnect: %w", err)
 	}
 	if v.SerializedConnectorData == "" {
-		return fmt.Errorf("connect did not set connector data")
+		caps, err := v.connector.Capabilities(ctx)
+		if err != nil {
+			return fmt.Errorf("connector.Capabilities: %w", err)
+		}
+		// with managed unmount connector disconnect is not mandatory
+		if !caps.ManagedUnmount {
+			return fmt.Errorf("connect did not set connector data")
+		}
 	}
 
 	fsnip := fsutils.New(v.tr)

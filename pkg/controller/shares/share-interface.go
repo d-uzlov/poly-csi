@@ -9,11 +9,18 @@ import (
 
 type ShareManager interface {
 	GetCapabilities() Capabilities
-	CreateShare(ctx context.Context, req CreateShareRequest) (shareData string, err error)
-	Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
-	Unpublish(ctx context.Context, shareData string, serialized string) error
-	UnpublishAll(ctx context.Context, shareData string) error
-	DeleteShare(ctx context.Context, shareData string) error
+	CreateShare(ctx context.Context, req CreateShareRequest) (Share, error)
+	// ParseShare recreates share handle from result of Share.Serialize
+	ParseShare(shareData string) (Share, error)
+}
+
+type Share interface {
+	Validate() error
+	Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
+	Unpublish(ctx context.Context, serialized string) error
+	UnpublishAll(ctx context.Context) error
+	DeleteShare(ctx context.Context) error
+	Serialize() (string, error)
 }
 
 type Capabilities struct {

@@ -28,16 +28,14 @@ type Capabilities struct {
 // constants for Capabilities.ConnectType
 const (
 	// connect provides block device
-	ConnectTypeBlock         = "__connect_type_block"
+	ConnectTypeBlock = "__connect_type_block"
 	// connect mounts a folder during staging
-	ConnectTypeFolder        = "__connect_type_folder"
+	ConnectTypeFolder = "__connect_type_folder"
 	// connect mounts a folder during publishing
 	// this also implies that Disconnect is never called, folder will be automatically unmounted.
 	ConnectTypePublishFolder = "__connect_type_publish_folder"
 )
 
-// ConnectRequest is mostly equivalent to csi.NodeStageVolumeRequest
-// except this struct can be (de)serialized without errors
 type ConnectRequest struct {
 	// FsMountPath is the suggested path for filesystem mount.
 	// When Capabilities.MountType is MountTypeFolder, node dispatcher expects a mountpoint at this path after successful Connector.Connect

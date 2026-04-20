@@ -70,9 +70,21 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node info does not list connector %s", mh.vi.ConnectorId)
 	}
 
-	pc, err := shrInstance.Publish(ctx, mh.vi.ShareData, mountInfo)
+	shareHandle, err := shrInstance.ParseShare(mh.vi.ShareData)
 	if err != nil {
-		return nil, fmt.Errorf("shareInstance.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
+		return nil, fmt.Errorf("parse share data: %w", err)
+	}
+	if shareHandle == nil {
+		return nil, fmt.Errorf("parse share data: nil result")
+	}
+	err = shareHandle.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate share: %w", err)
+	}
+
+	pc, err := shareHandle.Publish(ctx, mountInfo)
+	if err != nil {
+		return nil, fmt.Errorf("shareHandle.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
 	}
 	logger.Info("share.Publish: success")
 	if pc == nil {
@@ -142,6 +154,18 @@ func (d *Dispatcher) unpublishVolume(ctx context.Context, mh *volumeManagementHa
 		return nil, fmt.Errorf("find share config: %w", err)
 	}
 
+	shareHandle, err := shrInstance.ParseShare(mh.vi.ShareData)
+	if err != nil {
+		return nil, fmt.Errorf("parse share data: %w", err)
+	}
+	if shareHandle == nil {
+		return nil, fmt.Errorf("parse share data: nil result")
+	}
+	err = shareHandle.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate share: %w", err)
+	}
+
 	if nodeId != "" {
 		pds, err := mh.wrapper.GetPublishData(ctx, nodeId)
 		if err != nil {
@@ -153,9 +177,9 @@ func (d *Dispatcher) unpublishVolume(ctx context.Context, mh *volumeManagementHa
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 
-		err = shrInstance.Unpublish(ctx, mh.vi.ShareData, pds)
+		err = shareHandle.Unpublish(ctx, pds)
 		if err != nil {
-			return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
+			return nil, fmt.Errorf("shareHandle.Unpublish: %w", err)
 		}
 		logger.Info("share.Unpublish: success")
 
@@ -168,9 +192,9 @@ func (d *Dispatcher) unpublishVolume(ctx context.Context, mh *volumeManagementHa
 
 	caps := shrInstance.GetCapabilities()
 	if caps.UnpublishAll {
-		err = shrInstance.UnpublishAll(ctx, mh.vi.ShareData)
+		err = shareHandle.UnpublishAll(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("shrInstance.UnpublishAll: %w", err)
+			return nil, fmt.Errorf("shareHandle.UnpublishAll: %w", err)
 		}
 		logger.Info("share.UnpublishAll: success")
 		err = mh.wrapper.ClearPublishData(ctx)
@@ -191,9 +215,9 @@ func (d *Dispatcher) unpublishVolume(ctx context.Context, mh *volumeManagementHa
 			continue
 		}
 
-		err = shrInstance.Unpublish(ctx, mh.vi.ShareData, v)
+		err = shareHandle.Unpublish(ctx, v)
 		if err != nil {
-			return nil, fmt.Errorf("shrInstance.Unpublish: %w", err)
+			return nil, fmt.Errorf("shareHandle.Unpublish: %w", err)
 		}
 	}
 

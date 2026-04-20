@@ -2,128 +2,77 @@ package shrtargetcli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
-	tr   transport.Transport
-	gp   globalParams
+	tr transport.Transport
+	gp globalParams
+
+	Iqn           string `json:"iqn"`
+	Port          string `json:"port"`
+	Transport     string `json:"transport"`
+	BackstoreName string `json:"backstore_name"`
+	AuthType      string `json:"auth_type"`
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
-	gp, err := parseGlobalParams(globalParams)
+var _ shares.Share = &share{}
+
+func parseShare(data string) (*share, error) {
+	var result share
+	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		return nil, fmt.Errorf("parse global params: %w", err)
+		return nil, err
 	}
-	return &share{
-		tr:   tr,
-		gp:   gp,
-	}, nil
+	return &result, nil
 }
 
-func (sh *share) GetCapabilities() shares.Capabilities {
-	return shares.Capabilities{
-		UnpublishAll: false,
-		LocalVolume:  []string{storage.VolDevice},
-		OpaqueVolume: nil,
+func (sh *share) Serialize() (string, error) {
+	encoded, err := json.Marshal(sh)
+	if err != nil {
+		return "", err
 	}
+	return string(encoded), nil
 }
 
-func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	if !testReady(ctx, sh.tr) {
-		return "", fmt.Errorf("targetcli is not ready")
+func (sh *share) Validate() error {
+	if sh.tr == nil {
+		return fmt.Errorf("transport is nil")
 	}
-	p, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return "", fmt.Errorf("parse params: %w", err)
+	if sh.gp.iqnBase == "" {
+		return fmt.Errorf("iqn base is not set")
 	}
-	logs.FromCtx(ctx).Args("args: nvmet share", "params", p)
-	err = p.validate()
-	if err != nil {
-		return "", fmt.Errorf("validate params: %w", err)
+	if sh.Iqn == "" {
+		return fmt.Errorf("missing iqn")
 	}
-
-	devicePath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return "", fmt.Errorf("get local path: %w", err)
+	if sh.BackstoreName == "" {
+		return fmt.Errorf("missing backstoreName")
 	}
-
-	iqn := fmt.Sprintf("%s:%s", sh.gp.iqnBase, req.ShareId)
-
-	snip := newTargetcliSnippets(sh.tr)
-
-	// todo seems like backstore names should be short, not iqn
-	backstoreName := iqn
-	err = snip.configureBackstore(ctx, backstoreName, devicePath)
-	if err != nil {
-		return "", fmt.Errorf("configure backstore: %w", err)
+	if sh.Port == "" {
+		return fmt.Errorf("missing port")
 	}
-
-	enforceAuth := true
-	disableAuth := false
-	switch p.AuthType {
-	case authTypeNone:
-		enforceAuth = false
-		disableAuth = true
-	case authTypeIqn:
-		enforceAuth = false
-		disableAuth = false
-	case authTypeChapProvision:
-		enforceAuth = true
-		disableAuth = false
+	if sh.Transport == "" {
+		return fmt.Errorf("missing transport")
 	}
-	err = snip.configureTarget(ctx, iscsiTargetConfig{
-		iqn:           iqn,
-		backstoreName: backstoreName,
-		auth:          enforceAuth,
-		demo:          disableAuth,
-	})
-	if err != nil {
-		return "", fmt.Errorf("configure target: %w", err)
-	}
-
-	err = snip.save(ctx)
-	if err != nil {
-		return "", fmt.Errorf("save config: %w", err)
-	}
-
-	c := shareContext{
-		Iqn:           iqn,
-		Port:          p.ListenPort,
-		Transport:     p.Transport,
-		BackstoreName: backstoreName,
-		AuthType:      p.AuthType,
-	}
-	err = c.validate()
-	if err != nil {
-		return "", fmt.Errorf("validate share context: %w", err)
-	}
-
-	return c.serialize(), nil
+	return nil
 }
 
-func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
+func (sh *share) DeleteShare(ctx context.Context) error {
 	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("targetcli is not ready")
 	}
 
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
-	}
-
 	snip := newTargetcliSnippets(sh.tr)
 
-	err = snip.deleteTarget(ctx, c.Iqn)
+	err := snip.deleteTarget(ctx, sh.Iqn)
 	if err != nil {
 		return fmt.Errorf("delete target: %w", err)
 	}
-	err = snip.deleteBackstore(ctx, c.BackstoreName)
+	err = snip.deleteBackstore(ctx, sh.BackstoreName)
 	if err != nil {
 		return fmt.Errorf("delete backstore: %w", err)
 	}

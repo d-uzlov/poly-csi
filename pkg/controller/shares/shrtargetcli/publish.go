@@ -49,14 +49,9 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	if !testReady(ctx, sh.tr) {
 		return nil, fmt.Errorf("targetcli is not ready")
-	}
-
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
 	iscsiInfo, err := cntriscsiadm.ParseIscsiInfo(mi)
@@ -65,20 +60,20 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	}
 
 	chap := cntriscsiadm.AuthNone
-	if c.AuthType == authTypeChapProvision {
+	if sh.AuthType == authTypeChapProvision {
 		chap = cntriscsiadm.AuthChapFromPublishSecret
 	}
 	pc := cntriscsiadm.PublicContext{
-		Iqn:       c.Iqn,
-		Port:      c.Port,
-		Transport: c.Transport,
+		Iqn:       sh.Iqn,
+		Port:      sh.Port,
+		Transport: sh.Transport,
 		AuthType:  chap,
 	}
 	pd := publishData{
 		HostIqn: iscsiInfo.HostIqn,
 	}
 
-	if c.AuthType == authTypeNone {
+	if sh.AuthType == authTypeNone {
 		return &shares.PublishContext{
 			Public:    pc,
 			LocalData: pd,
@@ -87,12 +82,12 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	snip := newTargetcliSnippets(sh.tr)
 
-	err = snip.createClient(ctx, c.Iqn, iscsiInfo.HostIqn)
+	err = snip.createClient(ctx, sh.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
 		return nil, fmt.Errorf("create client: %w", err)
 	}
 
-	if c.AuthType == authTypeIqn {
+	if sh.AuthType == authTypeIqn {
 		err = snip.save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("save config: %w", err)
@@ -106,12 +101,12 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	secret := cntriscsiadm.SecretContext{}
 
-	acl, err := snip.readClientAcl(ctx, c.Iqn, iscsiInfo.HostIqn)
+	acl, err := snip.readClientAcl(ctx, sh.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
 		return nil, fmt.Errorf("read client auth: %w", err)
 	}
 	if acl == nil {
-		logs.FromCtx(ctx).MicroOp("acl is not found, generating a new one", "share-iqn", c.Iqn, "host-iqn", iscsiInfo.HostIqn)
+		logs.FromCtx(ctx).MicroOp("acl is not found, generating a new one", "share-iqn", sh.Iqn, "host-iqn", iscsiInfo.HostIqn)
 		acl = &chapAcl{
 			userId:         randstr.Base62(16),
 			password:       randstr.Base62(32),
@@ -119,7 +114,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 			mutualPassword: randstr.Base62(32),
 		}
 
-		err = snip.setupClientAcl(ctx, c.Iqn, iscsiInfo.HostIqn, *acl)
+		err = snip.setupClientAcl(ctx, sh.Iqn, iscsiInfo.HostIqn, *acl)
 		if err != nil {
 			return nil, fmt.Errorf("setup client acl: %w", err)
 		}
@@ -142,15 +137,11 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized string) error {
 	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("targetcli is not ready")
 	}
 
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
-	}
 	pd, err := parsePublishData(serialized)
 	if err != nil {
 		return fmt.Errorf("parse publish data: %w", err)
@@ -158,7 +149,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 
 	snip := newTargetcliSnippets(sh.tr)
 
-	err = snip.deleteClientAcl(ctx, c.Iqn, pd.HostIqn)
+	err = snip.deleteClientAcl(ctx, sh.Iqn, pd.HostIqn)
 	if err != nil {
 		return fmt.Errorf("delete client acl: %w", err)
 	}
@@ -171,6 +162,6 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 	return nil
 }
 
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
+func (sh *share) UnpublishAll(ctx context.Context) error {
 	return fmt.Errorf("UnpublishAll is not implemented")
 }

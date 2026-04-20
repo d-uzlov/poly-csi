@@ -23,8 +23,6 @@ func testReady(ctx context.Context, tr transport.Transport) bool {
 }
 
 type globalParams struct {
-	readyCommand string
-	readyCmd     []string
 	iqnBase      string
 }
 

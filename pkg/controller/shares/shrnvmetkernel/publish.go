@@ -48,13 +48,9 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	if !testReady(ctx, sh.tr) {
 		return nil, fmt.Errorf("nvmet is not ready")
-	}
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
 	}
 
 	snip := nvmet.NewSnippets(ctx, sh.tr, true)
@@ -69,7 +65,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	if err != nil {
 		return nil, fmt.Errorf("configure host: %w", err)
 	}
-	err = snip.AllowHost(c.Nqn, nvmeInfo.HostNqn)
+	err = snip.AllowHost(sh.Nqn, nvmeInfo.HostNqn)
 	if err != nil {
 		return nil, fmt.Errorf("allow host: %w", err)
 	}
@@ -81,27 +77,23 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	return &shares.PublishContext{
 		Public: cntrnvme.PublicContext{
-			TargetNqn:     c.Nqn,
+			TargetNqn:     sh.Nqn,
 			HostNqn:       nvmeInfo.HostNqn,
 			HostId:        nvmeInfo.HostId,
 			AuthType:      cntrnvme.AuthTypeNqn,
-			ConnectPort:   c.Port,
-			TransportType: c.Transport,
-			IoQueues:      c.IoQueues,
+			ConnectPort:   sh.Port,
+			TransportType: sh.Transport,
+			IoQueues:      sh.IoQueues,
 		},
 		LocalData: &publishData{
-		HostNqn: nvmeInfo.HostNqn,
-	},
+			HostNqn: nvmeInfo.HostNqn,
+		},
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized string) error {
 	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
-	}
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
 	}
 	pd, err := parsePublishData(serialized)
 	if err != nil {
@@ -110,7 +102,7 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 
 	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
-	err = snip.DisallowHost(c.Nqn, pd.HostNqn)
+	err = snip.DisallowHost(sh.Nqn, pd.HostNqn)
 	if err != nil {
 		return fmt.Errorf("disallow host: %w", err)
 	}
@@ -123,6 +115,6 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 	return nil
 }
 
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
+func (sh *share) UnpublishAll(ctx context.Context) error {
 	return fmt.Errorf("UnpublishAll is not implemented")
 }

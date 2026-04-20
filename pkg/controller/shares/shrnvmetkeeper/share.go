@@ -2,110 +2,69 @@ package shrnvmetkeeper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/transport"
-	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
 type share struct {
-	tr   transport.Transport
-	gp   globalParams
+	tr transport.Transport
+
+	Nqn       string `json:"nqn"`
+	Port      string `json:"port"`
+	Transport string `json:"transport"`
+	IoQueues  string `json:"io_queues"`
+	AuthType  string `json:"auth_type"`
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
-	gp, err := parseGlobalParams(globalParams)
+var _ shares.Share = &share{}
+
+func parseShare(data string) (*share, error) {
+	var result share
+	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		return nil, fmt.Errorf("parse global params: %w", err)
+		return nil, err
 	}
-	return &share{
-		tr:   tr,
-		gp:   gp,
-	}, nil
+	return &result, nil
 }
 
-func (sh *share) GetCapabilities() shares.Capabilities {
-	return shares.Capabilities{
-		UnpublishAll: false,
-		LocalVolume:  []string{storage.VolDevice},
-		OpaqueVolume: nil,
+func (sh *share) Serialize() (string, error) {
+	encoded, err := json.Marshal(sh)
+	if err != nil {
+		return "", err
 	}
+	return string(encoded), nil
 }
 
-func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return "", fmt.Errorf("parse params: %w", err)
+func (sh *share) Validate() error {
+	if sh.tr == nil {
+		return fmt.Errorf("transport is nil")
 	}
-
-	devicePath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return "", fmt.Errorf("get local path: %w", err)
+	if sh.Nqn == "" {
+		return fmt.Errorf("missing nqn")
 	}
-
-	nqn := fmt.Sprintf("%s:%s", sh.gp.nqnBase, req.ShareId)
-
-	allowAnyHost := false
-	if p.AuthType == authTypeNone {
-		allowAnyHost = true
+	if sh.Port == "" {
+		return fmt.Errorf("missing port")
 	}
-
-	cmd := append(nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
-		Nqn:          nqn,
-		AllowAnyHost: allowAnyHost,
-	}.Json())
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
-	if err != nil {
-		return "", fmt.Errorf("subsys create: %w", err)
+	if sh.Transport == "" {
+		return fmt.Errorf("missing transport")
 	}
-
-	cmd = append(nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
-		Nqn:        nqn,
-		Nsid:       "1",
-		DevicePath: devicePath,
-		Enabled:    true,
-	}.Json())
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
-	if err != nil {
-		return "", fmt.Errorf("namespace create: %w", err)
+	if sh.AuthType == "" {
+		return fmt.Errorf("missing auth_type")
 	}
-
-	cmd = append(nvmetKeeperCmd, "subsys", "attach", nqn, p.NvmetPortName)
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
-	if err != nil {
-		return "", fmt.Errorf("subsys attach: %w", err)
-	}
-
-	c := shareContext{
-		Nqn:       nqn,
-		Port:      p.ConnectPort,
-		Transport: p.TransportType,
-		IoQueues:  p.IoQueues,
-		AuthType:  p.AuthType,
-	}
-	err = c.validate()
-	if err != nil {
-		return "", fmt.Errorf("validate share context: %w", err)
-	}
-
-	return c.serialize(), nil
+	return nil
 }
 
-func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
-	}
-
-	cmd := append(nvmetKeeperCmd, "subsys", "detach", c.Nqn, c.Port)
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
+func (sh *share) DeleteShare(ctx context.Context) error {
+	cmd := append(nvmetKeeperCmd, "subsys", "detach", sh.Nqn, sh.Port)
+	err := transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys detach: %w", err)
 	}
 
-	cmd = append(nvmetKeeperCmd, "subsys", "delete", c.Nqn)
+	cmd = append(nvmetKeeperCmd, "subsys", "delete", sh.Nqn)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys delete: %w", err)

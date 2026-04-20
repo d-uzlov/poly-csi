@@ -2,89 +2,64 @@ package shrtniscsi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/controller/storage/strzfszvol"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
-	tr   transport.Transport
-	gp   globalParams
+	tr transport.Transport
+	gp globalParams
+
+	Iqn  string
+	Zvol string
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error) {
-	gp, err := parseGlobalParams(globalParams)
+var _ shares.Share = &share{}
+
+func parseShare(data string) (*share, error) {
+	var result share
+	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		return nil, fmt.Errorf("parse global params: %w", err)
+		return nil, err
 	}
-	return &share{
-		tr:   tr,
-		gp:   gp,
-	}, nil
+	return &result, nil
 }
 
-func (sh *share) GetCapabilities() shares.Capabilities {
-	return shares.Capabilities{
-		UnpublishAll: false,
-		LocalVolume:  []string{storage.VolDevice},
-		OpaqueVolume: []string{"zfs-zvol"},
-	}
-}
-
-func (sh *share) CreateShare(ctx context.Context, req shares.CreateShareRequest) (string, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return "", fmt.Errorf("parse params: %w", err)
-	}
-	_ = p
-
-	zfsVol, ok := req.Volume.(*strzfszvol.Volume)
-	if !ok {
-		return "", fmt.Errorf("storage volume is not zfs zvol: %T", req.Volume)
-	}
-
-	iqn := fmt.Sprintf("%s:%s", sh.gp.iqnBase, req.ShareId)
-
-	snip := newSnippets(sh.tr)
-
-	err = snip.setupTarget(ctx, tnIscsiRequest{
-		extentName: uuid.New().String(),
-		iqn:        iqn,
-		zvol:       zfsVol.Path,
-	})
+func (sh *share) Serialize() (string, error) {
+	encoded, err := json.Marshal(sh)
 	if err != nil {
 		return "", err
 	}
-
-	c := shareContext{
-		Iqn:  iqn,
-		Zvol: zfsVol.Path,
-	}
-	err = c.validate()
-	if err != nil {
-		return "", fmt.Errorf("validate share context: %w", err)
-	}
-
-	return c.serialize(), nil
+	return string(encoded), nil
 }
 
-func (sh *share) DeleteShare(ctx context.Context, shareData string) error {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
+func (sh *share) Validate() error {
+	if sh.tr == nil {
+		return fmt.Errorf("transport is nil")
 	}
+	if sh.gp.iqnBase == "" {
+		return fmt.Errorf("missing iqn base")
+	}
+	if sh.Iqn == "" {
+		return fmt.Errorf("missing iqn")
+	}
+	if sh.Zvol == "" {
+		return fmt.Errorf("missing zvol")
+	}
+	return nil
+}
 
+func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := newSnippets(sh.tr)
 
-	err = snip.removeIscsiTarget(ctx, c.Iqn)
+	err := snip.removeIscsiTarget(ctx, sh.Iqn)
 	if err != nil {
 		return err
 	}
-	err = snip.removeIscsiExtents(ctx, c.Zvol)
+	err = snip.removeIscsiExtents(ctx, sh.Zvol)
 	if err != nil {
 		return err
 	}

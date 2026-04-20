@@ -51,12 +51,7 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	c, err := parseShareData(shareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
-	}
-
+func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	nvmeInfo, err := cntrnvme.ParseNvmeInfo(mi)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
@@ -70,7 +65,7 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	var secret cntrnvme.SecretContext
 	authType := ""
 
-	switch c.AuthType {
+	switch sh.AuthType {
 	case authTypeNone:
 		// no need to configure hosts
 	case authTypeNqn:
@@ -87,46 +82,18 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	case authTypeChapProvision:
 		authType = cntrnvme.AuthTypeDhChap
 
-		cmd := []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
-		hostKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
+		host, err := sh.createSecureHost(ctx, hostNqn)
 		if err != nil {
-			return nil, fmt.Errorf("host create: %w", err)
+			return nil, fmt.Errorf("createSecureHost: %w", err)
 		}
-		hostKey = strings.TrimSpace(hostKey)
-		if hostKey == "" {
-			return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
-		}
-
-		cmd = []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
-		controllerKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
-		if err != nil {
-			return nil, fmt.Errorf("host create: %w", err)
-		}
-		controllerKey = strings.TrimSpace(controllerKey)
-		if controllerKey == "" {
-			return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
-		}
-
 		secret = cntrnvme.SecretContext{
-			HostKey:       hostKey,
-			ControllerKey: controllerKey,
+			HostKey:       host.HostKey,
+			ControllerKey: host.ControllerKey,
 		}
 
-		cmd = append(nvmetKeeperCmd, "host", "create", nvmet.Host{
-			Nqn:           hostNqn,
-			NeedAuth:      true,
-			HostKey:       hostKey,
-			ControllerKey: controllerKey,
-			HashType:      nvmet.HashTypeHmacSha256,
-			DhGroup:       nvmet.DhGroup2048,
-		}.Json())
-		err = transport.CheckedRun(ctx, sh.tr, cmd)
-		if err != nil {
-			return nil, fmt.Errorf("host create: %w", err)
-		}
 	}
 
-	cmd := append(nvmetKeeperCmd, "subsys", "allow", c.Nqn, hostNqn)
+	cmd := append(nvmetKeeperCmd, "subsys", "allow", sh.Nqn, hostNqn)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("subsys allow: %w", err)
@@ -134,13 +101,13 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 
 	return &shares.PublishContext{
 		Public: cntrnvme.PublicContext{
-			TargetNqn:     c.Nqn,
+			TargetNqn:     sh.Nqn,
 			HostNqn:       hostNqn,
 			HostId:        hostId,
 			AuthType:      authType,
-			ConnectPort:   c.Port,
-			TransportType: c.Transport,
-			IoQueues:      c.IoQueues,
+			ConnectPort:   sh.Port,
+			TransportType: sh.Transport,
+			IoQueues:      sh.IoQueues,
 		},
 		Secret: secret,
 		LocalData: &publishData{
@@ -149,17 +116,51 @@ func (sh *share) Publish(ctx context.Context, shareData string, mi connectors.Co
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, shareData string, serialized string) error {
-	c, err := parseShareData(shareData)
+func (sh *share) createSecureHost(ctx context.Context, hostNqn string) (*nvmet.Host, error) {
+	cmd := []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
+	hostKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
 	if err != nil {
-		return fmt.Errorf("parse share data: %w", err)
+		return nil, fmt.Errorf("host create: %w", err)
 	}
+	hostKey = strings.TrimSpace(hostKey)
+	if hostKey == "" {
+		return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
+	}
+
+	cmd = []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
+	controllerKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("host create: %w", err)
+	}
+	controllerKey = strings.TrimSpace(controllerKey)
+	if controllerKey == "" {
+		return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
+	}
+
+	hostInfo := nvmet.Host{
+		Nqn:           hostNqn,
+		NeedAuth:      true,
+		HostKey:       hostKey,
+		ControllerKey: controllerKey,
+		HashType:      nvmet.HashTypeHmacSha256,
+		DhGroup:       nvmet.DhGroup2048,
+	}
+	cmd = append(nvmetKeeperCmd, "host", "create", hostInfo.Json())
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("host create: %w", err)
+	}
+
+	return &hostInfo, nil
+}
+
+func (sh *share) Unpublish(ctx context.Context, serialized string) error {
 	pd, err := parsePublishData(serialized)
 	if err != nil {
 		return fmt.Errorf("parse publish data: %w", err)
 	}
 
-	cmd := append(nvmetKeeperCmd, "subsys", "disallow", c.Nqn, pd.HostNqn)
+	cmd := append(nvmetKeeperCmd, "subsys", "disallow", sh.Nqn, pd.HostNqn)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys disallow: %w", err)
@@ -168,6 +169,6 @@ func (sh *share) Unpublish(ctx context.Context, shareData string, serialized str
 	return nil
 }
 
-func (sh *share) UnpublishAll(ctx context.Context, shareData string) error {
+func (sh *share) UnpublishAll(ctx context.Context) error {
 	return fmt.Errorf("UnpublishAll is not implemented")
 }
