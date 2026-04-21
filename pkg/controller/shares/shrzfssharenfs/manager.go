@@ -40,11 +40,6 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 		return nil, fmt.Errorf("storage volume is not a zfs dataset: %T", req.Volume)
 	}
 
-	mountPath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get local path: %w", err)
-	}
-
 	snip := zfs.NewSnippets(m.tr)
 
 	err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
@@ -55,7 +50,7 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 	c := share{
 		tr:      m.tr,
 		Dataset: zfsVol.Path,
-		Folder:  mountPath,
+		Folder:  req.FsPath,
 	}
 
 	return &c, nil

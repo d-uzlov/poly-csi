@@ -2,7 +2,6 @@ package shrtnnfs
 
 import (
 	"context"
-	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
@@ -30,19 +29,14 @@ func (sh *manager) GetCapabilities() shares.Capabilities {
 func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest) (shares.Share, error) {
 	snip := newNfsSnippets(m.tr)
 
-	mountPath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get local path: %w", err)
-	}
-
-	err = snip.configureNfsShare(ctx, mountPath)
+	err := snip.configureNfsShare(ctx, req.FsPath)
 	if err != nil {
 		return nil, err
 	}
 
 	c := share{
 		tr:     m.tr,
-		Folder: mountPath,
+		Folder: req.FsPath,
 	}
 
 	return &c, nil

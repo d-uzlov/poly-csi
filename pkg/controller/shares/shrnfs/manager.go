@@ -41,14 +41,9 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 
 	snip := newNfsSnippets(m.tr)
 
-	mountPath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get local path: %w", err)
-	}
-
 	token, err := snip.configureNfsShare(ctx, nfsShareConfig{
 		name:        req.ShareId,
-		path:        mountPath,
+		path:        req.FsPath,
 		globalFlags: p.shareOptions,
 		clients: []nfsClientOptions{
 			{id: "*"},
@@ -61,7 +56,7 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 	return &share{
 		tr:          m.tr,
 		ExportsFile: token,
-		Folder:      mountPath,
+		Folder:      req.FsPath,
 	}, nil
 }
 

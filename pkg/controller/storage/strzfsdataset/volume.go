@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/utils/zfs"
@@ -12,8 +13,6 @@ import (
 type Volume struct {
 	Path string `json:"path"`
 	snip zfs.Snippets
-	// mountPath is a cached value, if it's empty it's fetched from filesystem
-	mountPath string
 }
 
 var _ storage.Volume = &Volume{}
@@ -46,26 +45,40 @@ func (v *Volume) Serialize() (string, error) {
 	return string(encoded), nil
 }
 
-func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
-	if v.mountPath != "" {
-		return v.mountPath, nil
-	}
-	info, err := v.snip.GetProperties(ctx, v.Path)
+func (v *Volume) CreateState(ctx context.Context, size int64) error {
+	_, err := v.snip.CreateDataset(ctx, v.Path, zfs.DatasetConfig{
+		Quota:          size,
+		RefQuota:       size,
+		Reservation:    0,
+		RefReservation: 0,
+	})
 	if err != nil {
-		return "", fmt.Errorf("checking dataset: %w", err)
+		return fmt.Errorf("create dataset: %w", err)
 	}
-	if info == nil {
-		return "", fmt.Errorf("dataset is not present in underlying storage")
-	}
-	if info.IsZvol() {
-		return "", fmt.Errorf("expected dataset but found zvol at path %s", v.Path)
-	}
-	v.mountPath = info.Properties.MountPoint.Value
 
-	return v.mountPath, nil
+	return nil
 }
 
-func (v *Volume) Delete(ctx context.Context) error {
+func (v *Volume) ReadState(ctx context.Context) (*storage.VolumeState, error) {
+	info, err := v.snip.GetProperties(ctx, v.Path)
+	if err != nil {
+		return nil, fmt.Errorf("checking dataset: %w", err)
+	}
+	if info == nil {
+		return nil, nil
+	}
+	if info.IsZvol() {
+		return nil, fmt.Errorf("expected dataset but found zvol at path %s", v.Path)
+	}
+	result := storage.VolumeState{
+		FsPath: info.Properties.MountPoint.Value,
+		Size:   info.GetSize(),
+	}
+
+	return &result, nil
+}
+
+func (v *Volume) DeleteState(ctx context.Context) error {
 	_, err := v.snip.DestroyDataset(ctx, v.Path)
 	if err != nil {
 		return err
@@ -73,43 +86,13 @@ func (v *Volume) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (v *Volume) GetSize(ctx context.Context) (int64, error) {
-	info, err := v.snip.GetProperties(ctx, v.Path)
-	if err != nil {
-		return 0, err
-	}
-	if info == nil {
-		return 0, fmt.Errorf("dataset not found")
-	}
-
-	return info.GetSize(), nil
-}
-
-func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
-	info, err := v.snip.GetProperties(ctx, v.Path)
-	if err != nil {
-		return 0, err
-	}
-	if info == nil {
-		return 0, fmt.Errorf("dataset not found")
-	}
-
-	currentSize := info.GetSize()
-	if newSize <= currentSize {
-		return currentSize, nil
-	}
-
-	err = v.snip.ConfigureDataset(ctx, v.Path, zfs.DatasetConfig{
+func (v *Volume) Expand(ctx context.Context, newSize int64) error {
+	return v.snip.ConfigureDataset(ctx, v.Path, zfs.DatasetConfig{
 		Quota:          newSize,
 		RefQuota:       newSize,
 		Reservation:    0,
 		RefReservation: 0,
 	})
-	if err != nil {
-		return 0, err
-	}
-
-	return newSize, nil
 }
 
 func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
@@ -120,6 +103,16 @@ func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapsho
 		return nil, fmt.Errorf("create zfs snapshot '%s': %w", snapshotName, err)
 	}
 
-	// it's ok if mountPath is not filled
-	return newSnapshot(snapshotName, v.snip, v.mountPath), nil
+	return newSnapshot(snapshotName, v.snip, ""), nil
+}
+
+func (v *Volume) ReceiveSnapshot(ctx context.Context, sourceFile string, timeout time.Duration) error {
+	targetSnapshot := fmt.Sprintf("%s@init", v.Path)
+	defer v.snip.DestroySnapshot(ctx, targetSnapshot)
+
+	err := v.snip.Receive(ctx, targetSnapshot, sourceFile, timeout)
+	if err != nil {
+		return fmt.Errorf("zfs receive: %w", err)
+	}
+	return nil
 }

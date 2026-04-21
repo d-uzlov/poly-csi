@@ -51,14 +51,9 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 		return nil, fmt.Errorf("configure user: %w", err)
 	}
 
-	mountPath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get local path: %w", err)
-	}
-
 	configFile, err := snip.configureShare(ctx, ShareParameters{
 		ShareName: shareName,
-		Path:      mountPath,
+		Path:      req.FsPath,
 		User:      userName,
 	})
 	if err != nil {

@@ -48,18 +48,13 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 		return nil, fmt.Errorf("validate params: %w", err)
 	}
 
-	devicePath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get local path: %w", err)
-	}
-
 	iqn := fmt.Sprintf("%s:%s", m.gp.iqnBase, req.ShareId)
 
 	snip := newTargetcliSnippets(m.tr)
 
 	// todo seems like backstore names should be short, not iqn
 	backstoreName := iqn
-	err = snip.configureBackstore(ctx, backstoreName, devicePath)
+	err = snip.configureBackstore(ctx, backstoreName, req.FsPath)
 	if err != nil {
 		return nil, fmt.Errorf("configure backstore: %w", err)
 	}

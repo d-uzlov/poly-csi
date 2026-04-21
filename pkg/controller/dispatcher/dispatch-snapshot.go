@@ -31,9 +31,12 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
 
-	volSize, err := vol.GetSize(ctx)
+	volumeState, err := vol.ReadState(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get volume size: %w", err)
+		return nil, fmt.Errorf("ReadState: %w", err)
+	}
+	if volumeState == nil {
+		return nil, fmt.Errorf("ReadState: nil result")
 	}
 
 	snap, err := vol.MakeSnapshot(ctx, req.Name)
@@ -60,7 +63,7 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 			SnapshotId:     snapshotId,
 			SourceVolumeId: req.SourceVolumeId,
 			CreationTime:   nil, // TODO
-			SizeBytes:      volSize,
+			SizeBytes:      volumeState.Size,
 			ReadyToUse:     true,
 		},
 	}, nil

@@ -29,6 +29,7 @@ type Capabilities struct {
 	UnpublishAll bool
 	// LocalVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.LocalVolume.
 	// When empty, this check is skipped.
+	// TODO make this a single value instead of a list?
 	LocalVolume []string
 	// OpaqueVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.OpaqueVolume.
 	// When empty, this check is skipped.
@@ -39,8 +40,8 @@ type CreateShareRequest struct {
 	ShareId       string
 	StaticParams  map[string]string
 	MutableParams map[string]string
-	LocalVolume   string
-	OpaqueVolume  string
+	LocalVolume   string // TODO remove this?
+	FsPath        string
 	Volume        storage.Volume
 }
 

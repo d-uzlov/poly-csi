@@ -45,11 +45,6 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 	}
 	logs.FromCtx(ctx).Args("args: nvmet share", "params", p)
 
-	devicePath, err := req.Volume.GetLocalPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get local path: %w", err)
-	}
-
 	nqn := fmt.Sprintf("%s:%s", m.gp.nqnBase, req.ShareId)
 
 	snip := nvmet.NewSnippets(ctx, m.tr, true)
@@ -64,7 +59,7 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 	err = snip.ConfigureNamespace(nvmet.Ns{
 		Nqn:        nqn,
 		Nsid:       "1",
-		DevicePath: devicePath,
+		DevicePath: req.FsPath,
 		Enabled:    true,
 	})
 	if err != nil {

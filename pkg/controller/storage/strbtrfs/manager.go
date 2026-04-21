@@ -3,10 +3,8 @@ package strbtrfs
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/btrfs"
 )
@@ -26,10 +24,10 @@ func New(tr transport.Transport, globalParams map[string]string) (storage.Storag
 
 func (m *manager) GetCapabilities() storage.Capabilities {
 	return storage.Capabilities{
-		LocalVolume:    storage.VolFolder,
-		OpaqueVolume:   "btrfs-subvolume",
-		NativeSnapshot: true,
-		LocalSend:      "btrfs-subvolume",
+		LocalPathType:    storage.VolFolder,
+		OpaqueVolumeType: "btrfs-subvolume",
+		NativeSnapshot:   true,
+		LocalSendType:    "btrfs-subvolume",
 	}
 }
 
@@ -55,31 +53,7 @@ func (m *manager) ParseSnapshot(serialized string) (storage.Snapshot, error) {
 	return parseSnapshot(serialized, m.snip)
 }
 
-func (m *manager) GetExistingVolume(ctx context.Context, req storage.CreateRequest) (storage.Volume, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return nil, fmt.Errorf("parse params: %w", err)
-	}
-
-	datasetPath := fmt.Sprintf("%s/%s", p.parentPath, req.Id)
-
-	exists, err := m.snip.SubvolumeTest(ctx, datasetPath)
-	if err != nil {
-		return nil, fmt.Errorf("checking existing dataset: %w", err)
-	}
-	if !exists {
-		return nil, nil
-	}
-
-	// TODO btrfs crashes when trying to get quota info in json format
-	// if info.GetSize() != req.Size {
-	// 	return nil, fmt.Errorf("size mismatch: %d != %d", info.GetSize(), req.Size)
-	// }
-
-	return newVolume(datasetPath, m.snip), nil
-}
-
-func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (storage.Volume, error) {
+func (m *manager) CreateVolume(req storage.CreateRequest) (storage.Volume, error) {
 	p, err := parseParams(req.StaticParams, req.MutableParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
@@ -87,98 +61,5 @@ func (m *manager) CreateVolume(ctx context.Context, req storage.CreateRequest) (
 
 	containerPath := fmt.Sprintf("%s/%s", p.parentPath, req.Id)
 
-	err = m.tr.SudoCmds().Mkdir(ctx, containerPath, false)
-	if err != nil {
-		return nil, fmt.Errorf("create volume container folder: %w", err)
-	}
-
-	vol := newVolume(containerPath, m.snip)
-	err = vol.createMainVolume(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("createMainVolume: %w", err)
-	}
-
-	success := false
-	defer func() {
-		if success {
-			return
-		}
-		err = vol.Delete(ctx)
-		if err != nil {
-			logs.FromCtx(ctx).Error("failed to delete created subvol", "error", err.Error())
-		} else {
-			logs.FromCtx(ctx).Info("deleted created subvol")
-		}
-	}()
-
-	err = vol.setQuota(ctx, req.Size)
-	if err != nil {
-		return nil, fmt.Errorf("set quota: %w", err)
-	}
-
-	success = true
-	return vol, nil
-}
-
-func (m *manager) Receive(ctx context.Context, sourceFile string, req storage.CreateRequest, timeout time.Duration) (storage.Volume, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return nil, fmt.Errorf("parse params: %w", err)
-	}
-
-	containerPath := fmt.Sprintf("%s/%s", p.parentPath, req.Id)
-
-	err = m.tr.SudoCmds().Mkdir(ctx, containerPath, false)
-	if err != nil {
-		return nil, fmt.Errorf("create volume container folder: %w", err)
-	}
-
-	volumeName, err := m.snip.Receive(ctx, containerPath, sourceFile, timeout)
-	if err != nil {
-		return nil, fmt.Errorf("btrfs receive: %w", err)
-	}
-	
-	receivedVolPath := containerPath+"/"+volumeName
-
-	vol := newVolume(containerPath, m.snip)
-
-	success := false
-	defer func() {
-		if success {
-			return
-		}
-		if receivedVolPath != vol.getMainVolume() {
-			_, err := m.snip.SubvolumeDelete(ctx, receivedVolPath)
-			if err != nil {
-				logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
-			} else {
-				logs.FromCtx(ctx).MicroOp("deleted received subvol")
-			}
-		}
-		err = vol.Delete(ctx)
-		if err != nil {
-			logs.FromCtx(ctx).Error("failed to delete received subvol", "error", err.Error())
-		} else {
-			logs.FromCtx(ctx).MicroOp("deleted received subvol")
-		}
-	}()
-
-	if receivedVolPath != vol.getMainVolume() {
-		err = m.snip.SubvolumeClone(ctx, receivedVolPath, vol.getMainVolume())
-		if err != nil {
-			return nil, fmt.Errorf("clone received subvol: %w", err)
-		}
-		_, err = m.snip.SubvolumeDelete(ctx, receivedVolPath)
-		if err != nil {
-			return nil, fmt.Errorf("delete received subvol: %w", err)
-		}
-	}
-
-	err = vol.setQuota(ctx, req.Size)
-	if err != nil {
-		return nil, fmt.Errorf("set quota: %w", err)
-	}
-
-	success = true
-	return vol, nil
+	return newVolume(containerPath, m.snip, m.tr), nil
 }

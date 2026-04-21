@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/transport"
@@ -45,11 +46,32 @@ func (v *Volume) Serialize() (string, error) {
 	return string(encoded), nil
 }
 
-func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
-	return v.Path, nil
+func (v *Volume) CreateState(ctx context.Context, size int64) error {
+	err := v.tr.SudoCmds().Mkdir(ctx, v.Path, true)
+	if err != nil {
+		return fmt.Errorf("create volume folder: %w", err)
+	}
+
+	return nil
 }
 
-func (v *Volume) Delete(ctx context.Context) error {
+func (v *Volume) ReadState(ctx context.Context) (*storage.VolumeState, error) {
+	sr, err := v.tr.Cmds().Stat(ctx, v.Path)
+	if err != nil {
+		return nil, fmt.Errorf("stat: %w", err)
+	}
+	if !sr.FileExists {
+		return nil, nil
+	}
+	result := storage.VolumeState{
+		FsPath: v.Path,
+		Size:   0,
+	}
+
+	return &result, nil
+}
+
+func (v *Volume) DeleteState(ctx context.Context) error {
 	err := v.tr.SudoCmds().RmDirRecursive(ctx, v.Path)
 	if err != nil {
 		return fmt.Errorf("remove %s: %w", v.Path, err)
@@ -57,14 +79,14 @@ func (v *Volume) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (v *Volume) GetSize(ctx context.Context) (int64, error) {
-	return 0, nil
-}
-
-func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
-	return 0, nil
+func (v *Volume) Expand(ctx context.Context, newSize int64) error {
+	return nil
 }
 
 func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
 	return nil, fmt.Errorf("unimplemented")
+}
+
+func (v *Volume) ReceiveSnapshot(ctx context.Context, sourceFile string, timeout time.Duration) error {
+	return fmt.Errorf("unimplemented")
 }

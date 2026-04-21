@@ -8,15 +8,9 @@ import (
 type StorageManager interface {
 	GetCapabilities() Capabilities
 	GetAvailableCapacity(ctx context.Context, staticParams map[string]string) (int64, error)
-	// GetExistingVolume checks if volume with specified parameters already exists in the underlying storage
-	// returns (nil, nil) if volume does not exist
-	GetExistingVolume(ctx context.Context, req CreateRequest) (Volume, error)
-	// CreateVolume configures underlying storage and returns a volume handle
-	// It may return an error if matching volume already exists, so you should call GetExistingVolume first
-	CreateVolume(ctx context.Context, req CreateRequest) (Volume, error)
-	// Receive creates a new volume based on contents of a pipe specified via sourceFile
-	// The stream must be produced by a volume snapshot with the same value of StorageManager.GetCapabilities.LocalSend
-	Receive(ctx context.Context, sourceFile string, req CreateRequest, timeout time.Duration) (Volume, error)
+	// CreateVolume creates a new volume handle.
+	// It does not check or change underlying storage.
+	CreateVolume(req CreateRequest) (Volume, error)
 	// ParseVolume recreates volume handle from result of Volume.Serialize
 	ParseVolume(serialized string) (Volume, error)
 	// ParseSnapshot recreates snapshot handle from result of Snapshot.Serialize
@@ -26,17 +20,35 @@ type StorageManager interface {
 type Volume interface {
 	// Serialize returns a string that can be used in StorageManager.ParseVolume to recreate this volume handle
 	Serialize() (string, error)
-	GetLocalPath(ctx context.Context) (string, error)
-	Delete(ctx context.Context) error
-	GetSize(ctx context.Context) (int64, error)
+
+	// CreateState configures underlying storage
+	// It may return an error if matching volume already exists,
+	// so you need to check that ReadState() is (nil, nil)
+	//
+	// If an error happens, storage could be partially configured.
+	// Cleanup is expected to be managed by caller.
+	CreateState(ctx context.Context, size int64) error
+	// ReadState returns volume state, or (nil, nil) if volume does not exist in underlying storage
+	ReadState(ctx context.Context) (*VolumeState, error)
+	DeleteState(ctx context.Context) error
+
 	// Modify(ctx context.Context, req *csi.ControllerModifyVolumeRequest) error
-	Expand(ctx context.Context, newSize int64) (int64, error)
+
+	Expand(ctx context.Context, newSize int64) error
+
 	// MakeSnapshot must create an instantaneous consistent snapshot or return an error
 	MakeSnapshot(ctx context.Context, name string) (Snapshot, error)
+	// ReceiveSnapshot initializes a new volume from snapshot content.
+	// sourceFile must be a pipe that is fed using Snapshot.Send from StorageManager with matching StorageManager.GetCapabilities.LocalSendType
+	//
+	// If an error happens, storage could be partially configured.
+	// Cleanup is expected to be managed by caller.
+	ReceiveSnapshot(ctx context.Context, sourceFile string, timeout time.Duration) error
 }
 
 type Snapshot interface {
 	Serialize() (string, error)
+
 	// GetLocalPath returns path in local filesystem containing snapshot content
 	// The path should be read-only if possible.
 	// Some implementations may need to take additional actions to make snapshot accessible in the filesystem,
@@ -50,36 +62,40 @@ type Snapshot interface {
 
 type CreateRequest struct {
 	Id            string
-	Size          int64
 	StaticParams  map[string]string
 	MutableParams map[string]string
 }
 
 type Capabilities struct {
-	// LocalVolume holds type of volume in filesystem.
+	// LocalPathType holds type of volume in filesystem.
 	// It must be one of well-known types.
-	// If volume is not available in filesystem, LocalVolume must be empty.
+	// If volume is not available in filesystem, LocalPathType must be empty.
 	// Dispatcher can use this info for filesystem checks.
 	// Filesystem-based share methods can use this to expose volume to network.
-	LocalVolume string
+	LocalPathType string
 
-	// OpaqueVolume holds storage-specific volume type.
-	// Unlike LocalVolume, OpaqueVolume does not use well-known values.
+	// OpaqueVolumeType holds storage-specific volume type.
+	// Unlike LocalPathType, OpaqueVolumeType does not use well-known values.
 	// Storage-specific share methods can use this to expose volume to network.
-	OpaqueVolume string
+	OpaqueVolumeType string
 
 	// Indicates whether volumes in this storage support instantaneous online snapshots.
 	NativeSnapshot bool
 
-	// LocalSend holds type of protocol used to send (and receive) volume in pipe.
-	// Since only snapshots can be sent, LocalSend is meaningless if native snapshots are disabled on storage.
-	// When 2 storage managers report the same LocalSend method,
+	// LocalSendType holds type of protocol used to send (and receive) volume in pipe.
+	// Since only snapshots can be sent, LocalSendType is meaningless if native snapshots are disabled on storage.
+	// When 2 storage managers report the same LocalSendType method,
 	// dispatcher can use it for optimized storage-specific volume cloning.
-	LocalSend string
+	LocalSendType string
 }
 
-// well-known local volume types
+// well-known local path types
 const (
 	VolFolder = "vol_type_folder"
 	VolDevice = "vol_type_device"
 )
+
+type VolumeState struct {
+	FsPath string
+	Size   int64
+}

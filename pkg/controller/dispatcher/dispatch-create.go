@@ -98,14 +98,14 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	shrCaps := shr.GetCapabilities()
 
 	if shrCaps.LocalVolume != nil {
-		if !slices.Contains(shrCaps.LocalVolume, strCaps.LocalVolume) {
-			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.ShareType, shrCaps.LocalVolume, dispatchParams.StorageType, strCaps.LocalVolume)
+		if !slices.Contains(shrCaps.LocalVolume, strCaps.LocalPathType) {
+			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.ShareType, shrCaps.LocalVolume, dispatchParams.StorageType, strCaps.LocalPathType)
 		}
 	}
 
 	if shrCaps.OpaqueVolume != nil {
-		if !slices.Contains(shrCaps.OpaqueVolume, strCaps.OpaqueVolume) {
-			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.ShareType, shrCaps.OpaqueVolume, dispatchParams.StorageType, strCaps.OpaqueVolume)
+		if !slices.Contains(shrCaps.OpaqueVolume, strCaps.OpaqueVolumeType) {
+			return nil, fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dispatchParams.ShareType, shrCaps.OpaqueVolume, dispatchParams.StorageType, strCaps.OpaqueVolumeType)
 		}
 	}
 
@@ -158,280 +158,292 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		storageId = id
 	}
 
-	size := req.CapacityRange.RequiredBytes
-
 	storageCreateRequest := storage.CreateRequest{
 		Id:            storageId,
-		Size:          size,
 		StaticParams:  req.Parameters,
 		MutableParams: req.MutableParameters,
 	}
 
-	var vol storage.Volume
+	vol, err := str.CreateVolume(storageCreateRequest)
+	if err != nil {
+		return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.StorageType, err)
+	}
+	if vol == nil {
+		return nil, fmt.Errorf("storage[%s]:CreateVolume: nil result", dispatchParams.StorageType)
+	}
 	defer func() {
-		if vol == nil {
-			return
-		}
 		if success {
 			return
 		}
 		logger.Info("deleting storage volume on failure")
 		logs.FromCtx(ctx).Info("running storage cleanup")
-		err = vol.Delete(ctx)
+		err = vol.DeleteState(ctx)
 		if err != nil {
 			logs.FromCtx(ctx).Error("failed to run storage cleanup", "error", err.Error())
 			return
 		}
 	}()
 
-	if req.VolumeContentSource != nil {
-		var sourceSnapshot storage.Snapshot
-		var sourceServer *parsedServer
-		var sourceCaps *storage.Capabilities
+	volumeState, err := vol.ReadState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read state: %w", err)
+	}
+	if volumeState == nil {
+		if req.VolumeContentSource != nil {
+			var sourceSnapshot storage.Snapshot
+			var sourceServer *parsedServer
+			var sourceCaps *storage.Capabilities
 
-		tmpSnapshotId := "snap-for-" + req.Name
+			tmpSnapshotId := "snap-for-" + req.Name
 
-		if src := req.VolumeContentSource.GetSnapshot(); src != nil {
-			sh, err := d.getSnapshotHandle(ctx, src.SnapshotId)
-			if err != nil {
-				return nil, fmt.Errorf("getSnapshotHandle: %w", err)
-			}
-			defer sh.release()
-			if sh.si == nil {
-				return nil, fmt.Errorf("source snapshot is not found")
-			}
-
-			if sh.si.SnapshotType != "native" {
-				return nil, fmt.Errorf("clone from non-native snapshot is not supported")
-			}
-
-			sourceServer = sh.srv
-
-			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.Conf.GlobalParams)
-			if err != nil {
-				return nil, fmt.Errorf("get source storage: %w", err)
-			}
-
-			caps := sourceStr.GetCapabilities()
-			sourceCaps = &caps
-
-			snap, err := sourceStr.ParseSnapshot(sh.si.SerializedData)
-			if err != nil {
-				return nil, fmt.Errorf("parse source snapshot data: %w", err)
-			}
-			sourceSnapshot = snap
-		} else if src := req.VolumeContentSource.GetVolume(); src != nil {
-			sh, err := d.getVolumeInfo(ctx, src.VolumeId)
-			if err != nil {
-				return nil, fmt.Errorf("get volume info: %w", err)
-			}
-			defer sh.release()
-			if sh.vi == nil {
-				return nil, fmt.Errorf("source volume is not found")
-			}
-
-			sourceServer = sh.srv
-
-			sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.Conf.GlobalParams)
-			if err != nil {
-				return nil, fmt.Errorf("get source storage: %w", err)
-			}
-
-			caps := sourceStr.GetCapabilities()
-			sourceCaps = &caps
-
-			sourceVol, err := sourceStr.ParseVolume(sh.vi.StorageData)
-			if err != nil {
-				return nil, fmt.Errorf("parse source storage data: %w", err)
-			}
-
-			sourceCaps := sourceStr.GetCapabilities()
-			if sourceCaps.NativeSnapshot {
-				sourceSnapshot, err = sourceVol.MakeSnapshot(ctx, tmpSnapshotId)
+			if src := req.VolumeContentSource.GetSnapshot(); src != nil {
+				sh, err := d.getSnapshotHandle(ctx, src.SnapshotId)
 				if err != nil {
-					return nil, fmt.Errorf("create source snapshot: %w", err)
+					return nil, fmt.Errorf("getSnapshotHandle: %w", err)
 				}
-				// TODO cleanup should use a different context, with extended timeout
-				defer sourceSnapshot.Delete(ctx)
+				defer sh.release()
+				if sh.si == nil {
+					return nil, fmt.Errorf("source snapshot is not found")
+				}
+
+				if sh.si.SnapshotType != "native" {
+					return nil, fmt.Errorf("clone from non-native snapshot is not supported")
+				}
+
+				sourceServer = sh.srv
+
+				sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.si.StorageType, sh.srv.Conf.GlobalParams)
+				if err != nil {
+					return nil, fmt.Errorf("get source storage: %w", err)
+				}
+
+				caps := sourceStr.GetCapabilities()
+				sourceCaps = &caps
+
+				snap, err := sourceStr.ParseSnapshot(sh.si.SerializedData)
+				if err != nil {
+					return nil, fmt.Errorf("parse source snapshot data: %w", err)
+				}
+				sourceSnapshot = snap
+			} else if src := req.VolumeContentSource.GetVolume(); src != nil {
+				sh, err := d.getVolumeInfo(ctx, src.VolumeId)
+				if err != nil {
+					return nil, fmt.Errorf("get volume info: %w", err)
+				}
+				defer sh.release()
+				if sh.vi == nil {
+					return nil, fmt.Errorf("source volume is not found")
+				}
+
+				sourceServer = sh.srv
+
+				sourceStr, err := storagefactory.StorageFromType(sh.srv.trInstance, sh.vi.StorageType, sh.srv.Conf.GlobalParams)
+				if err != nil {
+					return nil, fmt.Errorf("get source storage: %w", err)
+				}
+
+				caps := sourceStr.GetCapabilities()
+				sourceCaps = &caps
+
+				sourceVol, err := sourceStr.ParseVolume(sh.vi.StorageData)
+				if err != nil {
+					return nil, fmt.Errorf("parse source storage data: %w", err)
+				}
+
+				sourceCaps := sourceStr.GetCapabilities()
+				if sourceCaps.NativeSnapshot {
+					sourceSnapshot, err = sourceVol.MakeSnapshot(ctx, tmpSnapshotId)
+					if err != nil {
+						return nil, fmt.Errorf("create source snapshot: %w", err)
+					}
+					// TODO cleanup should use a different context, with extended timeout
+					defer sourceSnapshot.Delete(ctx)
+				} else {
+					return nil, fmt.Errorf("source volume does not support native snapshots")
+				}
 			} else {
-				return nil, fmt.Errorf("source volume does not support native snapshots")
+				return nil, fmt.Errorf("unknown volume content source type: %#v", req.VolumeContentSource.Type)
+			}
+
+			if sourceCaps == nil {
+				return nil, fmt.Errorf("unexpectedly missing source capabilities")
+			}
+			if sourceSnapshot == nil {
+				return nil, fmt.Errorf("unexpectedly missing source snapshot data")
+			}
+			if sourceServer == nil {
+				return nil, fmt.Errorf("unexpectedly missing source server")
+			}
+
+			var sendFunc sendFuncType
+			var receiveFunc receiveFuncType
+
+			targetCaps := str.GetCapabilities()
+			if sourceCaps.LocalSendType != "" && targetCaps.LocalSendType != "" &&
+				sourceCaps.LocalSendType == targetCaps.LocalSendType {
+				// Both source and target has send-receive support, and use the same format
+				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
+					return sourceSnapshot.Send(ctx, targetFile, timeout)
+				}
+				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) error {
+					return vol.ReceiveSnapshot(ctx, sourceFile, timeout)
+				}
+			} else if sourceCaps.LocalPathType != "" && targetCaps.LocalPathType != "" &&
+				sourceCaps.LocalPathType == targetCaps.LocalPathType {
+				// File-based volumes, can copy contents
+				sourcePath, releaseSnapshot, err := sourceSnapshot.GetLocalPath(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("get snapshot local path: %w", err)
+				}
+				defer releaseSnapshot()
+
+				err = vol.CreateState(ctx, req.CapacityRange.RequiredBytes)
+				if err != nil {
+					return nil, fmt.Errorf("CreateState: %w", err)
+				}
+				volumeState, err = vol.ReadState(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("storage[%s]:CreateVolume:ReadState: %w", dispatchParams.StorageType, err)
+				}
+				if volumeState == nil {
+					return nil, fmt.Errorf("storage[%s]:CreateVolume:ReadState: nil result", dispatchParams.StorageType)
+				}
+				logger.Info("storage.CreateVolume: success")
+
+				switch sourceCaps.LocalPathType {
+				case storage.VolFolder:
+					sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
+						return sendTar(ctx, sourceServer.trInstance, sourcePath, targetFile, timeout)
+					}
+					receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) error {
+						err := receiveTar(ctx, srv.trInstance, sourceFile, volumeState.FsPath, timeout)
+						if err != nil {
+							return fmt.Errorf("receive tar: %w", err)
+						}
+						return nil
+					}
+				case storage.VolDevice:
+					sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
+						return sendFile(ctx, sourceServer.trInstance, sourcePath, targetFile, timeout)
+					}
+					receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) error {
+						err := receiveFile(ctx, srv.trInstance, sourceFile, volumeState.FsPath, timeout)
+						if err != nil {
+							return fmt.Errorf("receive device file: %w", err)
+						}
+						return nil
+					}
+				default:
+					return nil, fmt.Errorf("unknown local volume type: %s", sourceCaps.LocalPathType)
+				}
+			} else {
+				return nil, fmt.Errorf("source and target use incompatible send-receive mechanism")
+			}
+
+			// TODO better timeout
+			timeout := time.Minute
+
+			sendPipe, receivePipe, release, err := createClonePipes(ctx, tmpSnapshotId, sourceServer, srv, timeout)
+			if release != nil {
+				defer release()
+			}
+			if err != nil {
+				return nil, fmt.Errorf("createClonePipes: %w", err)
+			}
+
+			sendCtx, sendCancel := context.WithTimeout(ctx, timeout)
+			defer sendCancel()
+			sendCh := make(chan error, 1)
+			go func() {
+				defer close(sendCh)
+				sendCh <- sendFunc(sendCtx, sendPipe, timeout)
+			}()
+
+			receiveCtx, receiveCancel := context.WithTimeout(ctx, timeout)
+			defer receiveCancel()
+
+			receiveCh := make(chan error, 1)
+			go func() {
+				defer close(receiveCh)
+				err := receiveFunc(receiveCtx, receivePipe, timeout)
+				receiveCh <- err
+			}()
+
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("wait send: %w", ctx.Err())
+			case err = <-sendCh:
+				if err != nil {
+					return nil, fmt.Errorf("send: %w", err)
+				}
+				logger.Info("storage.Send: success")
+				// send OK, now let's check receive
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("wait receive: %w", ctx.Err())
+			case err = <-receiveCh:
+				if err != nil {
+					return nil, fmt.Errorf("storage[%s]:receive: %w", dispatchParams.StorageType, err)
+				}
+				logger.Info("storage.Receive: success")
 			}
 		} else {
-			return nil, fmt.Errorf("unknown volume content source type: %#v", req.VolumeContentSource.Type)
-		}
-
-		if sourceCaps == nil {
-			return nil, fmt.Errorf("unexpectedly missing source capabilities")
-		}
-		if sourceSnapshot == nil {
-			return nil, fmt.Errorf("unexpectedly missing source snapshot data")
-		}
-		if sourceServer == nil {
-			return nil, fmt.Errorf("unexpectedly missing source server")
-		}
-
-		var sendFunc sendFuncType
-		var receiveFunc receiveFuncType
-
-		targetCaps := str.GetCapabilities()
-		if sourceCaps.LocalSend != "" && targetCaps.LocalSend != "" &&
-			sourceCaps.LocalSend == targetCaps.LocalSend {
-			// Both source and target has send-receive support, and use the same format
-			sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
-				return sourceSnapshot.Send(ctx, targetFile, timeout)
-			}
-			receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
-				return str.Receive(ctx, sourceFile, storageCreateRequest, timeout)
-			}
-		} else if sourceCaps.LocalVolume != "" && targetCaps.LocalVolume != "" &&
-			sourceCaps.LocalVolume == targetCaps.LocalVolume {
-			// File-based volumes, can copy contents
-			sourcePath, releaseSnapshot, err := sourceSnapshot.GetLocalPath(ctx)
+			err = vol.CreateState(ctx, req.CapacityRange.RequiredBytes)
 			if err != nil {
-				return nil, fmt.Errorf("get snapshot local path: %w", err)
-			}
-			defer releaseSnapshot()
-
-			recvVol, err := str.CreateVolume(ctx, storageCreateRequest)
-			if err != nil {
-				return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.StorageType, err)
-			}
-			targetPath, err := recvVol.GetLocalPath(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("storage[%s]:CreateVolume:GetLocalPath %w", dispatchParams.StorageType, err)
+				return nil, fmt.Errorf("CreateState: %w", err)
 			}
 			logger.Info("storage.CreateVolume: success")
-
-			switch sourceCaps.LocalVolume {
-			case storage.VolFolder:
-				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
-					return sendTar(ctx, sourceServer.trInstance, sourcePath, targetFile, timeout)
-				}
-				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
-					err := receiveTar(ctx, srv.trInstance, sourceFile, targetPath, timeout)
-					if err != nil {
-						return nil, fmt.Errorf("receive tar: %w", err)
-					}
-					return recvVol, nil
-				}
-			case storage.VolDevice:
-				sendFunc = func(ctx context.Context, targetFile string, timeout time.Duration) error {
-					return sendFile(ctx, sourceServer.trInstance, sourcePath, targetFile, timeout)
-				}
-				receiveFunc = func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error) {
-					err := receiveFile(ctx, srv.trInstance, sourceFile, targetPath, timeout)
-					if err != nil {
-						return nil, fmt.Errorf("receive device file: %w", err)
-					}
-					return recvVol, nil
-				}
-			default:
-				return nil, fmt.Errorf("unknown local volume type: %s", sourceCaps.LocalVolume)
-			}
-		} else {
-			return nil, fmt.Errorf("source and target use incompatible send-receive mechanism")
 		}
-
-		// TODO better timeout
-		timeout := time.Minute
-
-		sendPipe, receivePipe, release, err := createClonePipes(ctx, tmpSnapshotId, sourceServer, srv, timeout)
-		if release != nil {
-			defer release()
-		}
-		if err != nil {
-			return nil, fmt.Errorf("createClonePipes: %w", err)
-		}
-
-		sendCtx, sendCancel := context.WithTimeout(ctx, timeout)
-		defer sendCancel()
-		sendCh := make(chan error, 1)
-		go func() {
-			defer close(sendCh)
-			sendCh <- sendFunc(sendCtx, sendPipe, timeout)
-		}()
-
-		receiveCtx, receiveCancel := context.WithTimeout(ctx, timeout)
-		defer receiveCancel()
-
-		receiveCh := make(chan error, 1)
-		go func() {
-			defer close(receiveCh)
-			sc, err := receiveFunc(receiveCtx, receivePipe, timeout)
-			vol = sc
-			receiveCh <- err
-		}()
-
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("wait send: %w", ctx.Err())
-		case err = <-sendCh:
-			if err != nil {
-				return nil, fmt.Errorf("send: %w", err)
-			}
-			logger.Info("storage.Send: success")
-			// send OK, now let's check receive
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("wait receive: %w", ctx.Err())
-		case err = <-receiveCh:
-			if err != nil {
-				return nil, fmt.Errorf("storage[%s]:receive: %w", dispatchParams.StorageType, err)
-			}
-			if vol == nil {
-				return nil, fmt.Errorf("storage[%s]:receive: nil result", dispatchParams.StorageType)
-			}
-			logger.Info("storage.Receive: success")
-		}
-	} else {
-		vol, err = str.CreateVolume(ctx, storageCreateRequest)
-		if err != nil {
-			return nil, fmt.Errorf("storage[%s]:CreateVolume: %w", dispatchParams.StorageType, err)
-		}
-		if vol == nil {
-			return nil, fmt.Errorf("storage[%s]:CreateVolume: nil result", dispatchParams.StorageType)
-		}
-		logger.Info("storage.CreateVolume: success")
 	}
 
-	if vol == nil {
-		return nil, fmt.Errorf("volume create did not set storage context")
+	// read new volumeState
+	volumeState, err = vol.ReadState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read state: %w", err)
 	}
-
-	if strCaps.LocalVolume != "" {
-		localPath, err := vol.GetLocalPath(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get local file: %w", err)
+	if volumeState == nil {
+		return nil, fmt.Errorf("ReadState: nil result")
+	}
+	if volumeState.Size < req.CapacityRange.RequiredBytes {
+		// volumes that has destructive expand, must properly populate volumeState.Size
+		err = vol.Expand(ctx, req.CapacityRange.RequiredBytes)
+		if volumeState.FsPath == "" {
+			return nil, fmt.Errorf("expand: %w", err)
+		}
+	}
+	if strCaps.LocalPathType != "" {
+		if volumeState.FsPath == "" {
+			return nil, fmt.Errorf("read state: empty fs path")
 		}
 
 		// when using local volumes, we can check common stuff here, to avoid repeating it in each share
-		err = checkFile(ctx, srv.trInstance, strCaps.LocalVolume, localPath)
+		err = checkFile(ctx, srv.trInstance, strCaps.LocalPathType, volumeState.FsPath)
 		if err != nil {
 			return nil, fmt.Errorf("check local file: %w", err)
 		}
 
 		init := volumeinit.NewController(srv.trInstance)
-		switch strCaps.LocalVolume {
+		switch strCaps.LocalPathType {
 		case storage.VolDevice:
-			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalVolume)
-			_, err = init.RunBlock(ctx, initConfig, localPath)
+			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalPathType)
+			_, err = init.RunBlock(ctx, initConfig, volumeState.FsPath)
 			if err != nil {
 				return nil, fmt.Errorf("init block: %w", err)
 			}
-			err = init.RunFsWithTmpMount(ctx, initConfig, localPath)
+			err = init.RunFsWithTmpMount(ctx, initConfig, volumeState.FsPath)
 			if err != nil {
 				return nil, fmt.Errorf("init fs: %w", err)
 			}
 		case storage.VolFolder:
-			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalVolume)
-			err = init.RunFs(ctx, initConfig, localPath)
+			logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalPathType)
+			err = init.RunFs(ctx, initConfig, volumeState.FsPath)
 			if err != nil {
 				return nil, fmt.Errorf("init fs: %w", err)
 			}
 		default:
-			logs.FromCtx(ctx).MicroOp("skipping volume init", "volume-type", strCaps.LocalVolume)
+			logs.FromCtx(ctx).MicroOp("skipping volume init", "volume-type", strCaps.LocalPathType)
 		}
 	}
 
@@ -448,8 +460,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		ShareId:       shareId,
 		StaticParams:  req.Parameters,
 		MutableParams: req.MutableParameters,
-		LocalVolume:   strCaps.LocalVolume,
-		OpaqueVolume:  strCaps.OpaqueVolume,
+		LocalVolume:   strCaps.LocalPathType,
+		FsPath:        volumeState.FsPath,
 		Volume:        vol,
 	})
 	if err != nil {
@@ -590,7 +602,7 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
 
-	err = vol.Delete(ctx)
+	err = vol.DeleteState(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("delete storage[%s]: %w", mh.vi.StorageType, err)
 	}

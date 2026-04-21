@@ -79,15 +79,18 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
 
-	volumeSize, err := vol.GetSize(ctx)
+	volumeState, err := vol.ReadState(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("strInstance.GetVolumeSize: %w", err)
+		return nil, fmt.Errorf("ReadState: %w", err)
+	}
+	if volumeState == nil {
+		return nil, fmt.Errorf("ReadState: nil result")
 	}
 
 	return &csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      req.VolumeId,
-			CapacityBytes: volumeSize,
+			CapacityBytes: volumeState.Size,
 			VolumeContext: mh.vi.VolumeContext,
 			// ContentSource: , // TODO restore matching content source
 		},
@@ -144,14 +147,22 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 
 	newSize := req.CapacityRange.RequiredBytes
 
-	volumeSize, err := vol.Expand(ctx, newSize)
+	err = vol.Expand(ctx, newSize)
 	if err != nil {
 		return nil, fmt.Errorf("storage: expand volume: %w", err)
 	}
 	logger.Info("storage.Expand: success")
 
+	volumeState, err := vol.ReadState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ReadState: %w", err)
+	}
+	if volumeState == nil {
+		return nil, fmt.Errorf("ReadState: nil result")
+	}
+
 	return &csi.ControllerExpandVolumeResponse{
-		CapacityBytes:         volumeSize,
+		CapacityBytes:         volumeState.Size,
 		NodeExpansionRequired: true,
 	}, nil
 }

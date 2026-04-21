@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/utils/lvm"
@@ -50,11 +51,36 @@ func (v *Volume) Serialize() (string, error) {
 	return string(bytes), nil
 }
 
-func (v *Volume) GetLocalPath(ctx context.Context) (string, error) {
-	return v.snip.MakeLvPath(v.VgName, v.LvName), nil
+func (v *Volume) CreateState(ctx context.Context, size int64) error {
+	_, err := v.snip.LvCreate(ctx, v.VgName, v.LvName, size)
+	if err != nil {
+		return fmt.Errorf("create lv: %w", err)
+	}
+
+	return nil
 }
 
-func (v *Volume) Delete(ctx context.Context) error {
+func (v *Volume) ReadState(ctx context.Context) (*storage.VolumeState, error) {
+	lvs, err := v.snip.ListLvs(ctx, v.VgName, v.LvName)
+	if err != nil {
+		return nil, fmt.Errorf("checking existing lv: %w", err)
+	}
+	if len(lvs) == 0 {
+		return nil, nil
+	}
+	lv := lvs[0]
+	if lv.LvName != v.LvName {
+		return nil, fmt.Errorf("lv %s/%s not found", v.VgName, v.LvName)
+	}
+	result := storage.VolumeState{
+		FsPath: v.snip.MakeLvPath(v.VgName, v.LvName),
+		Size:   lv.GetSize(),
+	}
+
+	return &result, nil
+}
+
+func (v *Volume) DeleteState(ctx context.Context) error {
 	_, err := v.snip.LvDelete(ctx, v.VgName, v.LvName)
 	if err != nil {
 		return err
@@ -62,47 +88,22 @@ func (v *Volume) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (v *Volume) GetSize(ctx context.Context) (int64, error) {
-	lvs, err := v.snip.ListLvs(ctx, v.VgName, v.LvName)
-	if err != nil {
-		return 0, fmt.Errorf("checking existing lv: %w", err)
-	}
-	if len(lvs) == 0 {
-		return 0, fmt.Errorf("lv %s/%s not found", v.VgName, v.LvName)
-	}
-	lv := lvs[0]
-	if lv.LvName != v.LvName {
-		return 0, fmt.Errorf("lv %s/%s not found", v.VgName, v.LvName)
-	}
-	return lv.GetSize(), nil
-}
-
-func (v *Volume) Expand(ctx context.Context, newSize int64) (int64, error) {
-	currentSize, err := v.GetSize(ctx)
-	if err != nil {
-		return 0, err
-	}
-	if newSize <= currentSize {
-		return currentSize, nil
-	}
-
-	err = v.snip.LvSetSize(ctx, v.VgName, v.LvName, newSize)
-	if err != nil {
-		return 0, err
-	}
-
-	return newSize, nil
+func (v *Volume) Expand(ctx context.Context, newSize int64) error {
+	return v.snip.LvSetSize(ctx, v.VgName, v.LvName, newSize)
 }
 
 func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapshot, error) {
 	snapshotName := v.LvName + "." + name
 
-	size, err := v.GetSize(ctx)
+	state, err := v.ReadState(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get lv size '%s': %w", snapshotName, err)
+		return nil, fmt.Errorf("read state: %w", err)
+	}
+	if state == nil {
+		return nil, fmt.Errorf("read state: volume not found")
 	}
 
-	_, err = v.snip.LvSnapshot(ctx, v.VgName, v.LvName, snapshotName, size)
+	_, err = v.snip.LvSnapshot(ctx, v.VgName, v.LvName, snapshotName, state.Size)
 	if err != nil {
 		return nil, fmt.Errorf("create lv snapshot '%s': %w", snapshotName, err)
 	}
@@ -113,4 +114,8 @@ func (v *Volume) MakeSnapshot(ctx context.Context, name string) (storage.Snapsho
 	// }
 
 	return newSnapshot(v.VgName, snapshotName, v.snip), nil
+}
+
+func (v *Volume) ReceiveSnapshot(ctx context.Context, sourceFile string, timeout time.Duration) error {
+	return fmt.Errorf("unimplemented")
 }

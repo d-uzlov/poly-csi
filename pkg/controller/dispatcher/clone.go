@@ -6,13 +6,12 @@ import (
 	"math/rand"
 	"time"
 
-	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type sendFuncType func(ctx context.Context, targetFile string, timeout time.Duration) error
-type receiveFuncType func(ctx context.Context, sourceFile string, timeout time.Duration) (storage.Volume, error)
+type receiveFuncType func(ctx context.Context, sourceFile string, timeout time.Duration) error
 
 func createClonePipes(ctx context.Context, id string, sourceSrv *parsedServer, targetSrv *parsedServer, timeout time.Duration) (send string, receive string, release func(), err error) {
 	if sourceSrv.Conf.StableId == targetSrv.Conf.StableId {
