@@ -35,7 +35,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.getMultipath(tr)
+	mp := conf.GetMultipath(tr)
 
 	var vc volumecontext.VolumeContext
 	err = serialmaps.Parse(req.VolumeContext, volumecontext.Prefix, &vc)
@@ -43,7 +43,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse volume context: %w", err)
 	}
 
-	connector := conf.findConnectorById(vc.ConnectorId, tr)
+	connector := conf.FindConnectorById(vc.ConnectorId, tr)
 	if connector == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
 	}
@@ -162,9 +162,9 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.getMultipath(tr)
+	mp := conf.GetMultipath(tr)
 
-	nvi, err := TryParseMountInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.findConnectorById(connectorId, tr) })
+	nvi, err := TryParseMountInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.FindConnectorById(connectorId, tr) })
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

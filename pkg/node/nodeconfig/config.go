@@ -33,7 +33,7 @@ type NodeInfoDbConfig struct {
 }
 
 type NodeEncryptConfig struct {
-	NodeKey             KeyInfoConfig `yaml:"nodeKey" json:"nodeKey"`
+	NodeKey KeyInfoConfig `yaml:"nodeKey" json:"nodeKey"`
 }
 
 type NodeNetworkConfig struct {

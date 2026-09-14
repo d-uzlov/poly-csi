@@ -12,7 +12,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, networks []nodeconfig.NodeNetworkConfig) (regnodeinfo.RegNodeInfo, error) {
+func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, networks []nodeconfig.ParsedNetworks) (regnodeinfo.RegNodeInfo, error) {
 	nodePublicKey := pk.GetPublicKey()
 	info := NodeInfo{
 		Id:         nodeId,
@@ -49,22 +49,13 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 				matchesInclude := false
 				matchesExclude := false
 				for _, v := range n.Include {
-					// TODO move CIDR parsing to config reloading
-					_, cidr, err := net.ParseCIDR(v)
-					if err != nil {
-						return regnodeinfo.RegNodeInfo{}, fmt.Errorf("parse cidr %s from include: %w", v, err)
-					}
-					if cidr.Contains(addr.IP) {
+					if v.Contains(addr.IP) {
 						matchesInclude = true
 						break
 					}
 				}
 				for _, v := range n.Exclude {
-					_, cidr, err := net.ParseCIDR(v)
-					if err != nil {
-						return regnodeinfo.RegNodeInfo{}, fmt.Errorf("parse cidr %s from exclude: %w", v, err)
-					}
-					if cidr.Contains(addr.IP) {
+					if v.Contains(addr.IP) {
 						matchesExclude = true
 						break
 					}

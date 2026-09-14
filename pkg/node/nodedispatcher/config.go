@@ -6,39 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
-	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
-	"meoe.io/poly-csi/pkg/transport"
-	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-type ParsedEncrypt struct {
-	NodeKey encrypt.RsaPrivateKey
-	Conf    nodeconfig.NodeEncryptConfig
-}
-
-type parsedConfig struct {
-	Encrypt                 ParsedEncrypt
-	NodeInfoDb              nodeconfig.NodeInfoDbConfig
-	DevFolder               string
-	Multipath               mpfactory.ParsedMultipath
-	Mounts                  []*connectorfactory.ParsedConnector
-	Networks                []nodeconfig.NodeNetworkConfig
-	ExecConfig              localexec.Config
-	Logs                    nodeconfig.Logs
-	DisableCleanupOnFailure bool
-}
-
-func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
+func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, error) {
 	logger := slogctx.FromCtx(ctx)
 
 	dec := yaml.NewDecoder(bytes.NewBuffer(raw))
@@ -52,6 +31,15 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 	}
 
 	logger.Info("parsing config", "new-config", config)
+
+	netList := []nodeconfig.ParsedNetworks{}
+	for i, v := range config.Networks {
+		networks, err := parseNetworks(v)
+		if err != nil {
+			return nil, fmt.Errorf("networks[i=%d]: %w", i, err)
+		}
+		netList = append(netList, networks)
+	}
 
 	nodeKey, err := loadOrGenerateKey(config.Encrypt.NodeKey.Path)
 	if err != nil {
@@ -89,8 +77,8 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 
-	return &parsedConfig{
-		Encrypt: ParsedEncrypt{
+	return &nodeconfig.ParsedConfig{
+		Encrypt: nodeconfig.ParsedEncrypt{
 			NodeKey: *nodeKey,
 			Conf:    config.Encrypt,
 		},
@@ -98,11 +86,36 @@ func ParseConfig(ctx context.Context, raw []byte) (*parsedConfig, error) {
 		DevFolder:               config.DevFolder,
 		Multipath:               *mp,
 		Mounts:                  ml,
-		Networks:                config.Networks,
+		Networks:                netList,
 		ExecConfig:              config.ExecConfig,
 		Logs:                    config.Logs,
 		DisableCleanupOnFailure: config.DisableCleanupOnFailure,
 	}, nil
+}
+
+func parseNetworks(c nodeconfig.NodeNetworkConfig) (nodeconfig.ParsedNetworks, error) {
+	result := nodeconfig.ParsedNetworks{}
+	for i, v := range c.Include {
+		_, cidr, err := net.ParseCIDR(v)
+		if err != nil {
+			return nodeconfig.ParsedNetworks{}, fmt.Errorf("include[i=%d]='%s': %w", i, v, err)
+		}
+		if cidr == nil {
+			return nodeconfig.ParsedNetworks{}, fmt.Errorf("include[i=%d]='%s': cidr not found", i, v)
+		}
+		result.Include = append(result.Include, *cidr)
+	}
+	for i, v := range c.Exclude {
+		_, cidr, err := net.ParseCIDR(v)
+		if err != nil {
+			return nodeconfig.ParsedNetworks{}, fmt.Errorf("exclude[i=%d]='%s': %w", i, v, err)
+		}
+		if cidr == nil {
+			return nodeconfig.ParsedNetworks{}, fmt.Errorf("exclude[i=%d]='%s': cidr not found", i, v)
+		}
+		result.Exclude = append(result.Exclude, *cidr)
+	}
+	return result, nil
 }
 
 func loadOrGenerateKey(filepath string) (*encrypt.RsaPrivateKey, error) {
@@ -122,56 +135,4 @@ func loadOrGenerateKey(filepath string) (*encrypt.RsaPrivateKey, error) {
 		return nil, err
 	}
 	return rsa, nil
-}
-
-func (c *parsedConfig) findConnectorById(id string, tr transport.Transport) connectors.Connector {
-	for _, v := range c.Mounts {
-		if v.Conf.Id == id {
-			return v.Inflate(tr)
-		}
-	}
-
-	return nil
-}
-
-func (c *parsedConfig) GetRpcLogConfig(rpcPath string) logs.Config {
-	result := logs.Config{
-		LogLevel:     "info",
-		EchoCommands: false,
-		ExtraFields: map[string]string{
-			"scope":  "method",
-			"method": rpcPath,
-		},
-	}
-	result = result.Combine(c.Logs.Default)
-	config, ok := c.Logs.Rpc[rpcPath]
-	if ok {
-		result = result.Combine(config)
-	}
-	return result
-}
-
-func (c *parsedConfig) GetNodeInfoLogConfig() logs.Config {
-	result := logs.Config{
-		LogLevel:     "info",
-		EchoCommands: false,
-		ExtraFields: map[string]string{
-			"scope": "node-info",
-		},
-	}
-	result = result.Combine(c.Logs.Default)
-	result = result.Combine(c.Logs.NodeInfo)
-	return result
-}
-
-func (c *parsedConfig) getMultipath(tr transport.Transport) multipath.Multipath {
-	if !c.Multipath.Valid {
-		return nil
-	}
-
-	if c.Multipath.Inflate == nil {
-		return nil
-	}
-
-	return c.Multipath.Inflate(tr)
 }

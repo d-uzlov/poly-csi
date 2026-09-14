@@ -9,6 +9,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
 	"meoe.io/poly-csi/pkg/transport/localexec"
@@ -31,12 +32,12 @@ type Node struct {
 	nodeId  string
 
 	confMutex sync.RWMutex
-	conf      *parsedConfig
+	conf      *nodeconfig.ParsedConfig
 
 	nodeInfoCancel func(ctx context.Context)
 }
 
-func (n *Node) ReloadConfig(ctx context.Context, newConf *parsedConfig) error {
+func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfig) error {
 	tr := localexec.New(newConf.ExecConfig)
 
 	mounts := map[string]connectors.Connector{}
@@ -84,7 +85,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *parsedConfig) error {
 	return nil
 }
 
-func (n *Node) GetConfig() (conf *parsedConfig) {
+func (n *Node) GetConfig() (conf *nodeconfig.ParsedConfig) {
 	n.confMutex.RLock()
 	defer n.confMutex.RUnlock()
 

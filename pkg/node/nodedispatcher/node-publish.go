@@ -34,14 +34,14 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.getMultipath(tr)
+	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.findConnectorById(connectorId, tr) })
+	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.FindConnectorById(connectorId, tr) })
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
 
-	connector := conf.findConnectorById(nvi.ConnectorId, tr)
+	connector := conf.FindConnectorById(nvi.ConnectorId, tr)
 	if connector == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}

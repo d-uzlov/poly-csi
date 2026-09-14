@@ -66,9 +66,9 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.getMultipath(tr)
+	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.findConnectorById(connectorId, tr) })
+	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.FindConnectorById(connectorId, tr) })
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
