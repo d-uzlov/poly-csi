@@ -1,6 +1,6 @@
 module meoe.io/poly-csi
 
-go 1.26.1
+go 1.27.1
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.1
