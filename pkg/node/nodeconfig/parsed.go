@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
@@ -28,17 +27,18 @@ type ParsedConfig struct {
 	NodeInfoDb              NodeInfoDbConfig
 	DevFolder               string
 	Multipath               mpfactory.ParsedMultipath
-	Mounts                  []*connectorfactory.ParsedConnector
+	Connectors              []*connectorfactory.ParsedConnector
+	Presets                 map[string]map[string]string
 	Networks                []ParsedNetworks
 	ExecConfig              localexec.Config
 	Logs                    Logs
 	DisableCleanupOnFailure bool
 }
 
-func (c *ParsedConfig) FindConnectorById(id string, tr transport.Transport) connectors.Connector {
-	for _, v := range c.Mounts {
+func (c *ParsedConfig) FindConnectorById(id string) connectorfactory.InflateFunc {
+	for _, v := range c.Connectors {
 		if v.Conf.Id == id {
-			return v.Inflate(tr)
+			return v.Inflate
 		}
 	}
 

@@ -16,13 +16,17 @@ type connector struct {
 	devFolder string
 }
 
-func New(tr transport.Transport, config Config, devFolder string) connectors.Connector {
+func New(config Config, devFolder string) connectors.Connector {
 	return &connector{
-		tr:        tr,
-		snip:      newNvmeSnippets(tr, config.NvmeCmd, devFolder, config.ParseKernelLog),
 		config:    config,
 		devFolder: devFolder,
 	}
+}
+
+func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
+	c.tr = tr
+	c.snip = newNvmeSnippets(tr, c.config.NvmeCmd, c.devFolder, c.config.ParseKernelLog)
+	return nil
 }
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
@@ -66,7 +70,7 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	namespaceDevicePath := m.devFolder + "/" + namespaceDevice
 
 	return &connectors.ConnectResult{
-		Devices:    []string{namespaceDevicePath},
+		Devices: []string{namespaceDevicePath},
 		ConnectorData: VolumeData{
 			Nqn: pc.TargetNqn,
 		},

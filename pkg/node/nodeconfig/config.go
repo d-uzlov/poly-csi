@@ -10,15 +10,21 @@ import (
 )
 
 type NodeConfig struct {
-	Encrypt                 NodeEncryptConfig               `yaml:"encrypt" json:"encrypt"`
-	NodeInfoDb              NodeInfoDbConfig                `yaml:"nodeInfoDb" json:"nodeInfoDb"`
-	Multipath               mpfactory.MultipathConfig       `yaml:"multipath" json:"multipath"`
-	Connectors              []*connectorfactory.MountConfig `yaml:"connectors" json:"connectors"`
-	Networks                []NodeNetworkConfig             `yaml:"networks" json:"networks"`
-	DevFolder               string                          `yaml:"devFolder" json:"devFolder"`
-	ExecConfig              localexec.Config                `yaml:"execConfig" json:"execConfig"`
-	Logs                    Logs                            `yaml:"logs" json:"logs"`
-	DisableCleanupOnFailure bool                            `yaml:"disableCleanupOnFailure" json:"disableCleanupOnFailure"`
+	Encrypt                 NodeEncryptConfig                 `yaml:"encrypt" json:"encrypt"`
+	NodeInfoDb              NodeInfoDbConfig                  `yaml:"nodeInfoDb" json:"nodeInfoDb"`
+	Multipath               mpfactory.MultipathConfig         `yaml:"multipath" json:"multipath"`
+	Connectors              []*connectorfactory.ConnectorSpec `yaml:"connectors" json:"connectors"`
+	Presets                 []Preset                          `yaml:"presets"`
+	Networks                []NodeNetworkConfig               `yaml:"networks" json:"networks"`
+	DevFolder               string                            `yaml:"devFolder" json:"devFolder"`
+	ExecConfig              localexec.Config                  `yaml:"execConfig" json:"execConfig"`
+	Logs                    Logs                              `yaml:"logs" json:"logs"`
+	DisableCleanupOnFailure bool                              `yaml:"disableCleanupOnFailure" json:"disableCleanupOnFailure"`
+}
+
+type Preset struct {
+	Name   string            `yaml:"name"`
+	Params map[string]string `yaml:"params"`
 }
 
 type Logs struct {

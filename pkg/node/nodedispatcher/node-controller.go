@@ -41,12 +41,17 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 	tr := localexec.New(newConf.ExecConfig)
 
 	mounts := map[string]connectors.Connector{}
-	for _, v := range newConf.Mounts {
+	for _, v := range newConf.Connectors {
 		if !v.Valid {
 			continue
 		}
-		m := v.Inflate(tr)
+		m := v.Inflate()
 		if m == nil {
+			continue
+		}
+		err := m.Configure(ctx, tr, newConf.Presets[defaultPresetName])
+		if err != nil {
+			slogctx.FromCtx(ctx).Error("failed to initialize connector[id=%s] during reload: %w", v.Conf.Id, err)
 			continue
 		}
 		mounts[v.Conf.Id] = m

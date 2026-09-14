@@ -11,6 +11,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type client struct {
@@ -102,6 +103,10 @@ func (m *client) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, er
 	}
 
 	return &mni, nil
+}
+
+func (m *client) Configure(ctx context.Context, _ transport.Transport, preset map[string]string) error {
+	return nil
 }
 
 func (m *client) Capabilities(ctx context.Context) (connectors.Capabilities, error) {

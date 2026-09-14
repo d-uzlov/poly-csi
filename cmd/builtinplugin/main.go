@@ -54,7 +54,15 @@ func main() {
 			panic("connector config is not valid")
 		}
 
-		instance := conf.Connector.Inflate(tr)
+		instance := conf.Connector.Inflate()
+		if instance == nil {
+			panic("connector inflate failed")
+		}
+		// TODO add support for presets
+		err = instance.Configure(ctx, tr, map[string]string{})
+		if err != nil {
+			panic(err)
+		}
 		serverInstance := conf.InflateServer(ctx, instance)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {

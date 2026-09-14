@@ -5,11 +5,13 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/node/addropt"
+	"meoe.io/poly-csi/pkg/transport"
 )
 
 type Connector interface {
 	Capabilities(ctx context.Context) (Capabilities, error)
 	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
+	Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error
 	Connect(ctx context.Context, req ConnectRequest) (*ConnectResult, error)
 	Disconnect(ctx context.Context, serializedData string) error
 	Expand(ctx context.Context, serializedData string) error

@@ -14,11 +14,11 @@ import (
 )
 
 type Config struct {
-	ServerType   string                        `yaml:"serverType"`
-	ServerConfig map[string]any                `yaml:"serverConfig"`
-	Connector    *connectorfactory.MountConfig `yaml:"connector"`
-	DevFolder    string                        `yaml:"devFolder"`
-	Logs         logs.Config                   `yaml:"logs"`
+	ServerType   string                          `yaml:"serverType"`
+	ServerConfig map[string]any                  `yaml:"serverConfig"`
+	Connector    *connectorfactory.ConnectorSpec `yaml:"connector"`
+	DevFolder    string                          `yaml:"devFolder"`
+	Logs         logs.Config                     `yaml:"logs"`
 }
 
 type Inflate func(ctx context.Context, connector connectors.Connector) connectorpluginserver.ConnectorPlugin

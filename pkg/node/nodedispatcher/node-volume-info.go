@@ -11,6 +11,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -28,9 +29,10 @@ type NodeVolumeInfo struct {
 	MountType   string `json:"mount_type"`
 	FsMountPath string `json:"folder_path"`
 	// TODO we allow for /dev mount changes, we should not save device path here
-	BlockDevicePath         string `json:"block_device_path"`
-	SerializedMultipathData string `json:"multipath_data"`
-	SerializedConnectorData string `json:"connector_data"`
+	BlockDevicePath         string            `json:"block_device_path"`
+	SerializedMultipathData string            `json:"multipath_data"`
+	SerializedConnectorData string            `json:"connector_data"`
+	Preset                  map[string]string `json:"preset"`
 
 	tr           transport.Transport  `json:"-"`
 	connector    connectors.Connector `json:"-"`
@@ -43,9 +45,10 @@ type SavedParams struct {
 
 const metadataFile = "/mount-info.json"
 
-func newVolumeHandle(parentFolder string, tr transport.Transport, connector connectors.Connector, mp multipath.Multipath, connectorId string) NodeVolumeInfo {
+func newVolumeHandle(parentFolder string, tr transport.Transport, connector connectors.Connector, mp multipath.Multipath, connectorId string, preset map[string]string) NodeVolumeInfo {
 	return NodeVolumeInfo{
 		parentFolder: parentFolder,
+		Preset:       preset,
 		tr:           tr,
 		connector:    connector,
 		mp:           mp,
@@ -53,8 +56,8 @@ func newVolumeHandle(parentFolder string, tr transport.Transport, connector conn
 	}
 }
 
-func ParseNodeVolumeInfo(parentFolder string, tr transport.Transport, mp multipath.Multipath, createConnector func(connectorId string) connectors.Connector) (*NodeVolumeInfo, error) {
-	result, err := TryParseMountInfo(parentFolder, tr, mp, createConnector)
+func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.Transport, mp multipath.Multipath, findConnector func(connectorId string) connectorfactory.InflateFunc) (*NodeVolumeInfo, error) {
+	result, err := TryParseMountInfo(ctx, parentFolder, tr, mp, findConnector)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +67,7 @@ func ParseNodeVolumeInfo(parentFolder string, tr transport.Transport, mp multipa
 	return result, nil
 }
 
-func TryParseMountInfo(parentFolder string, tr transport.Transport, mp multipath.Multipath, createConnector func(connectorId string) connectors.Connector) (*NodeVolumeInfo, error) {
+func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Transport, mp multipath.Multipath, findConnector func(connectorId string) connectorfactory.InflateFunc) (*NodeVolumeInfo, error) {
 	content, err := os.ReadFile(parentFolder + metadataFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -79,10 +82,21 @@ func TryParseMountInfo(parentFolder string, tr transport.Transport, mp multipath
 		return nil, fmt.Errorf("parsing mount info from %s: %w", parentFolder+metadataFile, err)
 	}
 
-	connector := createConnector(result.ConnectorId)
-	if connector == nil {
-		return nil, fmt.Errorf("createConnector '%s': not found", result.ConnectorId)
+	inflate := findConnector(result.ConnectorId)
+	if inflate == nil {
+		return nil, fmt.Errorf("createConnector 'id=%s': not found", result.ConnectorId)
 	}
+
+	connector := inflate()
+	if connector == nil {
+		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", result.ConnectorId)
+	}
+	
+	err = connector.Configure(ctx, tr, result.Preset)
+	if err != nil {
+		return nil, fmt.Errorf("connector.Configure: %w", err)
+	}
+
 	result.parentFolder = parentFolder
 	result.tr = tr
 	result.connector = connector

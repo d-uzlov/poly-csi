@@ -15,11 +15,15 @@ type connector struct {
 	devFolder string
 }
 
-func New(tr transport.Transport, devFolder string) connectors.Connector {
+func New(devFolder string) connectors.Connector {
 	return &connector{
-		tr:        tr,
 		devFolder: devFolder,
 	}
+}
+
+func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
+	c.tr = tr
+	return nil
 }
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {

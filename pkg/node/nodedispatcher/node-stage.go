@@ -13,6 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -43,9 +44,27 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse volume context: %w", err)
 	}
 
-	connector := conf.FindConnectorById(vc.ConnectorId, tr)
-	if connector == nil {
+	if vc.PresetName == "" {
+		vc.PresetName = defaultPresetName
+	}
+	preset, ok := n.conf.Presets[vc.PresetName]
+	if !ok {
+		return nil, fmt.Errorf("preset with name '%s' is not found", vc.PresetName)
+	}
+
+	connectorInflate := conf.FindConnectorById(vc.ConnectorId)
+	if connectorInflate == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
+	}
+
+	connector := connectorInflate()
+	if connector == nil {
+		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", vc.ConnectorId)
+	}
+
+	err = connector.Configure(ctx, tr, preset)
+	if err != nil {
+		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}
 
 	caps, err := connector.Capabilities(ctx)
@@ -53,7 +72,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}
 
-	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId)
+	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, preset)
 	defer func() {
 		saveErr := nvi.writeToDisk()
 		if err == nil {
@@ -164,7 +183,9 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := TryParseMountInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.FindConnectorById(connectorId, tr) })
+	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, mp, func(connectorId string) connectorfactory.InflateFunc {
+		return conf.FindConnectorById(connectorId)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

@@ -9,6 +9,7 @@ type VolumeContext struct {
 	StorageType   string `map:"storage_type"`
 	ShareType     string `map:"share_type"`
 	ConnectorId   string `map:"connector_id"`
+	PresetName    string `map:"preset"`
 	FsGroupMethod string `map:"fs_group_method"`
 	Uuid          string `map:"uuid"`
 }

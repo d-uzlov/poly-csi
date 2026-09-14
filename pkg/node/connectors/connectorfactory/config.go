@@ -5,11 +5,9 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/transport"
 )
 
-type MountConfig struct {
+type ConnectorSpec struct {
 	Id      string         `yaml:"id"`
 	Type    string         `yaml:"type"`
 	Subtype string         `yaml:"subtype"`
@@ -18,11 +16,11 @@ type MountConfig struct {
 
 type ParsedConnector struct {
 	Valid   bool
-	Inflate func(tr transport.Transport) connectors.Connector
-	Conf    *MountConfig
+	Inflate InflateFunc
+	Conf    *ConnectorSpec
 }
 
-func ParseConnector(ctx context.Context, c *MountConfig, devFolder string) *ParsedConnector {
+func ParseConnector(ctx context.Context, c *ConnectorSpec, devFolder string) *ParsedConnector {
 	logger := slogctx.FromCtx(ctx)
 
 	if c.Type == "" {

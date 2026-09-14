@@ -12,6 +12,7 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -36,14 +37,9 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.FindConnectorById(connectorId, tr) })
+	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, func(connectorId string) connectorfactory.InflateFunc { return conf.FindConnectorById(connectorId) })
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
-	}
-
-	connector := conf.FindConnectorById(nvi.ConnectorId, tr)
-	if connector == nil {
-		return nil, fmt.Errorf("connector with id '%s' is not found", nvi.ConnectorId)
 	}
 
 	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
@@ -56,7 +52,7 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 		return nil, fmt.Errorf("parse address options from publish context: %w", err)
 	}
 
-	caps, err := connector.Capabilities(ctx)
+	caps, err := nvi.connector.Capabilities(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}

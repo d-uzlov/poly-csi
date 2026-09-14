@@ -17,6 +17,8 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
+const defaultPresetName = "default"
+
 func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, error) {
 	logger := slogctx.FromCtx(ctx)
 
@@ -77,6 +79,21 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 
+	presetMap := map[string]map[string]string{
+		defaultPresetName: {},
+	}
+	for i, v := range config.Presets {
+		if v.Name == "" {
+			logger.Error(fmt.Sprintf("preset[i=%d]: missing 'name' field", i))
+			continue
+		}
+		if _, ok := presetMap[v.Name]; ok {
+			logger.Error(fmt.Sprintf("preset[i=%d]: duplicate preset with name=%s", i, v.Name))
+			continue
+		}
+		presetMap[v.Name] = v.Params
+	}
+
 	return &nodeconfig.ParsedConfig{
 		Encrypt: nodeconfig.ParsedEncrypt{
 			NodeKey: *nodeKey,
@@ -85,7 +102,8 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 		NodeInfoDb:              config.NodeInfoDb,
 		DevFolder:               config.DevFolder,
 		Multipath:               *mp,
-		Mounts:                  ml,
+		Connectors:              ml,
+		Presets:                 presetMap,
 		Networks:                netList,
 		ExecConfig:              config.ExecConfig,
 		Logs:                    config.Logs,

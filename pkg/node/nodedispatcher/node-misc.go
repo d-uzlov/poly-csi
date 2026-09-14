@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -68,7 +68,7 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(req.StagingTargetPath, tr, mp, func(connectorId string) connectors.Connector { return conf.FindConnectorById(connectorId, tr) })
+	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, func(connectorId string) connectorfactory.InflateFunc { return conf.FindConnectorById(connectorId) })
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
