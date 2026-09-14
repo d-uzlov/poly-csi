@@ -83,7 +83,6 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 			AuthType:      cntrnvme.AuthTypeNqn,
 			ConnectPort:   sh.Port,
 			TransportType: sh.Transport,
-			IoQueues:      sh.IoQueues,
 		},
 		LocalData: &publishData{
 			HostNqn: nvmeInfo.HostNqn,

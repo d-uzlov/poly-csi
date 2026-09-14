@@ -15,6 +15,7 @@ type DispatchParams struct {
 	ShareType         string `map:"shareType"`
 	ShareIdTemplate   string `map:"shareIdTemplate"`
 	ConnectorId       string `map:"connectorId"`
+	NodePreset        string `map:"nodePreset"`
 	AddressNames      string `map:"addressNames"`
 	ServerName        string `map:"serverName"`
 	FsGroupPolicy     string `map:"fsGroupPolicy"`

@@ -78,7 +78,6 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 		Nqn:       nqn,
 		Port:      p.ConnectPort,
 		Transport: p.TransportType,
-		IoQueues:  p.IoQueues,
 		AuthType:  p.AuthType,
 	}
 

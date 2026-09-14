@@ -15,6 +15,7 @@ parameters:
   dispatch.shareType: nvmet-keeper
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nvme
+  dispatch.nodePreset: default
   dispatch.addressNames: storage,k8s
 
   zfs.parentDataset: rose/test
@@ -28,7 +29,6 @@ parameters:
   nvmet.nvmetPortName: '4420'
   nvmet.connectPort: '4420'
   nvmet.transportType: tcp
-  nvmet.ioQueues: '4'
   nvmet.authType: chap-provision
 
   fsType: ext4

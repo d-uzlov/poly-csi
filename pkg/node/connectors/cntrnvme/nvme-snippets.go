@@ -73,7 +73,7 @@ func initKernelMessageParser(prefix string) (getMessages func() []string, err er
 	}, nil
 }
 
-func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn string, hostId string, port string, nvmeTransport string, address string, ioQueues string, hostKey string, controllerKey string) error {
+func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn string, hostId string, port string, nvmeTransport string, address string, ioQueues string, hostKey string, controllerKey string, keepAliveTimeout string, controllerLossTimeout string, reconnectDelay string) error {
 	if snip.parseKernelLog {
 		getMessages, err := initKernelMessageParser("nvme")
 		if err != nil {
@@ -88,24 +88,27 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 		}()
 	}
 
+	args := map[string]string{
+		"--hostnqn": hostNqn,
+		"--hostid": hostId,
+		"--transport": nvmeTransport,
+		"--traddr": address,
+		"--trsvcid": port,
+		"--nqn": targetNqn,
+		"--keep-alive-tmo": keepAliveTimeout,
+		"--ctrl-loss-tmo": controllerLossTimeout,
+		"--reconnect-delay": reconnectDelay,
+		"--nr-io-queues": ioQueues,
+		"--dhchap-secret": hostKey,
+		"--dhchap-ctrl-secret": controllerKey,
+	}
 	cmd := append(snip.cmd,
 		"connect",
-		"--hostnqn", hostNqn,
-		"--hostid", hostId,
-		"--transport", nvmeTransport,
-		"--traddr", address,
-		"--trsvcid", port,
-		"--nqn", targetNqn,
-		"--ctrl-loss-tmo=-1",
 	)
-	if ioQueues != "" {
-		cmd = append(cmd, "--nr-io-queues", ioQueues)
-	}
-	if hostKey != "" {
-		cmd = append(cmd, "--dhchap-secret", hostKey)
-	}
-	if controllerKey != "" {
-		cmd = append(cmd, "--dhchap-ctrl-secret", controllerKey)
+	for k, v := range args {
+		if v != "" {
+			cmd = append(cmd, k+"="+v)
+		}
 	}
 	_, err := transport.RelaxedRun(ctx, snip.tr, cmd, "already connected")
 	if err != nil {

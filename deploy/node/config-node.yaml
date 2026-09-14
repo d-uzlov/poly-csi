@@ -37,6 +37,14 @@ connectors:
   config:
     socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
 
+presets:
+- name: default
+  params:
+    nvme.ioQueues: 4
+    nvme.keepAliveTimeoutSec: 1
+    nvme.controllerLossTimeoutSec: -1
+    nvme.reconnectDelaySec: 1
+
 networks:
 - includeCidr:
   - 0.0.0.0/0

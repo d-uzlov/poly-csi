@@ -14,7 +14,17 @@ type connector struct {
 	snip      NvmeSnippets
 	config    Config
 	devFolder string
+
+	ioQueues              string
+	keepAliveTimeout string
+	controllerLossTimeout string
+	reconnectDelay string
 }
+
+const ioQueuesKey = "nvme.ioQueues"
+const keepAliveTimeoutKey = "nvme.keepAliveTimeoutSec"
+const controllerLossTimeoutKey = "nvme.controllerLossTimeoutSec"
+const reconnectDelayKey = "nvme.reconnectDelaySec"
 
 func New(config Config, devFolder string) connectors.Connector {
 	return &connector{
@@ -26,6 +36,10 @@ func New(config Config, devFolder string) connectors.Connector {
 func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
 	c.tr = tr
 	c.snip = newNvmeSnippets(tr, c.config.NvmeCmd, c.devFolder, c.config.ParseKernelLog)
+	c.ioQueues = preset[ioQueuesKey]
+	c.keepAliveTimeout = preset[keepAliveTimeoutKey]
+	c.controllerLossTimeout = preset[controllerLossTimeoutKey]
+	c.reconnectDelay = preset[reconnectDelayKey]
 	return nil
 }
 
@@ -47,7 +61,7 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 
 	successCount := 0
 	for _, v := range req.AddressOptions {
-		err = m.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, pc.IoQueues, sc.HostKey, sc.ControllerKey)
+		err = m.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, m.ioQueues, sc.HostKey, sc.ControllerKey, m.keepAliveTimeout, m.controllerLossTimeout, m.reconnectDelay)
 		if err != nil {
 			if len(req.AddressOptions) <= 1 {
 				return nil, fmt.Errorf("nvmeConnect: %w", err)

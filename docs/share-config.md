@@ -93,7 +93,6 @@ Available options:
 - - `rdma` and fibre-channel are not tested because of lack of hardware.
 - [required] `nvmet.nvmetPortName`: pre-configured `nvmet` port.
 - [required] `nvmet.listenPort`: port on which `nvmet` port is listening.
-- `nvmet.ioQueues`: amount of parallel connections between NVME client and storage server. When not set, defaults to amount of cores on the client.
 - [required] `nvmet.authType`: describes how share is secured. See below for details.
 
 Saves state in `nvmet_keeper` config folder.
@@ -164,7 +163,6 @@ Available options:
 - `nvmet.transport`: NVME transport to use. Default: `tcp`
 - `nvmet.nvmetPort`: pre-configured `nvmet` port. Default: `1`
 - `nvmet.listenPort`: port on which `nvmet` port is listening. Default: `4420`
-- `nvmet.ioQueues`: amount of parallel connections between NVME client and storage server. When not set, defaults to amount of cores on the client.
 
 NVME target on generic Linux distro does not have a standard way to save state.
 This share manager expects to get a custom command that will capture `nvmet` state and make it persistent.

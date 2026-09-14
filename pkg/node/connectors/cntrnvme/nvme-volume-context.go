@@ -14,7 +14,6 @@ type PublicContext struct {
 	AuthType      string `map:"auth_type"`
 	ConnectPort   string `map:"connect_port"`
 	TransportType string `map:"transport_type"`
-	IoQueues      string `map:"io_queues"`
 }
 
 type SecretContext struct {

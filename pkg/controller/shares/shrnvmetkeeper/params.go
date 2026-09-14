@@ -17,7 +17,6 @@ type params struct {
 	TransportType string `map:"transportType"`
 	NvmetPortName string `map:"nvmetPortName"`
 	ConnectPort   string `map:"connectPort"`
-	IoQueues      string `map:"ioQueues"`
 	AuthType      string `map:"authType"`
 
 	// TODO add fallback to reading ListenPort from current nvmet state
@@ -84,9 +83,6 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 	}
 	if resMutable.AuthType != "" {
 		return nil, fmt.Errorf("auth type is not mutable")
-	}
-	if resMutable.IoQueues != "" {
-		return nil, fmt.Errorf("io queues is not mutable")
 	}
 
 	for k := range static {

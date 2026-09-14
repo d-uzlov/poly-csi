@@ -45,7 +45,6 @@ type params struct {
 	TransportType string `map:"transportType"`
 	NvmetPortName string `map:"nvmetPortName"`
 	ConnectPort   string `map:"connectPort"`
-	IoQueues      string `map:"ioQueues"`
 }
 
 const paramsPrefix = "nvmet."
@@ -98,9 +97,6 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 	}
 	if resMutable.ConnectPort != "" {
 		return nil, fmt.Errorf("connect port is not mutable")
-	}
-	if resMutable.IoQueues != "" {
-		return nil, fmt.Errorf("io queues is not mutable")
 	}
 
 	for k := range static {

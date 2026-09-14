@@ -498,6 +498,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		StorageType:   dispatchParams.StorageType,
 		ShareType:     dispatchParams.ShareType,
 		ConnectorId:   dispatchParams.ConnectorId,
+		PresetName:    dispatchParams.NodePreset,
 		Uuid:          callUuid,
 		FsGroupMethod: dispatchParams.FsGroupPolicy,
 	}

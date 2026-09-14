@@ -15,7 +15,6 @@ type share struct {
 	Nqn       string `json:"nqn"`
 	Port      string `json:"port"`
 	Transport string `json:"transport"`
-	IoQueues  string `json:"io_queues"`
 	AuthType  string `json:"auth_type"`
 }
 

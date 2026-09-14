@@ -107,7 +107,6 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 			AuthType:      authType,
 			ConnectPort:   sh.Port,
 			TransportType: sh.Transport,
-			IoQueues:      sh.IoQueues,
 		},
 		Secret: secret,
 		LocalData: &publishData{

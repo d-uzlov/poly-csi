@@ -79,9 +79,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 
-	presetMap := map[string]map[string]string{
-		defaultPresetName: {},
-	}
+	presetMap := map[string]map[string]string{}
 	for i, v := range config.Presets {
 		if v.Name == "" {
 			logger.Error(fmt.Sprintf("preset[i=%d]: missing 'name' field", i))
@@ -92,6 +90,9 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 			continue
 		}
 		presetMap[v.Name] = v.Params
+	}
+	if _, ok := presetMap[defaultPresetName]; !ok {
+		presetMap[defaultPresetName] = map[string]string{}
 	}
 
 	return &nodeconfig.ParsedConfig{
