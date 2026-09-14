@@ -49,10 +49,6 @@ func (n *Node) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeSta
 				Unit:      csi.VolumeUsage_INODES,
 			},
 		},
-		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: false,
-			Message:  "healthy",
-		},
 	}, nil
 }
 

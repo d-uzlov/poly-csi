@@ -91,10 +91,12 @@ func (c *Controller) ControllerGetCapabilities(ctx context.Context, req *csi.Con
 		// csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 		// csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
-		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 		csi.ControllerServiceCapability_RPC_GET_VOLUME,
 		csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 		csi.ControllerServiceCapability_RPC_MODIFY_VOLUME,
+		// csi.ControllerServiceCapability_RPC_GET_SNAPSHOT,
+		// csi.ControllerServiceCapability_RPC_GET_VOLUME_HEALTH,
+		// csi.ControllerServiceCapability_RPC_LIST_VOLUME_HEALTH,
 	}
 
 	var csc []*csi.ControllerServiceCapability

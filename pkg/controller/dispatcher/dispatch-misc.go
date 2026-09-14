@@ -95,10 +95,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 			// ContentSource: , // TODO restore matching content source
 		},
 		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
-			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: false,
-				Message:  "ok",
-			},
+			// PublishedNodeIds: []string{},
 		},
 	}, nil
 }
