@@ -77,7 +77,7 @@ func (m *client) runRequest(ctx context.Context, method string, req any) (string
 
 	if len(pr.Logs) != 0 {
 		logs.FromCtx(ctx).MicroOp("printing logs from remote connector")
-		logs.FromCtx(ctx).ConsumeCopy(pr.Logs)
+		logs.FromCtx(ctx).ConsumeCopy(pr.Logs, "remote-http-plugin")
 	}
 
 	switch pr.Status {

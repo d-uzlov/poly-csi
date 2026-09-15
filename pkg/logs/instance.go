@@ -32,6 +32,8 @@ const (
 	requestResult
 )
 
+// LogRequest describes an intent to write a log line.
+// It can be modified or cancelled (deleted) to alter actual log.
 type LogRequest struct {
 	Action    requestType `json:"action"`
 	Msg       string      `json:"msg"`
@@ -39,6 +41,7 @@ type LogRequest struct {
 	ephemeral bool        `json:"-"`
 }
 
+// Commit processes all pending log requests, writing of skipping them, according to state and options.
 func (c *Instance) Commit(success bool) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
@@ -52,20 +55,29 @@ func (c *Instance) Commit(success bool) {
 	c.requestQueue = nil
 }
 
+// GetCopy returns an independent copy of log requests.
+// Primary reason to use it is to consume the result in ConsumeCopy().
 func (c *Instance) GetCopy() []LogRequest {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	return slices.Clone(c.copyQueue)
 }
 
-func (c *Instance) ConsumeCopy(copy []LogRequest) {
+// ConsumeCopy adds input log requests to internal queue.
+func (c *Instance) ConsumeCopy(copy []LogRequest, from string) {
+	if from != "" {
+		for _, v := range copy {
+			v.Args = append(v.Args, "from", from)
+		}
+	}
 	for _, v := range copy {
-		// TODO add fields to indicate that this is copy?
-		c.request(v)
+		c.processRequest(v)
 	}
 }
 
-func (c *Instance) request(req LogRequest) {
+// processRequest processes single input processRequest,
+// possibly writing it and/or adding to internal queue.
+func (c *Instance) processRequest(req LogRequest) {
 	if !c.config.SkipOnSuccess {
 		c.executeRequest(req)
 	}
@@ -86,6 +98,7 @@ func (c *Instance) request(req LogRequest) {
 	}
 }
 
+// executeRequest writes given input request to underlying logger.
 func (c *Instance) executeRequest(req LogRequest) {
 	switch req.Action {
 	case requestArgs:
@@ -115,49 +128,54 @@ func (c *Instance) executeRequest(req LogRequest) {
 	}
 }
 
+// Args creates log entry with 'Args' tag
 func (c *Instance) Args(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestArgs,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
+// MicroOp creates log entry with 'MicroOp' tag
 func (c *Instance) MicroOp(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestSuccessMicroOp,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
+// Command creates log entry with 'Command' tag
 func (c *Instance) Command(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestCommand,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
+// Result creates log entry with 'Result' tag
 func (c *Instance) Result(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestResult,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
+// EphemeralInfo creates a generic Info log entry
 func (c *Instance) Info(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestInfo,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
-// EphemeralInfo creates an Info log entry which will not be present in GetCopy result
+// EphemeralInfo creates a generic Info log entry which will not be present in GetCopy result
 func (c *Instance) EphemeralInfo(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action:    requestInfo,
 		Msg:       msg,
 		Args:      args,
@@ -165,25 +183,27 @@ func (c *Instance) EphemeralInfo(msg string, args ...any) {
 	})
 }
 
+// EphemeralInfo creates a generic Warn log entry
 func (c *Instance) Warn(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestWarn,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
+// EphemeralInfo creates a generic Error log entry
 func (c *Instance) Error(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action: requestError,
 		Msg:    msg,
 		Args:   args,
 	})
 }
 
-// EphemeralError creates an Error log entry which will not be present in GetCopy result
+// EphemeralError creates a generic Error log entry which will not be present in GetCopy result
 func (c *Instance) EphemeralError(msg string, args ...any) {
-	c.request(LogRequest{
+	c.processRequest(LogRequest{
 		Action:    requestError,
 		Msg:       msg,
 		Args:      args,
