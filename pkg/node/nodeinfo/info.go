@@ -9,10 +9,10 @@ import (
 )
 
 type NodeInfo struct {
-	Id           string                                  `json:"id"`
-	PublicKey    encrypt.RsaPublicKey                   `json:"public_key"`
-	Connectors   map[string]connectors.ConnectorNodeInfo `json:"connectors"`
-	Ips          []string                                `json:"ips"`
+	Id         string                                  `json:"id"`
+	PublicKey  encrypt.RsaPublicKey                    `json:"public_key"`
+	Connectors map[string]connectors.ConnectorNodeInfo `json:"connectors"`
+	Ips        []string                                `json:"ips"`
 }
 
 func (ni *NodeInfo) Validate() error {
@@ -31,7 +31,7 @@ func (ni *NodeInfo) Serialize() (map[string]string, error) {
 		"id":              ni.Id,
 		"node_public_key": string(ni.PublicKey.SerializePem()),
 		"has_multipath":   "0",
-		"ips":             strings.Join(ni.Ips, " "),
+		"ips":             strings.Join(ni.Ips, ","),
 	}
 	for k, v := range ni.Connectors {
 		serialized, err := v.Serialize()
@@ -65,7 +65,7 @@ func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
 			result.PublicKey = *pk
 			continue
 		case "ips":
-			result.Ips = strings.Fields(v)
+			result.Ips = strings.Split(v, ",")
 		}
 		connectorId, foundConnector := strings.CutPrefix(k, "connector.")
 		if foundConnector {
