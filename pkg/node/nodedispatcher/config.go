@@ -17,8 +17,6 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-const defaultPresetName = "default"
-
 func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, error) {
 	logger := slogctx.FromCtx(ctx)
 
@@ -48,8 +46,13 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 		return nil, fmt.Errorf("load node private key: %w", err)
 	}
 
+	connectorList := []string{}
+	for _, v := range config.Connectors {
+		connectorList = append(connectorList, v.Id)
+	}
+
 	ml := []*connectorfactory.ParsedConnector{}
-	logger.Info(fmt.Sprintf("connectors in config: %d", len(config.Connectors)))
+	logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
 	for i, v := range config.Connectors {
 		parsed := connectorfactory.ParseConnector(ctx, v, config.DevFolder)
 		if parsed == nil {
@@ -90,9 +93,6 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 			continue
 		}
 		presetMap[v.Name] = v.Params
-	}
-	if _, ok := presetMap[defaultPresetName]; !ok {
-		presetMap[defaultPresetName] = map[string]string{}
 	}
 
 	return &nodeconfig.ParsedConfig{

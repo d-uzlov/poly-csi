@@ -3,8 +3,10 @@ package nodedispatcher
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -47,13 +49,15 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse volume context: %w", err)
 	}
 
-	if vc.PresetName == "" {
-		vc.PresetName = defaultPresetName
+	fullPreset := map[string]string{}
+	for v := range strings.SplitSeq(vc.PresetName, ",") {
+		preset, ok := n.conf.Presets[v]
+		if !ok {
+			return nil, fmt.Errorf("preset with name '%s' is not found", v)
+		}
+		maps.Copy(fullPreset, preset)
 	}
-	preset, ok := n.conf.Presets[vc.PresetName]
-	if !ok {
-		return nil, fmt.Errorf("preset with name '%s' is not found", vc.PresetName)
-	}
+	logs.FromCtx(ctx).MicroOp("using preset", "fullPreset", fullPreset)
 
 	connectorInflate := conf.FindConnectorById(vc.ConnectorId)
 	if connectorInflate == nil {
@@ -65,7 +69,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", vc.ConnectorId)
 	}
 
-	err = connector.Configure(ctx, tr, preset)
+	err = connector.Configure(ctx, tr, fullPreset)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}
@@ -75,7 +79,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}
 
-	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, preset)
+	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, fullPreset)
 	defer func() {
 		saveErr := nvi.writeToDisk()
 		if err == nil {
@@ -126,9 +130,9 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			return nil, fmt.Errorf("stageBlock: %w", err)
 		}
 		if n.conf.PodCgroupRoot != "" {
-			limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(preset)
+			limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(fullPreset)
 			if err != nil {
-				return nil, fmt.Errorf("ParseCgroupIoLimits[preset=%s]: %w", vc.PresetName, err)
+				return nil, fmt.Errorf("ParseCgroupIoLimits: %w", err)
 			}
 			if foundAny {
 				logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)

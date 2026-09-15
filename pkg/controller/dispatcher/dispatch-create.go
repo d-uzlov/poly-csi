@@ -472,7 +472,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}
 	err = shareHandle.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("validate share handle")
+		return nil, fmt.Errorf("validate share handle: %w", err)
 	}
 	logger.Info("share.CreateShare: success")
 	defer func() {
@@ -489,7 +489,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}()
 	shareData, err := shareHandle.Serialize()
 	if err != nil {
-		return nil, fmt.Errorf("serialize share")
+		return nil, fmt.Errorf("serialize share: %w", err)
 	}
 
 	logs.FromCtx(ctx).MicroOp("creating volume context")
@@ -504,11 +504,11 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}
 	err = vc.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("validate volume context")
+		return nil, fmt.Errorf("validate volume context: %w", err)
 	}
 	vcMap, err := serialmaps.Serialize(vc, volumecontext.Prefix)
 	if err != nil {
-		return nil, fmt.Errorf("serialize volume context")
+		return nil, fmt.Errorf("serialize volume context: %w", err)
 	}
 
 	var addressIds []string
@@ -529,7 +529,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	// TODO save req.VolumeContentSource
 	err = wrapped.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
 		ConnectorId:   dispatchParams.ConnectorId,
-		VolumeContext: vcMap,
+		VolumeContext: vc,
 		AddressIds:    addressIds,
 		StorageType:   dispatchParams.StorageType,
 		StorageData:   serializedVolume,

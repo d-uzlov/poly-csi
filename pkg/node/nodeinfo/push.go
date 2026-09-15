@@ -30,7 +30,7 @@ func PeriodicInfoPush(ctx context.Context, logConfig logs.Config, address string
 	startLogger.MicroOp("stopped node info push")
 }
 
-func pushInfo(ctx context.Context, logConfig logs.Config, reg nodremotereg.NodeRemoveRegistry, getInfo func(ctx context.Context) (regnodeinfo.RegNodeInfo, error)) {
+func pushInfo(ctx context.Context, logConfig logs.Config, reg nodremotereg.NodeRemoteRegistry, getInfo func(ctx context.Context) (regnodeinfo.RegNodeInfo, error)) {
 	logger := logConfig.MakeInstance()
 	ctx = logs.NewCtx(ctx, logger)
 

@@ -49,7 +49,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 		if m == nil {
 			continue
 		}
-		err := m.Configure(ctx, tr, newConf.Presets[defaultPresetName])
+		err := m.Configure(ctx, tr, map[string]string{})
 		if err != nil {
 			slogctx.FromCtx(ctx).Error("failed to initialize connector[id=%s] during reload: %w", v.Conf.Id, err)
 			continue
@@ -69,9 +69,15 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 	pushCtx, pushCancel := context.WithCancel(ctx)
 	pushCh := make(chan struct{})
 
+	presetNames := []string{}
+	for k := range newConf.Presets {
+		presetNames = append(presetNames, k)
+	}
+
+	slogctx.FromCtx(ctx).Debug("starting node info push", "presets", presetNames)
 	go nodeinfo.PeriodicInfoPush(pushCtx, newConf.GetNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
 		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
-			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, newConf.Networks)
+			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, newConf.Networks, presetNames)
 		}, func() {
 			close(pushCh)
 		},

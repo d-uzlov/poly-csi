@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	al.essio.dev/pkg/shellescape v1.6.1
 	github.com/container-storage-interface/spec v1.13.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/euank/go-kmsg-parser v2.0.0+incompatible
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/uuid v1.6.0
@@ -19,7 +20,6 @@ require (
 )
 
 require (
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect

@@ -39,16 +39,26 @@ connectors:
     socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
 
 presets:
-- name: default
+- name: nvmeCon
   params:
-    nvme.ioQueues: 4
     nvme.keepAliveTimeoutSec: 1
     nvme.controllerLossTimeoutSec: -1
     nvme.reconnectDelaySec: 1
-    # cgroup_io_max.readBw: 100Mi
-    # cgroup_io_max.writeBw: 100Mi
-    # cgroup_io_max.readIops: 1000
-    # cgroup_io_max.writeIops: 1000
+- name: nvmeIoq4
+  params:
+    nvme.ioQueues: 4
+- name: cgroupIo10
+  params:
+    cgroup_io_max.readBw: 10Mi
+    cgroup_io_max.writeBw: 10Mi
+    cgroup_io_max.readIops: 100
+    cgroup_io_max.writeIops: 100
+- name: cgroupIo100
+  params:
+    cgroup_io_max.readBw: 100Mi
+    cgroup_io_max.writeBw: 100Mi
+    cgroup_io_max.readIops: 1000
+    cgroup_io_max.writeIops: 1000
 
 networks:
 - includeCidr:

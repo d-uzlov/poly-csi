@@ -6,7 +6,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
+	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 // ==== misc ====
@@ -87,11 +89,16 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("ReadState: nil result")
 	}
 
+	vcMap, err := serialmaps.Serialize(mh.vi.VolumeContext, volumecontext.Prefix)
+	if err != nil {
+		return nil, fmt.Errorf("serialize volume context: %w", err)
+	}
+
 	return &csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      req.VolumeId,
 			CapacityBytes: volumeState.Size,
-			VolumeContext: mh.vi.VolumeContext,
+			VolumeContext: vcMap,
 			// ContentSource: , // TODO restore matching content source
 		},
 		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{

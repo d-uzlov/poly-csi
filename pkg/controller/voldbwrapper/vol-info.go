@@ -5,20 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 const mainVolumeModule = "volume.json"
 
 type VolumeInfo struct {
-	ConnectorId   string                `json:"mount_id"`
-	VolumeContext map[string]string     `json:"volume_context"`
-	AddressIds    []string              `json:"address_ids"`
-	StorageType   string                `json:"storage_type"`
-	StorageData   string                `json:"volume"`
-	ShareType     string                `json:"share_type"`
-	ShareData     string                `json:"share_data"`
-	InitConfig    volumeinit.InitConfig `json:"init_config"`
+	ConnectorId   string                      `json:"mount_id"`
+	VolumeContext volumecontext.VolumeContext `json:"volume_context"`
+	AddressIds    []string                    `json:"address_ids"`
+	StorageType   string                      `json:"storage_type"`
+	StorageData   string                      `json:"volume"`
+	ShareType     string                      `json:"share_type"`
+	ShareData     string                      `json:"share_data"`
+	InitConfig    volumeinit.InitConfig       `json:"init_config"`
 }
 
 func (w Wrapper) SetVolumeInfo(ctx context.Context, info VolumeInfo) error {

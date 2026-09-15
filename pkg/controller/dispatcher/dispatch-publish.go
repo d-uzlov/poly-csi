@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
@@ -63,6 +64,19 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 	err = ni.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("node_info: validation failed: %w", err)
+	}
+
+	for v := range strings.SplitSeq(mh.vi.VolumeContext.PresetName, ",") {
+		found := false
+		for _, p := range ni.Presets {
+			if p == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("node does not have preset '%s' required by volume (available %v)", v, ni.Presets)
+		}
 	}
 
 	mountInfo, ok := ni.Connectors[mh.vi.ConnectorId]
