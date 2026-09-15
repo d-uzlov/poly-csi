@@ -3,7 +3,8 @@ package noderegsrv
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"log/slog"
+	"maps"
 	"net/http"
 	"sync"
 	"time"
@@ -15,19 +16,24 @@ type NodeRegistry struct {
 	srv  *http.Server
 	mu   sync.RWMutex
 	data map[string]regnodeinfo.RegNodeInfo
+
+	logger *slog.Logger
 }
 
-func NewNodeRegistry() *NodeRegistry {
+func NewNodeRegistry(logger *slog.Logger) *NodeRegistry {
 	return &NodeRegistry{
-		data: map[string]regnodeinfo.RegNodeInfo{},
+		data:   map[string]regnodeinfo.RegNodeInfo{},
+		logger: logger,
 	}
 }
 
-func (nr *NodeRegistry) Set(ni regnodeinfo.RegNodeInfo) {
+func (nr *NodeRegistry) Set(ni regnodeinfo.RegNodeInfo) (changed bool) {
 	nr.mu.Lock()
 	defer nr.mu.Unlock()
 
+	same := maps.Equal(nr.data[ni.Id].Data, ni.Data)
 	nr.data[ni.Id] = ni
+	return !same
 }
 
 func (nr *NodeRegistry) Get(id string) *regnodeinfo.RegNodeInfo {
@@ -56,8 +62,10 @@ func (nr *NodeRegistry) handleRegister(w http.ResponseWriter, req *http.Request)
 		http.Error(w, "node_id required", http.StatusBadRequest)
 		return
 	}
-	nr.Set(ni)
-	fmt.Printf("registered node: %s", ni.Id)
+	changed := nr.Set(ni)
+	if changed {
+		nr.logger.Info("registered node", "id", ni.Id, "data", ni.Data)
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }

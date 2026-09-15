@@ -11,17 +11,17 @@ import (
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
 )
 
-type NodeRemoveRegistry struct {
+type NodeRemoteRegistry struct {
 	address string
 }
 
-func NewNodeRemoteRegistry(address string) NodeRemoveRegistry {
-	return NodeRemoveRegistry{
+func NewNodeRemoteRegistry(address string) NodeRemoteRegistry {
+	return NodeRemoteRegistry{
 		address: address,
 	}
 }
 
-func (r *NodeRemoveRegistry) Get(id string) (*regnodeinfo.RegNodeInfo, error) {
+func (r *NodeRemoteRegistry) Get(id string) (*regnodeinfo.RegNodeInfo, error) {
 	qp := make(url.Values)
 	qp.Set("id", id)
 
@@ -47,7 +47,7 @@ func (r *NodeRemoveRegistry) Get(id string) (*regnodeinfo.RegNodeInfo, error) {
 	return &ni, nil
 }
 
-func (r *NodeRemoveRegistry) Set(ni regnodeinfo.RegNodeInfo) error {
+func (r *NodeRemoteRegistry) Set(ni regnodeinfo.RegNodeInfo) error {
 	b, err := json.Marshal(ni)
 	if err != nil {
 		return fmt.Errorf("set node info: marshal: %w", err)
