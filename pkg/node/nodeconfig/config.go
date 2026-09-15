@@ -17,6 +17,7 @@ type NodeConfig struct {
 	Presets                 []Preset                          `yaml:"presets"`
 	Networks                []NodeNetworkConfig               `yaml:"networks" json:"networks"`
 	DevFolder               string                            `yaml:"devFolder" json:"devFolder"`
+	PodCgroupRoot           string                            `yaml:"podCgroupRoot" json:"podCgroupRoot"`
 	ExecConfig              localexec.Config                  `yaml:"execConfig" json:"execConfig"`
 	Logs                    Logs                              `yaml:"logs" json:"logs"`
 	DisableCleanupOnFailure bool                              `yaml:"disableCleanupOnFailure" json:"disableCleanupOnFailure"`

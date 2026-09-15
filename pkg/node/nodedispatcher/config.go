@@ -102,6 +102,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 		},
 		NodeInfoDb:              config.NodeInfoDb,
 		DevFolder:               config.DevFolder,
+		PodCgroupRoot:           config.PodCgroupRoot,
 		Multipath:               *mp,
 		Connectors:              ml,
 		Presets:                 presetMap,

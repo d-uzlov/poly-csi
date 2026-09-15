@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -14,7 +15,9 @@ import (
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
+	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/transport/localexec"
+	"meoe.io/poly-csi/pkg/utils/blockdevice"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 	"meoe.io/poly-csi/pkg/utils/volumeinit"
@@ -121,6 +124,24 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		})
 		if err != nil {
 			return nil, fmt.Errorf("stageBlock: %w", err)
+		}
+		if n.conf.PodCgroupRoot != "" {
+			limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(preset)
+			if err != nil {
+				return nil, fmt.Errorf("ParseCgroupIoLimits[preset=%s]: %w", vc.PresetName, err)
+			}
+			if foundAny {
+				logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)
+				blockPath, err := tr.Cmds().ReadLink(ctx, nvi.BlockDevicePath)
+				if err != nil {
+					return nil, fmt.Errorf("readLink(%s): %w", nvi.BlockDevicePath, err)
+				}
+				bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
+				err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
+				if err != nil {
+					return nil, fmt.Errorf("SetCgroupsIoLimit: %w", err)
+				}
+			}
 		}
 		switch {
 		case mountParams != nil:

@@ -2,13 +2,17 @@ package nodeconfig
 
 import (
 	"net"
+	"strconv"
+	"strings"
 
+	"github.com/dustin/go-humanize"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
+	"meoe.io/poly-csi/pkg/utils/blockdevice"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
@@ -25,14 +29,62 @@ type ParsedNetworks struct {
 type ParsedConfig struct {
 	Encrypt                 ParsedEncrypt
 	NodeInfoDb              NodeInfoDbConfig
-	DevFolder               string
 	Multipath               mpfactory.ParsedMultipath
 	Connectors              []*connectorfactory.ParsedConnector
 	Presets                 map[string]map[string]string
 	Networks                []ParsedNetworks
+	DevFolder               string
+	PodCgroupRoot           string
 	ExecConfig              localexec.Config
 	Logs                    Logs
 	DisableCleanupOnFailure bool
+}
+
+func ParseCgroupIoLimits(preset map[string]string) (limit blockdevice.IoLimit, foundAny bool, err error) {
+	result := blockdevice.IoLimit{
+		ReadBW:    "max",
+		WriteBW:   "max",
+		ReadIops:  "max",
+		WriteIops: "max",
+	}
+	const prefix = "cgroup_io_max."
+	for k, v := range preset {
+		type_, ok := strings.CutPrefix(k, prefix)
+		if !ok {
+			continue
+		}
+		switch type_ {
+		case "readBw":
+			value, err := humanize.ParseBytes(v)
+			if err != nil {
+				return blockdevice.IoLimit{}, false, err
+			}
+			foundAny = true
+			result.ReadBW = strconv.Itoa(int(value))
+		case "writeBw":
+			value, err := humanize.ParseBytes(v)
+			if err != nil {
+				return blockdevice.IoLimit{}, false,err
+			}
+			foundAny = true
+			result.WriteBW = strconv.Itoa(int(value))
+		case "readIops":
+			value, _, err := humanize.ParseSI(v)
+			if err != nil {
+				return blockdevice.IoLimit{}, false,err
+			}
+			foundAny = true
+			result.ReadIops = strconv.Itoa(int(value))
+		case "writeIops":
+			value, _, err := humanize.ParseSI(v)
+			if err != nil {
+				return blockdevice.IoLimit{}, false,err
+			}
+			foundAny = true
+			result.WriteIops = strconv.Itoa(int(value))
+		}
+	}
+	return result, foundAny, nil
 }
 
 func (c *ParsedConfig) FindConnectorById(id string) connectorfactory.InflateFunc {

@@ -9,6 +9,7 @@
     "backstore",
     "backstores",
     "blkid",
+    "blockdevice",
     "browsable",
     "btrfs",
     "builtinplugin",
