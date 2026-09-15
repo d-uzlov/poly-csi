@@ -91,7 +91,7 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 	if connector == nil {
 		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", result.ConnectorId)
 	}
-	
+
 	err = connector.Configure(ctx, tr, result.Preset)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
@@ -166,6 +166,8 @@ func (v *NodeVolumeInfo) stageBlock(ctx context.Context, req connectors.ConnectR
 	if len(cr.Devices) == 0 {
 		return fmt.Errorf("connector did not set device list")
 	}
+
+	v.MountType = mountTypeBlock
 
 	fsnip := fsutils.New(v.tr)
 
@@ -253,6 +255,9 @@ func (v *NodeVolumeInfo) stageFolderMount(ctx context.Context, req connectors.Co
 	if err != nil {
 		return fmt.Errorf("runConnect: %w", err)
 	}
+
+	v.MountType = mountTypeFolder
+
 	if v.SerializedConnectorData == "" {
 		caps, err := v.connector.Capabilities(ctx)
 		if err != nil {
@@ -307,8 +312,11 @@ func (v *NodeVolumeInfo) publishFolderMount(ctx context.Context, req connectors.
 
 func (v *NodeVolumeInfo) cleanupMount(ctx context.Context) (err error) {
 	if v.FsMountPath == "" {
+		logs.FromCtx(ctx).MicroOp("not mounted, skipping unmount")
 		return
 	}
+
+	logs.FromCtx(ctx).MicroOp("unmounting filesystem")
 
 	fsnip := fsutils.New(v.tr)
 	err = fsnip.Unmount(ctx, v.FsMountPath)
@@ -385,9 +393,10 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context) (err error) {
 		v.SerializedConnectorData = ""
 	}
 
+	// best-effort unmount, in case steps above failed
 	err = v.cleanupMount(ctx)
 	if err != nil {
-		return fmt.Errorf("cleanupMount: %w", err)
+		return fmt.Errorf("secondary cleanupMount: %w", err)
 	}
 
 	return nil
