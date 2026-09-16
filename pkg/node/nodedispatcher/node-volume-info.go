@@ -37,7 +37,6 @@ type NodeVolumeInfo struct {
 	conState        connectors.State     `json:"-"`
 	mp              multipath.Multipath  `json:"-"`
 	parentFolder    string               `json:"-"`
-	mainBlockDevice string               `json:"-"`
 }
 
 type SavedParams struct {
@@ -113,29 +112,34 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 	}
 	result.conState = state
 
-	if result.MountType == mountTypeBlock {
-		if result.SerializedMultipathData != "" {
-			result.mainBlockDevice, err = mp.GetDevice(ctx, result.SerializedMultipathData)
-			if err != nil {
-				return nil, fmt.Errorf("multipath.GetDevice: %w", err)
-			}
-		} else if result.SerializedConnectorState != "" {
-			devices, err := state.GetDevices(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("connector.GetDevices: %w", err)
-			}
-			if len(devices) != 1 {
-				return nil, fmt.Errorf("connector.GetDevices: expected single device, but got %d: %v", len(devices), devices)
-			}
-			result.mainBlockDevice = devices[0]
-		}
-	}
-
 	result.parentFolder = parentFolder
 	result.tr = tr
 	result.connector = connector
 	result.mp = mp
 	return &result, nil
+}
+
+func (v *NodeVolumeInfo) getMainBlockDevice(ctx context.Context) (string, error) {
+	if v.MountType != mountTypeBlock {
+		return "", fmt.Errorf("trying to get block device on non-block connection")
+	}
+	if v.SerializedMultipathData != "" {
+		return v.mp.GetDevice(ctx, v.SerializedMultipathData)
+	}
+	if v.conState == nil {
+		return "", fmt.Errorf("connection state object is not initialized")
+	}
+	devices, err := v.conState.GetDevices(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(devices) == 0 {
+		return "", fmt.Errorf("state.GetDevices did not return any devices")
+	}
+	if len(devices) > 1 {
+		return "", fmt.Errorf("state.GetDevices returned several devices, but multipath is not set up: %v", devices)
+	}
+	return devices[0], nil
 }
 
 func (v *NodeVolumeInfo) deleteFromDisk(ctx context.Context) error {
@@ -209,7 +213,6 @@ func (v *NodeVolumeInfo) stageBlock(ctx context.Context, req connectors.ConnectR
 	logs.FromCtx(ctx).MicroOp("got device list", "devices", devices)
 
 	if len(devices) == 1 {
-		v.mainBlockDevice = devices[0]
 		return nil
 	}
 
@@ -232,7 +235,6 @@ func (v *NodeVolumeInfo) stageBlock(ctx context.Context, req connectors.ConnectR
 	if device == "" {
 		return fmt.Errorf("multipath did not set device")
 	}
-	v.mainBlockDevice = device
 
 	err = fsnip.WaitForBlockDevice(ctx, device, time.Second, time.Millisecond*50)
 	if err != nil {
@@ -249,21 +251,26 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 
 	fsnip := fsutils.New(v.tr)
 
+	dev, err := v.getMainBlockDevice(ctx)
+	if err != nil {
+		return fmt.Errorf("getMainBlockDevice: %w", err)
+	}
+
 	// TODO save 'changed' into persistent storage
 	// what are my options? what if we format fs, fail, and then the volume gets dismounted and staged at another node
 	// we probably need to wipe the fs in case of a fail, so that another node detects RunBlock changed
 	// but what if the volume was cloned? then formatting would be really bad
-	changed, err := init.RunBlock(ctx, initConfig, v.mainBlockDevice)
+	changed, err := init.RunBlock(ctx, initConfig, dev)
 	if err != nil {
 		return fmt.Errorf("init.RunBlock: %w", err)
 	}
 
-	_, err = fsnip.EnsureMounted(ctx, v.mainBlockDevice, targetPath, "", mountFlags)
+	_, err = fsnip.EnsureMounted(ctx, dev, targetPath, "", mountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}
 	v.FsMountPath = targetPath
-	logs.FromCtx(ctx).MicroOp("mount device: success", "device", v.mainBlockDevice, "target-path", targetPath)
+	logs.FromCtx(ctx).MicroOp("mount device: success", "device", dev, "target-path", targetPath)
 
 	if changed {
 		err = init.RunFs(ctx, initConfig, v.FsMountPath)

@@ -135,15 +135,20 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			return nil, fmt.Errorf("stageBlock: %w", err)
 		}
 		if n.conf.PodCgroupRoot != "" {
+			dev, err := nvi.getMainBlockDevice(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("getMainBlockDevice: %w", err)
+			}
+
 			limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(fullPreset)
 			if err != nil {
 				return nil, fmt.Errorf("ParseCgroupIoLimits: %w", err)
 			}
 			if foundAny {
 				logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)
-				blockPath, err := tr.Cmds().ReadLink(ctx, nvi.mainBlockDevice)
+				blockPath, err := tr.Cmds().ReadLink(ctx, dev)
 				if err != nil {
-					return nil, fmt.Errorf("readLink(%s): %w", nvi.mainBlockDevice, err)
+					return nil, fmt.Errorf("readLink(%s): %w", dev, err)
 				}
 				bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
 				err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
