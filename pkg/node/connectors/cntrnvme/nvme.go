@@ -4,21 +4,20 @@ import (
 	"context"
 	"fmt"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 type connector struct {
-	tr        transport.Transport
-	snip      NvmeSnippets
-	config    Config
-	devFolder string
+	commonConfig connectors.CommonConfig
+	snip         NvmeSnippets
+	config       Config
 
 	ioQueues              string
-	keepAliveTimeout string
+	keepAliveTimeout      string
 	controllerLossTimeout string
-	reconnectDelay string
+	reconnectDelay        string
 }
 
 const ioQueuesKey = "nvme.ioQueues"
@@ -26,20 +25,27 @@ const keepAliveTimeoutKey = "nvme.keepAliveTimeoutSec"
 const controllerLossTimeoutKey = "nvme.controllerLossTimeoutSec"
 const reconnectDelayKey = "nvme.reconnectDelaySec"
 
-func New(config Config, devFolder string) connectors.Connector {
-	return &connector{
-		config:    config,
-		devFolder: devFolder,
-	}
+func New() connectors.Connector {
+	return &connector{}
 }
 
-func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
-	c.tr = tr
-	c.snip = newNvmeSnippets(tr, c.config.NvmeCmd, c.devFolder, c.config.ParseKernelLog)
-	c.ioQueues = preset[ioQueuesKey]
-	c.keepAliveTimeout = preset[keepAliveTimeoutKey]
-	c.controllerLossTimeout = preset[controllerLossTimeoutKey]
-	c.reconnectDelay = preset[reconnectDelayKey]
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+	c.commonConfig = conf
+
+	if err := yaml.Unmarshal(opaqueConfig, &c.config); err != nil {
+		return fmt.Errorf("parse opaqueConfig: %w", err)
+	}
+	c.config.FillDefaults()
+	if err := c.config.Validate(); err != nil {
+		return fmt.Errorf("validate config: %w", err)
+	}
+
+	c.snip = newNvmeSnippets(conf.Tr, c.config.NvmeCmd, conf.DevFolder, c.config.ParseKernelLog)
+	c.ioQueues = conf.Preset[ioQueuesKey]
+	c.keepAliveTimeout = conf.Preset[keepAliveTimeoutKey]
+	c.controllerLossTimeout = conf.Preset[controllerLossTimeoutKey]
+	c.reconnectDelay = conf.Preset[reconnectDelayKey]
+
 	return nil
 }
 
@@ -49,7 +55,7 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 	}, nil
 }
 
-func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
+func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
 	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -61,7 +67,7 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 
 	successCount := 0
 	for _, v := range req.AddressOptions {
-		err = m.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, m.ioQueues, sc.HostKey, sc.ControllerKey, m.keepAliveTimeout, m.controllerLossTimeout, m.reconnectDelay)
+		err = c.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, c.ioQueues, sc.HostKey, sc.ControllerKey, c.keepAliveTimeout, c.controllerLossTimeout, c.reconnectDelay)
 		if err != nil {
 			if len(req.AddressOptions) <= 1 {
 				return nil, fmt.Errorf("nvmeConnect: %w", err)
@@ -76,43 +82,19 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("all %d nvme multipath connections failed, see logs for details", len(req.AddressOptions))
 	}
 
-	namespaceDevice, err := m.snip.FindNamespaceDevice(ctx, pc.TargetNqn, 1)
-	if err != nil {
-		return nil, fmt.Errorf("nvmeFindNamespace: %w", err)
-	}
-
-	namespaceDevicePath := m.devFolder + "/" + namespaceDevice
-
-	return &connectors.ConnectResult{
-		Devices: []string{namespaceDevicePath},
-		ConnectorData: VolumeData{
-			Nqn: pc.TargetNqn,
-		},
+	return &state{
+		con: c,
+		Nqn: pc.TargetNqn,
 	}, nil
 }
 
-func (m *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
-	vd, err := parseVolumeData(serializedConnectorData)
+func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+	res, err := parseState(serializedConnectorData)
 	if err != nil {
-		return fmt.Errorf("parse serialized connector data: %w", err)
+		return nil, err
 	}
 
-	err = m.snip.Disconnect(ctx, vd.Nqn)
-	if err != nil {
-		return fmt.Errorf("nvmeDisconnect: %w", err)
-	}
-	return nil
-}
+	res.con = c
 
-func (m *connector) Expand(ctx context.Context, serializedConnectorData string) error {
-	vd, err := parseVolumeData(serializedConnectorData)
-	if err != nil {
-		return fmt.Errorf("parse serialized connector data: %w", err)
-	}
-
-	err = m.snip.Rescan(ctx, vd.Nqn)
-	if err != nil {
-		return fmt.Errorf("nvmeRescan: %w", err)
-	}
-	return nil
+	return res, nil
 }

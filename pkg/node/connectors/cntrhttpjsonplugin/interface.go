@@ -1,6 +1,22 @@
 package cntrhttpjsonplugin
 
-import "meoe.io/poly-csi/pkg/logs"
+import (
+	"context"
+
+	"meoe.io/poly-csi/pkg/logs"
+)
+
+type Sender interface {
+	SetConfig(opaqueConfig []byte) error
+	Send(ctx context.Context, req PluginRequest) (result string, err error)
+}
+
+type PluginRequest struct {
+	Method        string            `json:"method"`
+	Preset        map[string]string `json:"preset"`
+	State         string            `json:"state"`
+	SerializedArg string            `json:"serializedArg"`
+}
 
 type PluginResponse struct {
 	Status string            `json:"status"`
@@ -12,10 +28,16 @@ type PluginResponse struct {
 const ResponseStatusError = "error"
 const ResponseStatusOk = "ok"
 
+// connector methods
 const (
 	MethodGetCapabilities = "/capabilities"
 	MethodGetInfo         = "/get_info"
 	MethodConnect         = "/connect"
-	MethodDisconnect      = "/disconnect"
-	MethodExpand          = "/expand"
+)
+
+// state methods
+const (
+	MethodGetDeviceList = "/get_device_list"
+	MethodDisconnect    = "/disconnect"
+	MethodExpand        = "/expand"
 )

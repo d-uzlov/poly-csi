@@ -87,10 +87,10 @@ func ParseCgroupIoLimits(preset map[string]string) (limit blockdevice.IoLimit, f
 	return result, foundAny, nil
 }
 
-func (c *ParsedConfig) FindConnectorById(id string) connectorfactory.InflateFunc {
+func (c *ParsedConfig) FindConnectorById(id string) *connectorfactory.ParsedConnector {
 	for _, v := range c.Connectors {
 		if v.Conf.Id == id {
-			return v.Inflate
+			return v
 		}
 	}
 

@@ -16,7 +16,6 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/blockdevice"
@@ -59,17 +58,21 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	}
 	logs.FromCtx(ctx).MicroOp("using preset", "fullPreset", fullPreset)
 
-	connectorInflate := conf.FindConnectorById(vc.ConnectorId)
-	if connectorInflate == nil {
+	conTemplate := conf.FindConnectorById(vc.ConnectorId)
+	if conTemplate == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
 	}
 
-	connector := connectorInflate()
+	connector := conTemplate.Inflate()
 	if connector == nil {
 		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", vc.ConnectorId)
 	}
 
-	err = connector.Configure(ctx, tr, fullPreset)
+	err = connector.Configure(ctx, connectors.CommonConfig{
+		Tr:        tr,
+		DevFolder: n.conf.DevFolder,
+		Preset:    fullPreset,
+	}, conTemplate.Conf.ByteConfig)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}
@@ -136,9 +139,9 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			}
 			if foundAny {
 				logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)
-				blockPath, err := tr.Cmds().ReadLink(ctx, nvi.BlockDevicePath)
+				blockPath, err := tr.Cmds().ReadLink(ctx, nvi.mainBlockDevice)
 				if err != nil {
-					return nil, fmt.Errorf("readLink(%s): %w", nvi.BlockDevicePath, err)
+					return nil, fmt.Errorf("readLink(%s): %w", nvi.mainBlockDevice, err)
 				}
 				bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
 				err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
@@ -208,9 +211,7 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, mp, func(connectorId string) connectorfactory.InflateFunc {
-		return conf.FindConnectorById(connectorId)
-	})
+	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.FindConnectorById)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

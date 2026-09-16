@@ -12,7 +12,6 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -37,7 +36,7 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, func(connectorId string) connectorfactory.InflateFunc { return conf.FindConnectorById(connectorId) })
+	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.FindConnectorById)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

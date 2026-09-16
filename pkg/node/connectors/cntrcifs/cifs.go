@@ -5,23 +5,19 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 type connector struct {
-	tr        transport.Transport
-	devFolder string
+	conf connectors.CommonConfig
 }
 
-func New(devFolder string) connectors.Connector {
-	return &connector{
-		devFolder: devFolder,
-	}
+func New() connectors.Connector {
+	return &connector{}
 }
 
-func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
-	c.tr = tr
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+	c.conf = conf
 	return nil
 }
 
@@ -36,7 +32,7 @@ func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
+func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
 	if req.AccessMount == nil {
 		return nil, fmt.Errorf("smb/cifs does not support block mounting")
 	}
@@ -63,7 +59,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 	if req.AccessMount.FsType != "cifs" {
 		return nil, fmt.Errorf("expected cifs fs type but got %s", req.AccessMount.FsType)
 	}
-	mi, err := fsutils.New(c.tr).EnsureMounted(ctx, smbPath, req.FsMountPath, req.AccessMount.FsType, flags)
+	mi, err := fsutils.New(c.conf.Tr).EnsureMounted(ctx, smbPath, req.FsMountPath, req.AccessMount.FsType, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -77,15 +73,18 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, smbPath, mi.MountPoint)
 	}
 
-	return &connectors.ConnectResult{}, nil
+	return &state{
+		con: c,
+	}, nil
 }
 
-func (c *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
-	// unmount is managed externally
-	return nil
-}
+func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+	res, err := parseState(serializedConnectorData)
+	if err != nil {
+		return nil, err
+	}
 
-func (c *connector) Expand(ctx context.Context, serializedConnectorData string) error {
-	// cifs volumes don't need expanding
-	return nil
+	res.con = c
+
+	return res, nil
 }

@@ -12,8 +12,8 @@ type NvmePublicInfo struct {
 	HostId  string `json:"host_id"`
 }
 
-func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	info, err := nvmeGetNodeInfo(ctx, m.tr)
+func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+	info, err := nvmeGetNodeInfo(ctx, c.commonConfig.Tr)
 	if err != nil {
 		return nil, err
 	}

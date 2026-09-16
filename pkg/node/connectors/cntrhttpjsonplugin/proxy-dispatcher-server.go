@@ -1,0 +1,94 @@
+package cntrhttpjsonplugin
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/transport"
+)
+
+type DispatcherServer struct {
+	tr           transport.Transport
+	devFolder    string
+	inflate      connectors.InflateFunc
+	opaqueConfig []byte
+}
+
+func NewDispatcherServer(tr transport.Transport, devFolder string, inflate connectors.InflateFunc, opaqueConfig []byte) *DispatcherServer {
+	return &DispatcherServer{
+		tr:           tr,
+		devFolder:    devFolder,
+		inflate:      inflate,
+		opaqueConfig: opaqueConfig,
+	}
+}
+
+func (d *DispatcherServer) Process(ctx context.Context, req PluginRequest) (result any, err error) {
+	if d.inflate == nil {
+		return nil, fmt.Errorf("inflate is not initialized")
+	}
+	con := d.inflate()
+	if con == nil {
+		return nil, fmt.Errorf("inflate returned nil")
+	}
+	conf := connectors.CommonConfig{
+		Tr:        d.tr,
+		DevFolder: d.devFolder,
+		Preset:    req.Preset,
+	}
+	err = con.Configure(ctx, conf, d.opaqueConfig)
+	if err != nil {
+		return nil, fmt.Errorf("con.Configure: %w", err)
+	}
+
+	switch req.Method {
+	case MethodGetCapabilities:
+		return con.Capabilities(ctx)
+	case MethodGetInfo:
+		return con.GetInfo(ctx)
+	case MethodConnect:
+		var cr connectors.ConnectRequest
+		err = json.Unmarshal([]byte(req.SerializedArg), &cr)
+		if err != nil {
+			return nil, fmt.Errorf("parse arg: %w", err)
+		}
+		state, err := con.Connect(ctx, cr)
+		if err != nil {
+			return nil, fmt.Errorf("con.Connect: %w", err)
+		}
+		serialized, err := state.Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("state.Serialize: %w", err)
+		}
+		return serialized, nil
+	case MethodGetDeviceList, MethodDisconnect, MethodExpand:
+		state, err := con.ParseState(req.State)
+		if err != nil {
+			return nil, fmt.Errorf("con.ParseState: %w", err)
+		}
+		switch req.Method {
+		case MethodGetDeviceList:
+			devices, err := state.GetDevices(ctx)
+			if err != nil {
+				return nil, err
+			}
+			// allow for different /dev mount
+			for k, v := range devices {
+				devPath, ok := strings.CutPrefix(v, d.devFolder)
+				if ok {
+					devices[k] = devPath
+				}
+			}
+			return devices, nil
+		case MethodDisconnect:
+			return nil, state.Disconnect(ctx)
+		case MethodExpand:
+			return nil, state.Expand(ctx)
+		}
+	}
+
+	return nil, fmt.Errorf("method '%s' is not supported", req.Method)
+}

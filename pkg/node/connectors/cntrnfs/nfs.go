@@ -6,23 +6,19 @@ import (
 	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 type connector struct {
-	tr        transport.Transport
-	devFolder string
+	conf connectors.CommonConfig
 }
 
-func New(devFolder string) connectors.Connector {
-	return &connector{
-		devFolder: devFolder,
-	}
+func New() connectors.Connector {
+	return &connector{}
 }
 
-func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
-	c.tr = tr
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+	c.conf = conf
 	return nil
 }
 
@@ -37,7 +33,7 @@ func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (*connectors.ConnectResult, error) {
+func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
 	if req.AccessMount == nil {
 		return nil, fmt.Errorf("nfs does not support block mounting")
 	}
@@ -56,7 +52,7 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 
 	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
 
-	mi, err := fsutils.New(m.tr).EnsureMounted(ctx, nfsPath, req.FsMountPath, req.AccessMount.FsType, req.AccessMount.MountFlags)
+	mi, err := fsutils.New(c.conf.Tr).EnsureMounted(ctx, nfsPath, req.FsMountPath, req.AccessMount.FsType, req.AccessMount.MountFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -70,15 +66,19 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, nfsPath, mi.MountPoint)
 	}
 
-	return &connectors.ConnectResult{}, nil
+	return &state{
+		con:  c,
+		Path: nfsPath,
+	}, nil
 }
 
-func (m *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
-	// unmount is managed externally
-	return nil
-}
+func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+	res, err := parseState(serializedConnectorData)
+	if err != nil {
+		return nil, err
+	}
 
-func (m *connector) Expand(ctx context.Context, serializedConnectorData string) error {
-	// nfs volumes don't need expanding
-	return nil
+	res.con = c
+
+	return res, nil
 }

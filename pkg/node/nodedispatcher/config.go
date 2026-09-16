@@ -54,7 +54,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 	ml := []*connectorfactory.ParsedConnector{}
 	logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
 	for i, v := range config.Connectors {
-		parsed := connectorfactory.ParseConnector(ctx, v, config.DevFolder)
+		parsed := connectorfactory.ParseConnector(ctx, v)
 		if parsed == nil {
 			logger.Info(fmt.Sprintf("parsing mount %d failed", i))
 			continue

@@ -3,28 +3,31 @@ package cntriscsiadm
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/transport"
 )
 
 type connector struct {
-	tr        transport.Transport
-	config    Config
-	devFolder string
+	commonConfig connectors.CommonConfig
+	config       Config
 }
 
-func New(config Config, devFolder string) connectors.Connector {
+func New() connectors.Connector {
 	return &connector{
-		config:    config,
-		devFolder: devFolder,
 	}
 }
 
-func (c *connector) Configure(ctx context.Context, tr transport.Transport, preset map[string]string) error {
-	c.tr = tr
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+	c.commonConfig = conf
+	if err := yaml.Unmarshal(opaqueConfig, &c.config); err != nil {
+		return fmt.Errorf("parse opaqueConfig: %w", err)
+	}
+	c.config.FillDefaults()
+	if err := c.config.Validate(); err != nil {
+		return fmt.Errorf("validate config: %w", err)
+	}
 	return nil
 }
 
@@ -34,7 +37,7 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 	}, nil
 }
 
-func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (result *connectors.ConnectResult, err error) {
+func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
 	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -44,7 +47,7 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
-	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
+	snip := newIscsiSnippets(c.commonConfig.Tr, ctx, c.config.IscsiadmCmd)
 
 	// setting up cleanup before even attempting to connect
 	// because failure could be caused by invalid state, that should be forcefully disconnected.
@@ -111,96 +114,19 @@ func (m *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("all %d iscsi multipath connections failed: %s", len(req.AddressOptions), combinedError)
 	}
 
-	is, err := snip.findSessions(pc.Iqn)
-	if err != nil {
-		return nil, fmt.Errorf("find iscsi sessions: %w", err)
-	}
-
-	logs.FromCtx(ctx).MicroOp("iscsi: find device paths")
-	var devices []string
-	for _, v := range is {
-		// /sys/class/iscsi_session/sessionX/state
-		// /sys/class/iscsi_connection/connectionX\:0/state
-		statePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/state", v.index)
-		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-			stateBytes, err := m.tr.Cmds().Read(ctx, statePath, true)
-			if err != nil {
-				// runtime errors should be self-explanatory
-				return err
-			}
-			state := string(stateBytes)
-			if state != "LOGGED_IN" {
-				return fmt.Errorf("unexpected iscsi session state: %s", state)
-			}
-			return nil
-		})
-		if err != nil {
-			combinedError += fmt.Sprintf("iscsi device for %s is not online: %s ; ", v.address, err.Error())
-			logs.FromCtx(ctx).Error("iscsi device is not online", "address", v.address, "error", err.Error())
-			continue
-		}
-
-		deviceLink := fmt.Sprintf(m.devFolder+"/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
-		// iscsi creates links in background, need to wait for it to appear
-		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-			stat, err := m.tr.Cmds().Stat(ctx, deviceLink)
-			if err != nil {
-				// runtime errors should be self-explanatory
-				return err
-			}
-			if !stat.FileExists {
-				return fmt.Errorf("link does not exist: %s", deviceLink)
-			}
-			devices = append(devices, stat.Path)
-			return nil
-		})
-		if err != nil {
-			combinedError += fmt.Sprintf("failed to get iscsi device file link at %s: %s ; ", deviceLink, err.Error())
-			logs.FromCtx(ctx).Error("failed to get iscsi device file link", "address", v.address, "path", deviceLink, "error", err.Error())
-		}
-	}
-	if len(devices) == 0 {
-		return nil, fmt.Errorf("iscsi device is not found: %s", combinedError)
-	}
-	if len(devices) < len(req.AddressOptions) {
-		logs.FromCtx(ctx).Warn("iscsi: some addresses failed to connect, returning partial list")
-	}
-	return &connectors.ConnectResult{
-		Devices:    devices,
-		ConnectorData: VolumeData{
-			Iqn: pc.Iqn,
-		},
+	return &state{
+		con: c,
+		Iqn: pc.Iqn,
 	}, nil
 }
 
-func (m *connector) Disconnect(ctx context.Context, serializedConnectorData string) error {
-	vd, err := parseVolumeData(serializedConnectorData)
+func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+	res, err := parseState(serializedConnectorData)
 	if err != nil {
-		return fmt.Errorf("parse serialized connector data: %w", err)
+		return nil, err
 	}
 
-	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
+	res.con = c
 
-	is, err := snip.findSessions(vd.Iqn)
-	if err != nil {
-		return fmt.Errorf("find iscsi sessions: %w", err)
-	}
-	for _, v := range is {
-		err = snip.disconnect(vd.Iqn, v.address)
-		if err != nil {
-			return fmt.Errorf("iscsi disconnect from %s: %w", v.address, err)
-		}
-	}
-	return nil
-}
-
-func (m *connector) Expand(ctx context.Context, serializedConnectorData string) error {
-	snip := newIscsiSnippets(m.tr, ctx, m.config.IscsiadmCmd)
-	// TODO rescan only target devices?
-	err := snip.rescanAll()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return res, nil
 }
