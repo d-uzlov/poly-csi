@@ -50,7 +50,7 @@ func (n *Node) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabili
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 		csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
-		// csi.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
+		csi.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
 		// csi.NodeServiceCapability_RPC_GET_STORAGE_HEALTH,
 	}
 	result := []*csi.NodeServiceCapability{}

@@ -35,6 +35,9 @@ type State interface {
 	Disconnect(ctx context.Context) error
 	// Expand ensures that local state synchronizes with remote state.
 	Expand(ctx context.Context) error
+
+	CheckHealth(ctx context.Context) ([]HealthMessage, error)
+
 	// Serialize creates an opaque string that can be used in Connector.ParseState
 	Serialize() (string, error)
 	Validate() error
@@ -80,11 +83,15 @@ type ConnectRequest struct {
 	DisableCleanupOnFailure bool   `json:"disableCleanupOnFailure"`
 }
 
-type ConnectResult struct {
-	// ConnectorData and SerializedConnectorData are mutually exclusive options for connector data storage.
-	// When ConnectorData is set, dispatcher will try to use JSON serialization to create SerializedConnectorData.
-	ConnectorData any `json:"-"`
-	// SerializedConnectorData is data passed to later requests to connector.
-	// It can be automatically populated from ConnectorData.
-	SerializedConnectorData string `json:"connector_data"`
+const (
+	HealthStatusDegraded     = "degraded"
+	HealthStatusDataLoss     = "data_loss"
+	HealthStatusInaccessible = "inaccessible"
+)
+
+// HealthMessage is a mirror of csi.VolumeHealth_VolumeHealthEntry, created to remove unnecessary dependency
+type HealthMessage struct {
+	Status  string
+	Reason  string
+	Message string
 }

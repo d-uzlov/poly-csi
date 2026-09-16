@@ -82,9 +82,43 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("all %d nvme multipath connections failed, see logs for details", len(req.AddressOptions))
 	}
 
+	subsys, err := c.snip.GetSubsysInfo(ctx, pc.TargetNqn)
+	if err != nil {
+		return nil, fmt.Errorf("GetSubsysInfo: %w", err)
+	}
+	if subsys == nil {
+		return nil, fmt.Errorf("subsys not found: %s", pc.TargetNqn)
+	}
+
+	if len(subsys.Namespaces) == 0 {
+		return nil, fmt.Errorf("subsystem does not have any namespaces")
+	}
+	var namespaceDevice string
+	for _, ns := range subsys.Namespaces {
+		if ns.NSID == 1 {
+			namespaceDevice = ns.NameSpace
+			break
+		}
+	}
+	if namespaceDevice == "" {
+		return nil, fmt.Errorf("could not find namespace block device")
+	}
+
+	var controllers []string
+	serial := subsys.Controllers[0].SerialNumber
+	for _, v := range subsys.Controllers {
+		if serial != v.SerialNumber {
+			return nil, fmt.Errorf("different controllers have different serial number")
+		}
+		controllers = append(controllers, v.Controller)
+	}
+
 	return &state{
-		con: c,
-		Nqn: pc.TargetNqn,
+		con:         c,
+		Nqn:         pc.TargetNqn,
+		DeviceName:  namespaceDevice,
+		Serial:      serial,
+		Controllers: controllers,
 	}, nil
 }
 

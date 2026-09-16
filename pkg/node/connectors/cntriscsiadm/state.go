@@ -121,6 +121,10 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
+func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
+	return nil, nil
+}
+
 func (s *state) Serialize() (string, error) {
 	res, err := json.Marshal(s)
 	if err != nil {

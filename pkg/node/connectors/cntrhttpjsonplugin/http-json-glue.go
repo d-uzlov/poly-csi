@@ -170,7 +170,7 @@ func (s *HttpServer) handle(ctx context.Context, logger *logs.Instance, req *htt
 		return "", fmt.Errorf("parse request: %w", err), http.StatusBadRequest
 	}
 
-	logger.EphemeralInfo("new request")
+	logger.EphemeralInfo("new request", "request", parsedRequest)
 
 	callRes, err := s.dispatcher.Process(ctx, parsedRequest)
 	if err != nil {
@@ -178,10 +178,16 @@ func (s *HttpServer) handle(ctx context.Context, logger *logs.Instance, req *htt
 	}
 	logger.EphemeralInfo("handler call success", "data", callRes)
 
-	serialized, err := json.Marshal(callRes)
-	if err != nil {
-		return "", fmt.Errorf("json marshal call result: %w", err), http.StatusInternalServerError
+	var serialized string
+	if crs, ok := callRes.(string); ok {
+		serialized = crs
+	} else {
+		serializedBytes, err := json.Marshal(callRes)
+		if err != nil {
+			return "", fmt.Errorf("json marshal call result: %w", err), http.StatusInternalServerError
+		}
+		serialized = string(serializedBytes)
 	}
 
-	return string(serialized), nil, http.StatusOK
+	return serialized, nil, http.StatusOK
 }

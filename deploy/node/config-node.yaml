@@ -107,6 +107,8 @@ logs:
     /csi.v1.Node/NodeExpandVolume:
       echoCommands: true
 
+    /csi.v1.Node/NodeGetVolumeHealth:
+      echoCommands: true
     /csi.v1.Node/NodeGetVolumeStats:
       echoCommands: true
       skipOnSuccess: true

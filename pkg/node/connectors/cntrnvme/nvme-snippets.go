@@ -89,17 +89,17 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 	}
 
 	args := map[string]string{
-		"--hostnqn": hostNqn,
-		"--hostid": hostId,
-		"--transport": nvmeTransport,
-		"--traddr": address,
-		"--trsvcid": port,
-		"--nqn": targetNqn,
-		"--keep-alive-tmo": keepAliveTimeout,
-		"--ctrl-loss-tmo": controllerLossTimeout,
-		"--reconnect-delay": reconnectDelay,
-		"--nr-io-queues": ioQueues,
-		"--dhchap-secret": hostKey,
+		"--hostnqn":            hostNqn,
+		"--hostid":             hostId,
+		"--transport":          nvmeTransport,
+		"--traddr":             address,
+		"--trsvcid":            port,
+		"--nqn":                targetNqn,
+		"--keep-alive-tmo":     keepAliveTimeout,
+		"--ctrl-loss-tmo":      controllerLossTimeout,
+		"--reconnect-delay":    reconnectDelay,
+		"--nr-io-queues":       ioQueues,
+		"--dhchap-secret":      hostKey,
 		"--dhchap-ctrl-secret": controllerKey,
 	}
 	cmd := append(snip.cmd,
@@ -130,7 +130,7 @@ func (snip *NvmeSnippets) Disconnect(ctx context.Context, nqn string) error {
 func (snip *NvmeSnippets) GetSubsysInfo(ctx context.Context, nqn string) (*nvmeSubsystemInfo, error) {
 	devices, err := snip.ListSubsys(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("nvmeListSubsys: %w", err)
+		return nil, fmt.Errorf("ListSubsys: %w", err)
 	}
 	for _, d := range devices {
 		if len(d.Subsystems) == 0 {
@@ -143,7 +143,7 @@ func (snip *NvmeSnippets) GetSubsysInfo(ctx context.Context, nqn string) (*nvmeS
 			return &s, nil
 		}
 	}
-	return nil, fmt.Errorf("nqn not found: %s", nqn)
+	return nil, nil
 }
 
 // func nvmeFindController(ctx context.Context, tr transport.Transport, nqn string, config nvmeshare.NvmeConnectConfig) (string, error) {
@@ -169,6 +169,9 @@ func (snip *NvmeSnippets) FindNamespaceDevice(ctx context.Context, nqn string, n
 	subsys, err := snip.GetSubsysInfo(ctx, nqn)
 	if err != nil {
 		return "", fmt.Errorf("nvmeGetNqnInfo: %w", err)
+	}
+	if subsys == nil {
+		return "", fmt.Errorf("subsys not found: %s", nqn)
 	}
 
 	if len(subsys.Namespaces) == 0 {
@@ -233,16 +236,19 @@ func (snip *NvmeSnippets) ListSubsys(ctx context.Context) ([]nvmeInfo, error) {
 }
 
 func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
-	nqnInfo, err := snip.GetSubsysInfo(ctx, nqn)
+	subsys, err := snip.GetSubsysInfo(ctx, nqn)
 	if err != nil {
-		return fmt.Errorf("nvmeGetNqnInfo: %w", err)
+		return fmt.Errorf("GetSubsysInfo: %w", err)
 	}
-	if len(nqnInfo.Controllers) == 0 {
+	if subsys == nil {
+		return fmt.Errorf("subsys not found: %s", nqn)
+	}
+	if len(subsys.Controllers) == 0 {
 		return fmt.Errorf("nqn does not have any controllers connected: %s", nqn)
 	}
 	anySuccess := false
 	err = nil
-	for _, c := range nqnInfo.Controllers {
+	for _, c := range subsys.Controllers {
 		devPath := snip.devFolder + "/" + c.Controller
 		cmd := append(snip.cmd, "ns-rescan", "--verbose", devPath)
 		err = transport.CheckedRun(ctx, snip.tr, cmd)

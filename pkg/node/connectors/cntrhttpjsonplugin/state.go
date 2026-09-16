@@ -22,10 +22,6 @@ func parseState(serialized string) (*state, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = result.Validate()
-	if err != nil {
-		return nil, err
-	}
 	return &result, nil
 }
 
@@ -86,6 +82,10 @@ func (s *state) Expand(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
+	return nil, nil
 }
 
 func (s *state) Serialize() (string, error) {
