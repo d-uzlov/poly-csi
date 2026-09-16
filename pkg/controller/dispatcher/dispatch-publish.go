@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -66,16 +67,11 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: validation failed: %w", err)
 	}
 
-	for v := range strings.SplitSeq(mh.vi.VolumeContext.PresetName, ",") {
-		found := false
-		for _, p := range ni.Presets {
-			if p == v {
-				found = true
-				break
+	if mh.vi.VolumeContext.PresetName != "" {
+		for v := range strings.SplitSeq(mh.vi.VolumeContext.PresetName, ",") {
+			if !slices.Contains(ni.Presets, v) {
+				return nil, fmt.Errorf("node does not have preset '%s' required by volume (available %v)", v, ni.Presets)
 			}
-		}
-		if !found {
-			return nil, fmt.Errorf("node does not have preset '%s' required by volume (available %v)", v, ni.Presets)
 		}
 	}
 

@@ -49,12 +49,14 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	}
 
 	fullPreset := map[string]string{}
-	for v := range strings.SplitSeq(vc.PresetName, ",") {
-		preset, ok := n.conf.Presets[v]
-		if !ok {
-			return nil, fmt.Errorf("preset with name '%s' is not found", v)
+	if vc.PresetName != "" {
+		for v := range strings.SplitSeq(vc.PresetName, ",") {
+			preset, ok := n.conf.Presets[v]
+			if !ok {
+				return nil, fmt.Errorf("preset with name '%s' is not found", v)
+			}
+			maps.Copy(fullPreset, preset)
 		}
-		maps.Copy(fullPreset, preset)
 	}
 	logs.FromCtx(ctx).MicroOp("using preset", "fullPreset", fullPreset)
 
