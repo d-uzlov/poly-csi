@@ -20,6 +20,8 @@ type VolumeInfo struct {
 	ShareType     string                      `json:"share_type"`
 	ShareData     string                      `json:"share_data"`
 	InitConfig    volumeinit.InitConfig       `json:"init_config"`
+	Size          int64                       `json:"size"`
+	LocalPathType string                      `json:"local_type"`
 }
 
 func (w Wrapper) SetVolumeInfo(ctx context.Context, info VolumeInfo) error {

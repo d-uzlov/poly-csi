@@ -86,7 +86,7 @@ func (v *Volume) DeleteState(ctx context.Context) error {
 	return nil
 }
 
-func (v *Volume) Expand(ctx context.Context, newSize int64) error {
+func (v *Volume) SetSize(ctx context.Context, newSize int64) error {
 	return v.snip.ConfigureDataset(ctx, v.Path, zfs.DatasetConfig{
 		Quota:          newSize,
 		RefQuota:       newSize,
@@ -115,4 +115,32 @@ func (v *Volume) ReceiveSnapshot(ctx context.Context, sourceFile string, timeout
 		return fmt.Errorf("zfs receive: %w", err)
 	}
 	return nil
+}
+
+func (v *Volume) CheckHealth(ctx context.Context) ([]storage.HealthMessage, error) {
+	var result []storage.HealthMessage
+
+	props, err := v.snip.GetProperties(ctx, v.Path)
+	if err != nil {
+		return nil, fmt.Errorf("zfs get: %w", err)
+	}
+	if props.Properties.RefQuota.IsEmpty() {
+		result = append(result, storage.HealthMessage{
+			Status:  storage.HealthStatusDegraded,
+			Reason:  "no_quota",
+			Message: "dataset quota is not set",
+		})
+	}
+	mounted, err := props.Properties.Mounted.GetBool()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Mounted property: %w", err)
+	}
+	if !mounted {
+		result = append(result, storage.HealthMessage{
+			Status:  storage.HealthStatusDegraded,
+			Reason:  "dataset_not_mounted",
+			Message: "dataset is not mounted into filesystem",
+		})
+	}
+	return nil, nil
 }

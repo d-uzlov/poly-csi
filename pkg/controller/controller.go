@@ -95,7 +95,7 @@ func (c *Controller) ControllerGetCapabilities(ctx context.Context, req *csi.Con
 		csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 		csi.ControllerServiceCapability_RPC_MODIFY_VOLUME,
 		// csi.ControllerServiceCapability_RPC_GET_SNAPSHOT,
-		// csi.ControllerServiceCapability_RPC_GET_VOLUME_HEALTH,
+		csi.ControllerServiceCapability_RPC_GET_VOLUME_HEALTH,
 		// csi.ControllerServiceCapability_RPC_LIST_VOLUME_HEALTH,
 	}
 
@@ -235,6 +235,14 @@ func (c *Controller) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 	}
 
 	return c.dispatcher.ControllerExpandVolume(ctx, req)
+}
+
+func (c *Controller) ControllerGetVolumeHealth(ctx context.Context, req *csi.ControllerGetVolumeHealthRequest) (*csi.ControllerGetVolumeHealthResponse, error) {
+	if req.VolumeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
+	}
+
+	return c.dispatcher.ControllerGetVolumeHealth(ctx, req)
 }
 
 func (c *Controller) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {

@@ -407,10 +407,13 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("ReadState: nil result")
 	}
 	if volumeState.Size < req.CapacityRange.RequiredBytes {
-		// volumes that has destructive expand, must properly populate volumeState.Size
-		err = vol.Expand(ctx, req.CapacityRange.RequiredBytes)
-		if volumeState.FsPath == "" {
-			return nil, fmt.Errorf("expand: %w", err)
+		err = vol.SetSize(ctx, req.CapacityRange.RequiredBytes)
+		if err != nil {
+			return nil, fmt.Errorf("SetSize: %w", err)
+		}
+		volumeState, err = vol.ReadState(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read state: %w", err)
 		}
 	}
 	if strCaps.LocalPathType != "" {
@@ -536,6 +539,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		ShareType:     dispatchParams.ShareType,
 		ShareData:     shareData,
 		InitConfig:    initConfig,
+		Size:          volumeState.Size,
+		LocalPathType: strCaps.LocalPathType,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("save volume info: %w", err)

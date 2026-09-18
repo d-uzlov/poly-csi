@@ -135,7 +135,7 @@ func (v *Volume) GetSize(ctx context.Context) (int64, error) {
 	return size, nil
 }
 
-func (v *Volume) Expand(ctx context.Context, newSize int64) error {
+func (v *Volume) SetSize(ctx context.Context, newSize int64) error {
 	return v.snip.SetQuota(ctx, v.getMainVolume(), newSize)
 }
 

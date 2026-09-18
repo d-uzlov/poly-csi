@@ -34,7 +34,7 @@ type Volume interface {
 
 	// Modify(ctx context.Context, req *csi.ControllerModifyVolumeRequest) error
 
-	Expand(ctx context.Context, newSize int64) error
+	SetSize(ctx context.Context, newSize int64) error
 
 	// MakeSnapshot must create an instantaneous consistent snapshot or return an error
 	MakeSnapshot(ctx context.Context, name string) (Snapshot, error)
@@ -96,6 +96,24 @@ const (
 )
 
 type VolumeState struct {
+	// FsPath is the path in the Server filesystem where volume is available
+	// Can be empty in case volume can not be found in filesystem.
 	FsPath string
+	// Size is the size limit of the volume.
+	// MUST be populated correctly for block volumes.
+	// For filesystem volumes that cannot enforce a size limit on a volume value must be zero.
 	Size   int64
+}
+
+const (
+	HealthStatusDegraded     = "degraded"
+	HealthStatusDataLoss     = "data_loss"
+	HealthStatusInaccessible = "inaccessible"
+)
+
+// HealthMessage is a mirror of csi.VolumeHealth_VolumeHealthEntry, created to remove unnecessary dependency
+type HealthMessage struct {
+	Status  string
+	Reason  string
+	Message string
 }

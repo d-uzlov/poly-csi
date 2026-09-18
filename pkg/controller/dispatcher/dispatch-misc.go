@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
@@ -151,7 +152,7 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 
 	newSize := req.CapacityRange.RequiredBytes
 
-	err = vol.Expand(ctx, newSize)
+	err = vol.SetSize(ctx, newSize)
 	if err != nil {
 		return nil, fmt.Errorf("storage: expand volume: %w", err)
 	}
@@ -165,8 +166,74 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 		return nil, fmt.Errorf("ReadState: nil result")
 	}
 
+	mh.vi.Size = volumeState.Size
+
+	err = mh.wrapper.SetVolumeInfo(ctx, *mh.vi)
+	if err != nil {
+		return nil, fmt.Errorf("save volume info: %w", err)
+	}
+
 	return &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         volumeState.Size,
 		NodeExpansionRequired: true,
+	}, nil
+}
+
+func (d *Dispatcher) ControllerGetVolumeHealth(ctx context.Context, req *csi.ControllerGetVolumeHealthRequest) (*csi.ControllerGetVolumeHealthResponse, error) {
+	// logger := logs.FromCtx(ctx)
+	result := []*csi.VolumeHealth_VolumeHealthEntry{}
+
+	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
+	if err != nil {
+		return nil, fmt.Errorf("get volume info: %w", err)
+	}
+	defer mh.release()
+	if mh.vi == nil {
+		return nil, fmt.Errorf("volume not found")
+	}
+
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
+	if err != nil {
+		return nil, err
+	}
+	vol, err := strInstance.ParseVolume(mh.vi.StorageData)
+	if err != nil {
+		return nil, fmt.Errorf("parse storage data: %w", err)
+	}
+	volState, err := vol.ReadState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read volume state: %w", err)
+	}
+
+	if mh.vi.Size != 0 {
+		if volState.Size != mh.vi.Size {
+			result = append(result, &csi.VolumeHealth_VolumeHealthEntry{
+				Status:  csi.VolumeHealthErrorType_DEGRADED,
+				Reason:  "wrong_size",
+				Message: fmt.Sprintf("size of the volume changed: initial %d, current %d", mh.vi.Size, volState.Size),
+			})
+		}
+	}
+
+	if mh.vi.LocalPathType == storage.VolFolder && mh.vi.Size != 0 {
+		df, err := mh.srv.trInstance.Cmds().Df(ctx, volState.FsPath)
+		if err != nil {
+			return nil, fmt.Errorf("check free space: %w", err)
+		}
+
+		if df.Used+df.Available < mh.vi.Size {
+			result = append(result, &csi.VolumeHealth_VolumeHealthEntry{
+				Status:  csi.VolumeHealthErrorType_DEGRADED,
+				Reason:  "out_of_space",
+				Message: "Volume will not be able to reach capacity due to filesystem running out of space",
+			})
+		}
+	}
+
+	return &csi.ControllerGetVolumeHealthResponse{
+		VolumeHealth: &csi.VolumeHealth{
+			VolumeId:       req.VolumeId,
+			HealthStatuses: result,
+		},
 	}, nil
 }

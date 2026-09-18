@@ -31,6 +31,7 @@ type DatasetProperties struct {
 	RefReservation ZfsProperty `json:"refreservation"`
 	Available      ZfsProperty `json:"available"`
 	MountPoint     ZfsProperty `json:"mountpoint"`
+	Mounted        ZfsProperty `json:"mounted"`
 }
 
 func (ds DatasetState) IsZvol() bool {
@@ -79,6 +80,13 @@ func (p ZfsProperty) GetInt() (int64, error) {
 	return i, nil
 }
 
+func (p ZfsProperty) GetBool() (bool, error) {
+	if p.IsEmpty() {
+		return false, fmt.Errorf("value is empty")
+	}
+	return p.Value == "yes", nil
+}
+
 func (p ZfsProperty) IsEmpty() bool {
 	return p.Value == "" || p.Value == "-" || p.Value == "none"
 }
@@ -95,6 +103,7 @@ func (s *Snippets) GetProperties(ctx context.Context, path string) (*DatasetStat
 		"refreservation",
 		"available",
 		"mountpoint",
+		"mounted",
 	}
 	// -p Display numbers in parsable (exact) values.
 	cmd := append(zfsCmd, "get", strings.Join(properties, ","), path, "-p", "--json")

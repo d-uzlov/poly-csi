@@ -88,7 +88,7 @@ func (v *Volume) DeleteState(ctx context.Context) error {
 	return nil
 }
 
-func (v *Volume) Expand(ctx context.Context, newSize int64) error {
+func (v *Volume) SetSize(ctx context.Context, newSize int64) error {
 	return v.snip.LvSetSize(ctx, v.VgName, v.LvName, newSize)
 }
 
