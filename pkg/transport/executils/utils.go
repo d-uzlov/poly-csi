@@ -301,39 +301,34 @@ func (ec *ExecCommands) Stat(ctx context.Context, path string) (transport.StatRe
 }
 
 func (ec *ExecCommands) Df(ctx context.Context, path string) (*transport.FsSizeInfo, error) {
-	cmd := []string{"df", "--output=size,used,avail", "--block-size=1", path}
-	// cmd := fmt.Sprintf("df --output=avail --block-size=1 '%s' | tail -n +2", path)
+	cmd := []string{"stat", "--file-system", "--printf=%S %a %b", path}
 	stdout, err := transport.CheckedRunStdout(ctx, ec.tr, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("df: %w", err)
-	}
-	lines := strings.Split(stdout, "\n")
-	if len(lines) != 2 {
-		return nil, fmt.Errorf("expected only 2 lines in df stdout: %s", stdout)
+		return nil, fmt.Errorf("stat fs: %w", err)
 	}
 
-	fields := strings.Fields(lines[1])
+	fields := strings.Fields(stdout)
 	if len(fields) != 3 {
-		return nil, fmt.Errorf("expected 3 fields in df stdout: %s", stdout)
+		return nil, fmt.Errorf("expected 3 fields in stat fs stdout: %s", stdout)
 	}
 
-	size, err := strconv.ParseInt(lines[1], 10, 64)
+	blockSize, err := strconv.ParseInt(fields[0], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parse size from df stdout")
+		return nil, fmt.Errorf("parse block size '%s': %w", fields[0], err)
 	}
-	used, err := strconv.ParseInt(lines[1], 10, 64)
+	availBlocks, err := strconv.ParseInt(fields[1], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parse used from df stdout")
+		return nil, fmt.Errorf("parse avail blocks '%s': %w", fields[1], err)
 	}
-	avail, err := strconv.ParseInt(lines[1], 10, 64)
+	totalBlocks, err := strconv.ParseInt(fields[2], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parse avail from df stdout")
+		return nil, fmt.Errorf("parse total blocks '%s': %w", fields[2], err)
 	}
 
 	return &transport.FsSizeInfo{
-		Size:      size,
-		Used:      used,
-		Available: avail,
+		Size:      totalBlocks * blockSize,
+		Available: availBlocks * blockSize,
+		Used:      (totalBlocks - availBlocks) * blockSize,
 	}, nil
 }
 
