@@ -3,6 +3,7 @@ package cntrnvme
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/logs"
@@ -65,9 +66,14 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
+	expectedConnections := []ExpectedConnection{}
 	successCount := 0
 	for _, v := range req.AddressOptions {
-		err = c.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, c.ioQueues, sc.HostKey, sc.ControllerKey, c.keepAliveTimeout, c.controllerLossTimeout, c.reconnectDelay)
+		ec := ExpectedConnection{
+			AddrName: v.Name,
+		}
+		expectedConnections = append(expectedConnections, ec)
+		controllerName, err := c.snip.Connect(ctx, pc.TargetNqn, pc.HostNqn, pc.HostId, pc.ConnectPort, pc.TransportType, v.Address, c.ioQueues, sc.HostKey, sc.ControllerKey, c.keepAliveTimeout, c.controllerLossTimeout, c.reconnectDelay)
 		if err != nil {
 			if len(req.AddressOptions) <= 1 {
 				return nil, fmt.Errorf("nvmeConnect: %w", err)
@@ -76,6 +82,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 			logs.FromCtx(ctx).Error("nvmeConnect failed", "address", v, "error", err.Error())
 			continue
 		}
+		ec.Controller = controllerName
 		successCount++
 	}
 	if successCount == 0 {
@@ -104,13 +111,16 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("could not find namespace block device")
 	}
 
-	var controllers []string
 	serial := subsys.Controllers[0].SerialNumber
 	for _, v := range subsys.Controllers {
 		if serial != v.SerialNumber {
 			return nil, fmt.Errorf("different controllers have different serial number")
 		}
-		controllers = append(controllers, v.Controller)
+		for i, ec := range expectedConnections {
+			if ec.Controller == v.Controller {
+				expectedConnections[i].AddrIp = parseNvmeAddress(v.Address)
+			}
+		}
 	}
 
 	return &state{
@@ -118,7 +128,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		Nqn:         pc.TargetNqn,
 		DeviceName:  namespaceDevice,
 		Serial:      serial,
-		Controllers: controllers,
+		Connections: expectedConnections,
 	}, nil
 }
 
@@ -131,4 +141,13 @@ func (c *connector) ParseState(serializedConnectorData string) (connectors.State
 	res.con = c
 
 	return res, nil
+}
+
+func parseNvmeAddress(full string) string {
+	for v := range strings.SplitSeq(full, ",") {
+		if suff, ok := strings.CutPrefix(v, "traddr="); ok {
+			return suff
+		}
+	}
+	return ""
 }

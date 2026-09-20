@@ -73,11 +73,11 @@ func initKernelMessageParser(prefix string) (getMessages func() []string, err er
 	}, nil
 }
 
-func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn string, hostId string, port string, nvmeTransport string, address string, ioQueues string, hostKey string, controllerKey string, keepAliveTimeout string, controllerLossTimeout string, reconnectDelay string) error {
+func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn string, hostId string, port string, nvmeTransport string, address string, ioQueues string, hostKey string, controllerKey string, keepAliveTimeout string, controllerLossTimeout string, reconnectDelay string) (string, error) {
 	if snip.parseKernelLog {
 		getMessages, err := initKernelMessageParser("nvme")
 		if err != nil {
-			return fmt.Errorf("failed to init kmsgparser: %w", err)
+			return "", fmt.Errorf("failed to init kmsgparser: %w", err)
 		}
 		defer func() {
 			// TODO this can repeat messages when requests are parallel
@@ -87,6 +87,10 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 			}
 		}()
 	}
+
+	idFile := fmt.Sprintf("/tmp/nvme_connect@%s@%s", targetNqn, address)
+	// TODO defer context
+	defer snip.tr.Cmds().RmFile(ctx, idFile)
 
 	args := map[string]string{
 		"--hostnqn":            hostNqn,
@@ -101,10 +105,11 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 		"--nr-io-queues":       ioQueues,
 		"--dhchap-secret":      hostKey,
 		"--dhchap-ctrl-secret": controllerKey,
+		// TODO this is added in nvme-cli v3.0, uncomment when it is available in alpine linux
+		// "--devid-file":         idFile,
 	}
-	cmd := append(snip.cmd,
-		"connect",
-	)
+	// cmd := append(snip.cmd, "connect", "--idempotent")
+	cmd := append(snip.cmd, "connect")
 	for k, v := range args {
 		if v != "" {
 			cmd = append(cmd, k+"="+v)
@@ -112,9 +117,14 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 	}
 	_, err := transport.RelaxedRun(ctx, snip.tr, cmd, "already connected")
 	if err != nil {
-		return fmt.Errorf("nvme connect '%s': %w", targetNqn, err)
+		return "", fmt.Errorf("nvme connect '%s': %w", targetNqn, err)
 	}
-	return nil
+	// id, err := snip.tr.Cmds().Read(ctx, idFile, true)
+	// if err != nil {
+	// 	return "", fmt.Errorf("read devid-file '%s': %w", idFile, err)
+	// }
+
+	return "", nil
 }
 
 func (snip *NvmeSnippets) Disconnect(ctx context.Context, nqn string) error {

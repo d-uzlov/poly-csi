@@ -12,10 +12,16 @@ import (
 type state struct {
 	con *connector
 
-	Nqn         string   `json:"nqn"`
-	DeviceName  string   `json:"device_name"`
-	Serial      string   `json:"serial"`
-	Controllers []string `json:"controllers"`
+	Nqn         string               `json:"nqn"`
+	DeviceName  string               `json:"device_name"`
+	Serial      string               `json:"serial"`
+	Connections []ExpectedConnection `json:"connections"`
+}
+
+type ExpectedConnection struct {
+	Controller string
+	AddrName   string
+	AddrIp     string
 }
 
 var _ connectors.State = &state{}
@@ -65,18 +71,22 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 		return issues, nil
 	}
 
-	for _, expectedController := range s.Controllers {
+	for _, ec := range s.Connections {
 		found := false
 		for _, controller := range subsys.Controllers {
-			if expectedController == controller.Controller {
+			if ec.Controller == controller.Controller {
 				found = true
 			}
 		}
 		if !found {
+			msg := fmt.Sprintf("missing controller for %s", ec.AddrName)
+			if ec.Controller != "" {
+				msg = fmt.Sprintf("missing controller for %s (was %s)", ec.AddrName, ec.Controller)
+			}
 			issues = append(issues, connectors.HealthMessage{
 				Status:  connectors.HealthStatusDegraded,
 				Reason:  "missing_controller",
-				Message: fmt.Sprintf("controller %s: existed on initial connection but now missing", expectedController),
+				Message: msg,
 			})
 		}
 	}
@@ -93,6 +103,7 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 			issues = append(issues, connectors.HealthMessage{
 				Status:  connectors.HealthStatusDegraded,
 				Reason:  "controller_is_down",
+				// TODO add connection name
 				Message: fmt.Sprintf("controller %s: state is not 'live': %s", controller.Controller, state),
 			})
 		}
