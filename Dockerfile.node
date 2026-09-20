@@ -15,25 +15,26 @@ RUN test -n "${APP_VERSION}"
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
   CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/node/config.externalVersion=${APP_VERSION}" ./cmd/node/
 
-FROM alpine:3.23.3 AS runtime
+FROM alpine:3.24.2 AS runtime
 
 WORKDIR /
 
 # https://wiki.alpinelinux.org/wiki/Filesystems
+# https://pkgs.alpinelinux.org/packages
 # === package         : required_command ===
 #     nvme-cli        : nvme
 #     e2fsprogs       : mkfs.ext*
 #     e2fsprogs-extra : resize2fs
 #     open-iscsi      : iscsiadm
-#     util-linux      : mount
+#     util-linux      : mount (with advanced options)
 #     nfs-utils       : <nfs address resolution when running `mount`>
 RUN apk add \
   nvme-cli=2.16-r1 \
-  e2fsprogs=1.47.3-r0 \
-  e2fsprogs-extra=1.47.3-r0 \
-  cifs-utils=7.4-r0 \
+  e2fsprogs=1.47.4-r0 \
+  e2fsprogs-extra=1.47.4-r0 \
+  cifs-utils=7.5-r0 \
   multipath-tools=0.13.0-r0 \
-  util-linux=2.41.2-r0 \
+  util-linux=2.42.3-r1 \
   nfs-utils=2.6.4-r6 \
   --no-cache
 
