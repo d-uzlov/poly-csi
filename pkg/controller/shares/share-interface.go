@@ -51,12 +51,12 @@ type PublishContext struct {
 	//
 	// It is serialized using serialmaps package.
 	// It must be a struct with fields annotated with `map:"map_key"` tags
-	Public any
+	Public any `json:"public"`
 	// Secret data is passed to node deployment as serialized and encrypted string.
 	// It is serialized into JSON, annotate it accordingly.
-	Secret any
+	Secret any `json:"secret"`
 	// LocalData is an arbitrary storage for internal information for ShareManager.Publish and ShareManager.Unpublish.
 	// Can be empty/nil if ShareManager.Unpublish is a no-op.
 	// It is serialized into JSON, annotate it accordingly.
-	LocalData any
+	LocalData any `json:"localData"`
 }

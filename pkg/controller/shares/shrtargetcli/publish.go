@@ -99,8 +99,6 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		}, nil
 	}
 
-	secret := cntriscsiadm.SecretContext{}
-
 	acl, err := snip.readClientAcl(ctx, sh.Iqn, iscsiInfo.HostIqn)
 	if err != nil {
 		return nil, fmt.Errorf("read client auth: %w", err)
@@ -118,11 +116,13 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		if err != nil {
 			return nil, fmt.Errorf("setup client acl: %w", err)
 		}
+	}
 
-		secret.ClientUser = acl.userId
-		secret.ClientPass = acl.password
-		secret.TargetUser = acl.mutualUserId
-		secret.TargetPass = acl.mutualPassword
+	secret := cntriscsiadm.SecretContext{
+		ClientUser: acl.userId,
+		ClientPass: acl.password,
+		TargetUser: acl.mutualUserId,
+		TargetPass: acl.mutualPassword,
 	}
 
 	err = snip.save(ctx)

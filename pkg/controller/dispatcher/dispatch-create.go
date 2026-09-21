@@ -550,7 +550,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      volumeId,
-			CapacityBytes: 0,
+			CapacityBytes: volumeState.Size,
 			VolumeContext: vcMap,
 			ContentSource: req.VolumeContentSource,
 		},
