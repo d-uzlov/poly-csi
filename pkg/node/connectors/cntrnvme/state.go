@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/addropt"
@@ -134,11 +135,27 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 	if subsys == nil {
 		issues = append(issues, connectors.HealthMessage{
 			Status:  connectors.HealthStatusInaccessible,
-			Reason:  "no_subsys",
+			Reason:  "NotConnected",
 			Message: "subsystem is no longer connected to this host",
 		})
 		return issues, nil
+	} else if len(subsys.Controllers) == 0 {
+		issues = append(issues, connectors.HealthMessage{
+			Status:  connectors.HealthStatusInaccessible,
+			Reason:  "NotConnected",
+			Message: "subsystem is not associated with any controller",
+		})
+		return issues, nil
+	} else if len(subsys.Namespaces) == 0 {
+		issues = append(issues, connectors.HealthMessage{
+			Status:  connectors.HealthStatusInaccessible,
+			Reason:  "NoNamespaces",
+			Message: "subsystem does not have any namespaces",
+		})
+		return issues, nil
 	}
+
+	var missingControllers []string
 
 	for _, ec := range s.Connections {
 		found := false
@@ -148,58 +165,52 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 			}
 		}
 		if !found {
-			msg := fmt.Sprintf("missing controller for %s", ec.Addr.Name)
-			if ec.Controller != "" {
-				msg = fmt.Sprintf("missing controller for %s (was %s)", ec.Addr.Name, ec.Controller)
+			if ec.Controller == "" {
+				missingControllers = append(missingControllers, fmt.Sprintf("missing controller for %s", ec.Addr.Name))
+			} else {
+				missingControllers = append(missingControllers, fmt.Sprintf("missing controller for %s (was %s)", ec.Addr.Name, ec.Controller))
 			}
-			issues = append(issues, connectors.HealthMessage{
-				Status:  connectors.HealthStatusDegraded,
-				Reason:  "missing_controller",
-				Message: msg,
-			})
 		}
 	}
+
+	var internalErrors []string
 	for _, controller := range subsys.Controllers {
 		// can't use controller.State because sometimes it's not populated
 		state, err := readState(ctx, s.tr, controller.Controller)
 		if err != nil {
-			issues = append(issues, connectors.HealthMessage{
-				Status:  connectors.HealthStatusDegraded,
-				Reason:  "internal_error",
-				Message: fmt.Sprintf("controller %s: failed to read state: %s", controller.Controller, err.Error()),
-			})
+			internalErrors = append(internalErrors, fmt.Sprintf("failed to read state of %s: %s", controller.Controller, err.Error()))
 		} else if state != "live" {
-			issues = append(issues, connectors.HealthMessage{
-				Status: connectors.HealthStatusDegraded,
-				Reason: "controller_is_down",
-				// TODO add connection name
-				Message: fmt.Sprintf("controller %s: state is not 'live': %s", controller.Controller, state),
-			})
+			missingControllers = append(missingControllers, fmt.Sprintf("controller %s: state is not 'live': %s", controller.Controller, state))
 		}
 	}
-	if len(subsys.Controllers) == 0 {
-		// TODO can this ever happen?
+
+	if len(missingControllers) > 0 {
 		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusInaccessible,
-			Reason:  "all_controllers_down",
-			Message: "subsystem is not associated with any controller",
+			Status:  connectors.HealthStatusDegraded,
+			Reason:  "MultipathLoss",
+			Message: strings.Join(missingControllers, ", "),
 		})
 	}
+	if len(missingControllers) > 0 {
+		issues = append(issues, connectors.HealthMessage{
+			Status:  connectors.HealthStatusDegraded,
+			Reason:  "InternalError",
+			Message: strings.Join(internalErrors, ", "),
+		})
+	}
+
+	var failedNamespaces []string
 	for _, ns := range subsys.Namespaces {
 		_, err := s.snip.IdNs(ctx, fmt.Sprintf("%s/%s", s.DevFolder, ns.NameSpace))
 		if err != nil {
-			issues = append(issues, connectors.HealthMessage{
-				Status:  connectors.HealthStatusInaccessible,
-				Reason:  "namespace_is_down",
-				Message: fmt.Sprintf("namespace %s: failed to run id-ns", ns.NameSpace),
-			})
+			failedNamespaces = append(failedNamespaces, fmt.Sprintf("namespace %s: failed to run id-ns", ns.NameSpace))
 		}
 	}
-	if len(subsys.Namespaces) == 0 {
+	if len(missingControllers) > 0 {
 		issues = append(issues, connectors.HealthMessage{
 			Status:  connectors.HealthStatusInaccessible,
-			Reason:  "all_namespaces_down",
-			Message: "subsystem does not have any namespaces",
+			Reason:  "NamespaceFailed",
+			Message: strings.Join(failedNamespaces, ", "),
 		})
 	}
 
