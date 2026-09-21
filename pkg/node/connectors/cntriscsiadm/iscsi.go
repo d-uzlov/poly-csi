@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
@@ -15,8 +14,7 @@ type connector struct {
 }
 
 func New() connectors.Connector {
-	return &connector{
-	}
+	return &connector{}
 }
 
 func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
@@ -37,7 +35,7 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 	}, nil
 }
 
-func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
+func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
 	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("ParsePublishContext: %w", err)
@@ -47,26 +45,7 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
-	snip := newIscsiSnippets(c.commonConfig.Tr, ctx, c.config.IscsiadmCmd)
-
-	// setting up cleanup before even attempting to connect
-	// because failure could be caused by invalid state, that should be forcefully disconnected.
-	defer func() {
-		if req.DisableCleanupOnFailure {
-			return
-		}
-		if err == nil {
-			return
-		}
-		logs.FromCtx(ctx).MicroOp("detected failure, running cleanup")
-		for _, v := range req.AddressOptions {
-			addr := fmt.Sprintf("%s:%s", v.Address, pc.Port)
-			cleanupErr := snip.disconnect(pc.Iqn, addr)
-			if cleanupErr != nil {
-				logs.FromCtx(ctx).Error("failed to run cleanup", "address", addr, "error", cleanupErr.Error())
-			}
-		}
-	}()
+	snip := newIscsiSnippets(c.commonConfig.Tr, c.config.IscsiadmCmd)
 
 	attributes := map[string]string{}
 
@@ -83,50 +62,35 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 		return nil, fmt.Errorf("unknown chap type: '%s'", pc.AuthType)
 	}
 
-	var combinedError string
-	successCount := 0
-	for _, v := range req.AddressOptions {
-		addr := fmt.Sprintf("%s:%s", v.Address, pc.Port)
-		err = snip.configureTarget(pc.Iqn, addr, attributes)
-		if err != nil {
-			if len(req.AddressOptions) <= 1 {
-				return nil, fmt.Errorf("iscsi: configureTarget: %w", err)
-			}
+	var ecs []Connection
 
-			logs.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err.Error())
-			combinedError += fmt.Sprintf("failed to configure connection to %s: %s ; ", addr, err.Error())
-			continue
-		}
-		err = snip.connect(pc.Iqn, addr)
-		if err != nil {
-			if len(req.AddressOptions) <= 1 {
-				return nil, fmt.Errorf("iscsi: connect: %w", err)
-			}
-
-			logs.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err.Error())
-			combinedError += fmt.Sprintf("failed to connect to %s: %s ; ", addr, err.Error())
-			continue
-		}
-
-		successCount++
-	}
-	if successCount == 0 {
-		return nil, fmt.Errorf("all %d iscsi multipath connections failed: %s", len(req.AddressOptions), combinedError)
+	for _, ao := range req.AddressOptions {
+		ecs = append(ecs, Connection{
+			Addr: ao,
+		})
 	}
 
 	return &state{
-		con: c,
-		Iqn: pc.Iqn,
+		tr:                      c.commonConfig.Tr,
+		snip:                    &snip,
+		DevFolder:               c.commonConfig.DevFolder,
+		DisableCleanupOnFailure: req.DisableCleanupOnFailure,
+		Iqn:                     pc.Iqn,
+		Port:                    pc.Port,
+		Attributes:              attributes,
+		Connections:             ecs,
 	}, nil
 }
 
-func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err
 	}
 
-	res.con = c
+	res.tr = c.commonConfig.Tr
+	snip := newIscsiSnippets(c.commonConfig.Tr, c.config.IscsiadmCmd)
+	res.snip = &snip
 
 	return res, nil
 }

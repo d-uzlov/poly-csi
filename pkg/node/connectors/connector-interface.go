@@ -3,7 +3,6 @@ package connectors
 import (
 	"context"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -20,18 +19,23 @@ type Connector interface {
 	// GetInfo returns opaque string containing connector-specific info about the node.
 	// Controller can parse this info and use it to publish the volume.
 	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
-	// Connect creates node state representing the volume.
-	// It returns a State object which can manage this state.
-	Connect(ctx context.Context, req ConnectRequest) (State, error)
-	// ParseState recreates state object from State.Serialize result
-	ParseState(serializedData string) (State, error)
+	// GetHandle creates a handle to manage a connection.
+	// Connector must parse params and create a handle, without making any changes in OS.
+	GetHandle(ctx context.Context, req ConnectRequest) (ConnectionHandle, error)
+	// ParseHandle recreates state object from State.Serialize result
+	ParseHandle(serializedData string) (ConnectionHandle, error)
 }
 
-type State interface {
-	// GetDevices returns list of block devices associated with serializedData.
+type ConnectionHandle interface {
+	ConnectBlock(ctx context.Context) error
+	// GetDevices returns list of block devices associated connection.
 	// It's irrelevant for connectors that don't create block devices.
 	GetDevices(ctx context.Context) ([]string, error)
-	// Disconnect destroys state associated with serializedData.
+
+	ConnectFolder(ctx context.Context, req ConnectFolderRequest) error
+
+	// Disconnect must ensure that volume is disconnected.
+	// If system does not have volume info, disconnect is a no-op without errors.
 	Disconnect(ctx context.Context) error
 	// Expand ensures that local state synchronizes with remote state.
 	Expand(ctx context.Context) error
@@ -46,7 +50,6 @@ type State interface {
 type CommonConfig struct {
 	Tr        transport.Transport
 	DevFolder string
-	Preset    map[string]string
 }
 
 type Capabilities struct {
@@ -57,6 +60,9 @@ type Capabilities struct {
 	// ManagedUnmount requests the caller to call unmount on connected folder before Disconnect.
 	// This is ignored when ConnectType is ConnectTypeBlock.
 	ManagedUnmount bool `json:"managed_unmount"`
+
+	// ContextPrefix indicated which keys in CSI publish context are part of the connector config.
+	ContextPrefix string `json:"context_prefix"`
 }
 
 // constants for Capabilities.ConnectType
@@ -71,16 +77,20 @@ const (
 )
 
 type ConnectRequest struct {
-	// FsMountPath is the suggested path for filesystem mount.
-	// When Capabilities.MountType is MountTypeFolder, node dispatcher expects a mountpoint at this path after successful Connector.Connect
-	FsMountPath    string                            `json:"fs_mount_path"`
-	AddressOptions []addropt.AddressOption           `json:"address_options"`
-	VolumeContext  map[string]string                 `json:"volume_context"`
-	PublishContext map[string]string                 `json:"publish_context"`
-	AccessMount    *csi.VolumeCapability_MountVolume `json:"access_mount"`
+	AddressOptions []addropt.AddressOption `json:"address_options"`
+	VolumeContext  map[string]string       `json:"volume_context"`
+	PublishContext map[string]string       `json:"publish_context"`
 	// PublishSecret is a decrypted secret from publish context
-	PublishSecret           []byte `json:"publish_context_secret"`
-	DisableCleanupOnFailure bool   `json:"disableCleanupOnFailure"`
+	PublishSecret           []byte            `json:"publish_context_secret"`
+	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
+	Preset                  map[string]string `json:"preset"`
+}
+
+type ConnectFolderRequest struct {
+	FsMountPath string   `json:"fs_mount_path"`
+	FsType      string   `json:"fs_type"`
+	MountFlags  []string `json:"mount_flags"`
+	MountGroup  string   `json:"mount_group"`
 }
 
 const (

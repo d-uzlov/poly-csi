@@ -73,7 +73,46 @@ func initKernelMessageParser(prefix string) (getMessages func() []string, err er
 	}, nil
 }
 
-func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn string, hostId string, port string, nvmeTransport string, address string, ioQueues string, hostKey string, controllerKey string, keepAliveTimeout string, controllerLossTimeout string, reconnectDelay string) (string, error) {
+type ConnectParams struct {
+	TargetNqn     string `json:"targetNqn"`
+	HostNqn       string `json:"hostNqn"`
+	HostId        string `json:"hostId"`
+	Port          string `json:"port"`
+	NvmeTransport string `json:"nvmeTransport"`
+}
+
+func (p ConnectParams) Validate() error {
+	if p.TargetNqn == "" {
+		return fmt.Errorf("missing TargetNqn")
+	}
+	if p.HostNqn == "" {
+		return fmt.Errorf("missing HostNqn")
+	}
+	if p.HostId == "" {
+		return fmt.Errorf("missing HostId")
+	}
+	if p.Port == "" {
+		return fmt.Errorf("missing Port")
+	}
+	if p.NvmeTransport == "" {
+		return fmt.Errorf("missing NvmeTransport")
+	}
+	return nil
+}
+
+type ConnectAuth struct {
+	HostKey       string `json:"hostKey"`
+	ControllerKey string `json:"controllerKey"`
+}
+
+type ConnectExtra struct {
+	IoQueues              string `json:"ioQueues"`
+	KeepAliveTimeout      string `json:"keepAliveTimeout"`
+	ControllerLossTimeout string `json:"controllerLossTimeout"`
+	ReconnectDelay        string `json:"reconnectDelay"`
+}
+
+func (snip *NvmeSnippets) Connect(ctx context.Context, address string, params ConnectParams, auth *ConnectAuth, extra *ConnectExtra) (string, error) {
 	if snip.parseKernelLog {
 		getMessages, err := initKernelMessageParser("nvme")
 		if err != nil {
@@ -88,36 +127,45 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, targetNqn string, hostNqn
 		}()
 	}
 
-	idFile := fmt.Sprintf("/tmp/nvme_connect@%s@%s", targetNqn, address)
+	idFile := fmt.Sprintf("/tmp/nvme_connect@%s@%s", params.TargetNqn, address)
 	// TODO defer context
 	defer snip.tr.Cmds().RmFile(ctx, idFile)
 
-	args := map[string]string{
-		"--hostnqn":            hostNqn,
-		"--hostid":             hostId,
-		"--transport":          nvmeTransport,
-		"--traddr":             address,
-		"--trsvcid":            port,
-		"--nqn":                targetNqn,
-		"--keep-alive-tmo":     keepAliveTimeout,
-		"--ctrl-loss-tmo":      controllerLossTimeout,
-		"--reconnect-delay":    reconnectDelay,
-		"--nr-io-queues":       ioQueues,
-		"--dhchap-secret":      hostKey,
-		"--dhchap-ctrl-secret": controllerKey,
-		// TODO this is added in nvme-cli v3.0, uncomment when it is available in alpine linux
-		// "--devid-file":         idFile,
-	}
-	// cmd := append(snip.cmd, "connect", "--idempotent")
-	cmd := append(snip.cmd, "connect")
-	for k, v := range args {
-		if v != "" {
-			cmd = append(cmd, k+"="+v)
+	// TODO add "--idempotent" when nvme-cli 3.0 is available
+	cmd := append(snip.cmd,
+		"connect",
+		"--traddr="+address,
+		"--hostnqn="+params.HostNqn,
+		"--hostid="+params.HostId,
+		"--transport="+params.NvmeTransport,
+		"--trsvcid="+params.Port,
+		"--nqn="+params.TargetNqn,
+	)
+
+	if extra != nil {
+		args := map[string]string{
+			"--keep-alive-tmo":  extra.KeepAliveTimeout,
+			"--ctrl-loss-tmo":   extra.ControllerLossTimeout,
+			"--reconnect-delay": extra.ReconnectDelay,
+			"--nr-io-queues":    extra.IoQueues,
+			// TODO this is added in nvme-cli v3.0, uncomment when it is available in alpine linux
+			// "--devid-file":         idFile,
+		}
+		for k, v := range args {
+			if v != "" {
+				cmd = append(cmd, k+"="+v)
+			}
 		}
 	}
+
+	if auth != nil {
+		cmd = append(cmd, "--dhchap-secret="+auth.HostKey)
+		cmd = append(cmd, "--dhchap-ctrl-secret="+auth.ControllerKey)
+	}
+
 	_, err := transport.RelaxedRun(ctx, snip.tr, cmd, "already connected")
 	if err != nil {
-		return "", fmt.Errorf("nvme connect '%s': %w", targetNqn, err)
+		return "", fmt.Errorf("nvme connect: %w", err)
 	}
 	// id, err := snip.tr.Cmds().Read(ctx, idFile, true)
 	// if err != nil {
@@ -273,4 +321,13 @@ func (snip *NvmeSnippets) Rescan(ctx context.Context, nqn string) error {
 		return fmt.Errorf("could not rescan any of nqn controllers: %s", nqn)
 	}
 	return nil
+}
+
+func (snip *NvmeSnippets) IdNs(ctx context.Context, devicePath string) (string, error) {
+	cmd := append(snip.cmd, "id-ns", devicePath, "--output-format=json")
+	stdout, err := transport.CheckedRunStdout(ctx, snip.tr, cmd)
+	if err != nil {
+		return "", err
+	}
+	return stdout, nil
 }

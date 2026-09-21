@@ -30,7 +30,6 @@ func (c *DispatcherClient) Configure(ctx context.Context, conf connectors.Common
 func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	req := PluginRequest{
 		Method:        MethodGetCapabilities,
-		Preset:        c.conf.Preset,
 		State:         "",
 		SerializedArg: "",
 	}
@@ -51,7 +50,6 @@ func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabil
 func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	req := PluginRequest{
 		Method:        MethodGetInfo,
-		Preset:        c.conf.Preset,
 		State:         "",
 		SerializedArg: "",
 	}
@@ -69,14 +67,13 @@ func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNo
 	return &res, nil
 }
 
-func (c *DispatcherClient) Connect(ctx context.Context, cReq connectors.ConnectRequest) (connectors.State, error) {
+func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
 	serializedArg, err := json.Marshal(cReq)
 	if err != nil {
 		return nil, fmt.Errorf("serialize connect request: %w", err)
 	}
 	req := PluginRequest{
-		Method:        MethodConnect,
-		Preset:        c.conf.Preset,
+		Method:        MethodMakeHandle,
 		State:         "",
 		SerializedArg: string(serializedArg),
 	}
@@ -91,7 +88,7 @@ func (c *DispatcherClient) Connect(ctx context.Context, cReq connectors.ConnectR
 	}, nil
 }
 
-func (c *DispatcherClient) ParseState(serializedConnectorData string) (connectors.State, error) {
+func (c *DispatcherClient) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

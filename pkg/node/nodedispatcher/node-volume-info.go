@@ -32,11 +32,11 @@ type NodeVolumeInfo struct {
 	SerializedConnectorState string            `json:"connector_data"`
 	Preset                   map[string]string `json:"preset"`
 
-	tr              transport.Transport  `json:"-"`
-	connector       connectors.Connector `json:"-"`
-	conState        connectors.State     `json:"-"`
-	mp              multipath.Multipath  `json:"-"`
-	parentFolder    string               `json:"-"`
+	tr           transport.Transport         `json:"-"`
+	connector    connectors.Connector        `json:"-"`
+	conState     connectors.ConnectionHandle `json:"-"`
+	mp           multipath.Multipath         `json:"-"`
+	parentFolder string                      `json:"-"`
 }
 
 type SavedParams struct {
@@ -96,13 +96,12 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 	err = connector.Configure(ctx, connectors.CommonConfig{
 		Tr:        tr,
 		DevFolder: devFolder,
-		Preset:    result.Preset,
 	}, conTemplate.Conf.ByteConfig)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}
 
-	state, err := connector.ParseState(result.SerializedConnectorState)
+	state, err := connector.ParseHandle(result.SerializedConnectorState)
 	if err != nil {
 		return nil, fmt.Errorf("connector.ParseState(%s): %w", result.SerializedConnectorState, err)
 	}
@@ -155,42 +154,24 @@ func (v *NodeVolumeInfo) deleteFromDisk(ctx context.Context) error {
 }
 
 func (v *NodeVolumeInfo) writeToDisk() error {
-	// todo do this via transport
-	encoded, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(v.parentFolder+metadataFile, encoded, 0660)
-}
-
-func (v *NodeVolumeInfo) runConnect(ctx context.Context, req connectors.ConnectRequest) error {
-	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: request", v.ConnectorId))
-	cr, err := v.connector.Connect(ctx, req)
-	if err != nil {
-		return fmt.Errorf("connect: %w", err)
-	}
-	if cr == nil {
-		return fmt.Errorf("connect: nil result")
-	}
-	logs.FromCtx(ctx).MicroOp(fmt.Sprintf("connector(%s).Connect: success", v.ConnectorId), "mountPath", req.FsMountPath)
-
-	serialized, err := cr.Serialize()
+	serialized, err := v.conState.Serialize()
 	if err != nil {
 		return fmt.Errorf("connector.State.Serialize: %w", err)
 	}
 	v.SerializedConnectorState = serialized
-	v.conState = cr
 
-	return nil
+	encoded, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	// todo do this via transport
+	return os.WriteFile(v.parentFolder+metadataFile, encoded, 0660)
 }
 
-func (v *NodeVolumeInfo) stageBlock(ctx context.Context, req connectors.ConnectRequest) error {
-	err := v.runConnect(ctx, req)
+func (v *NodeVolumeInfo) stageBlock(ctx context.Context) error {
+	err := v.conState.ConnectBlock(ctx)
 	if err != nil {
-		return fmt.Errorf("runConnect: %w", err)
-	}
-	if v.SerializedConnectorState == "" {
-		return fmt.Errorf("connect did not set connector data")
+		return fmt.Errorf("conState.ConnectBlock: %w", err)
 	}
 
 	devices, err := v.conState.GetDevices(ctx)
@@ -246,6 +227,7 @@ func (v *NodeVolumeInfo) stageBlock(ctx context.Context, req connectors.ConnectR
 
 func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string, mountFlags []string, initConfig volumeinit.InitConfig) error {
 	var err error
+	v.FsMountPath = targetPath
 
 	init := volumeinit.NewNode(v.tr)
 
@@ -265,12 +247,11 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 		return fmt.Errorf("init.RunBlock: %w", err)
 	}
 
-	_, err = fsnip.EnsureMounted(ctx, dev, targetPath, "", mountFlags)
+	_, err = fsnip.EnsureMounted(ctx, dev, v.FsMountPath, "", mountFlags)
 	if err != nil {
 		return fmt.Errorf("EnsureMounted: %w", err)
 	}
-	v.FsMountPath = targetPath
-	logs.FromCtx(ctx).MicroOp("mount device: success", "device", dev, "target-path", targetPath)
+	logs.FromCtx(ctx).MicroOp("mount device: success", "device", dev, "target-path", v.FsMountPath)
 
 	if changed {
 		err = init.RunFs(ctx, initConfig, v.FsMountPath)
@@ -283,56 +264,42 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 	return nil
 }
 
-func (v *NodeVolumeInfo) stageFolderMount(ctx context.Context, req connectors.ConnectRequest) error {
-	err := os.MkdirAll(req.FsMountPath, 0777)
+func (v *NodeVolumeInfo) stageFolderMount(ctx context.Context, req connectors.ConnectFolderRequest) error {
+	v.FsMountPath = req.FsMountPath
+	err := os.MkdirAll(v.FsMountPath, 0777)
 	if err != nil {
 		return fmt.Errorf("create FsMountPath: %w", err)
 	}
 
-	err = v.runConnect(ctx, req)
+	err = v.conState.ConnectFolder(ctx, req)
 	if err != nil {
 		return fmt.Errorf("runConnect: %w", err)
 	}
 
 	v.MountType = mountTypeFolder
 
-	if v.SerializedConnectorState == "" {
-		caps, err := v.connector.Capabilities(ctx)
-		if err != nil {
-			return fmt.Errorf("connector.Capabilities: %w", err)
-		}
-		// with managed unmount connector disconnect is not mandatory
-		if !caps.ManagedUnmount {
-			return fmt.Errorf("connect did not set connector data")
-		}
-	}
-
 	fsnip := fsutils.New(v.tr)
 
-	mi, err := fsnip.FindMount(ctx, req.FsMountPath)
+	mi, err := fsnip.FindMount(ctx, v.FsMountPath)
 	if err != nil {
 		return fmt.Errorf("check mountpoint: %w", err)
 	}
 	if mi == nil {
 		return fmt.Errorf("check mountpoint: not found")
 	}
-	v.FsMountPath = req.FsMountPath
 
 	return nil
 }
 
-func (v *NodeVolumeInfo) publishFolderMount(ctx context.Context, req connectors.ConnectRequest) error {
+func (v *NodeVolumeInfo) publishFolderMount(ctx context.Context, req connectors.ConnectFolderRequest) error {
 	err := os.MkdirAll(req.FsMountPath, 0777)
 	if err != nil {
 		return fmt.Errorf("create FsMountPath: %w", err)
 	}
 
-	err = v.runConnect(ctx, req)
+	err = v.conState.ConnectFolder(ctx, req)
 	if err != nil {
 		return fmt.Errorf("runConnect: %w", err)
-	}
-	if v.SerializedConnectorState != "" {
-		return fmt.Errorf("publish does not support connector data: %w", err)
 	}
 
 	fsnip := fsutils.New(v.tr)

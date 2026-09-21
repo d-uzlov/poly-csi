@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 type connector struct {
@@ -32,10 +31,7 @@ func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
-	if req.AccessMount == nil {
-		return nil, fmt.Errorf("smb/cifs does not support block mounting")
-	}
+func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("smb connector does not support more than one address")
 	}
@@ -50,41 +46,21 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 
 	smbPath := fmt.Sprintf("//%s/%s", req.AddressOptions[0].Address, pc.ShareName)
 
-	flags := req.AccessMount.MountFlags
-	if req.AccessMount.VolumeMountGroup != "" {
-		flags = append(req.AccessMount.MountFlags, fmt.Sprintf("gid=%s", req.AccessMount.VolumeMountGroup))
-	}
-	flags = append(flags, fmt.Sprintf("username=%s", pc.UserName), fmt.Sprintf("password=%s", sc.UserPassword))
-
-	if req.AccessMount.FsType != "cifs" {
-		return nil, fmt.Errorf("expected cifs fs type but got %s", req.AccessMount.FsType)
-	}
-	mi, err := fsutils.New(c.conf.Tr).EnsureMounted(ctx, smbPath, req.FsMountPath, req.AccessMount.FsType, flags)
-	if err != nil {
-		return nil, err
-	}
-	if mi == nil {
-		return nil, fmt.Errorf("mount succeeded but fs info is nil")
-	}
-	if mi.FsType != "cifs" {
-		return nil, fmt.Errorf("fs is already mounted with different fs type: %s != cifs, at mountpoint %s", mi.FsType, mi.MountPoint)
-	}
-	if mi.Source != smbPath {
-		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, smbPath, mi.MountPoint)
-	}
-
 	return &state{
-		con: c,
+		tr:        c.conf.Tr,
+		SharePath: smbPath,
+		Username:  pc.UserName,
+		Password:  sc.UserPassword,
 	}, nil
 }
 
-func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err
 	}
 
-	res.con = c
+	res.tr = c.conf.Tr
 
 	return res, nil
 }

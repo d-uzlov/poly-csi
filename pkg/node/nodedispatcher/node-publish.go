@@ -10,10 +10,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport/localexec"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
@@ -39,16 +37,6 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.FindConnectorById)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
-	}
-
-	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
-	if err != nil {
-		return nil, fmt.Errorf("ExtractSecretFromMap: %w", err)
-	}
-
-	addressOptions, err := addropt.Parse(req.PublishContext)
-	if err != nil {
-		return nil, fmt.Errorf("parse address options from publish context: %w", err)
 	}
 
 	caps, err := nvi.connector.Capabilities(ctx)
@@ -86,15 +74,14 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
 		}
 
-		err = nvi.publishFolderMount(ctx, connectors.ConnectRequest{
-			FsMountPath:             req.TargetPath,
-			AddressOptions:          addressOptions,
-			VolumeContext:           req.VolumeContext,
-			PublishContext:          req.PublishContext,
-			AccessMount:             mountParams,
-			PublishSecret:           secretPlaintext,
-			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-		})
+		cr := connectors.ConnectFolderRequest{
+			FsMountPath: req.TargetPath,
+			FsType:      mountParams.FsType,
+			MountFlags:  mountParams.MountFlags,
+			MountGroup:  mountParams.VolumeMountGroup,
+		}
+
+		err = nvi.publishFolderMount(ctx, cr)
 		if err != nil {
 			return nil, fmt.Errorf("publishFolderMount: %w", err)
 		}

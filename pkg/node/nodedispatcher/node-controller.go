@@ -58,7 +58,6 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 		err = m.Configure(ctx, connectors.CommonConfig{
 			Tr:        tr,
 			DevFolder: newConf.DevFolder,
-			Preset:    map[string]string{},
 		}, opaqueConfig)
 		if err != nil {
 			slogctx.FromCtx(ctx).Error("failed to initialize connector[id=%s] during reload: %w", v.Conf.Id, err)

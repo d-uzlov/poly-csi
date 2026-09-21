@@ -7,17 +7,28 @@ import (
 	"time"
 
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type state struct {
-	con *connector
+	tr   transport.Transport `json:"-"`
+	snip *iscsiSnippets      `json:"-"`
 
-	Iqn string `json:"iqn"`
+	DevFolder               string            `json:"devFolder"`
+	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
+	Iqn                     string            `json:"iqn"`
+	Port                    string            `json:"port"`
+	Attributes              map[string]string `json:"attributes"`
+	Connections             []Connection      `json:"connections"`
 }
 
-var _ connectors.State = &state{}
+type Connection struct {
+	Addr addropt.AddressOption
+}
+
+var _ connectors.ConnectionHandle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -28,11 +39,64 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) GetDevices(ctx context.Context) ([]string, error) {
-	tr := s.con.commonConfig.Tr
-	snip := newIscsiSnippets(tr, ctx, s.con.config.IscsiadmCmd)
+func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
+	return fmt.Errorf("nvme: ConnectFolder is not implemented")
+}
 
-	is, err := snip.findSessions(s.Iqn)
+func (s *state) ConnectBlock(ctx context.Context) (err error) {
+	// setting up cleanup before even attempting to connect
+	// because failure could be caused by invalid state, that should be forcefully disconnected.
+	// TODO remove this?
+	defer func() {
+		if s.DisableCleanupOnFailure {
+			return
+		}
+		if err == nil {
+			return
+		}
+		logs.FromCtx(ctx).MicroOp("detected failure, running cleanup")
+		for _, v := range s.Connections {
+			addr := fmt.Sprintf("%s:%s", v.Addr.Address, s.Port)
+			cleanupErr := s.snip.disconnect(ctx, s.Iqn, addr)
+			if cleanupErr != nil {
+				logs.FromCtx(ctx).Error("failed to run cleanup", "address", addr, "error", cleanupErr.Error())
+			}
+		}
+	}()
+
+	successCount := 0
+	for _, v := range s.Connections {
+		addr := fmt.Sprintf("%s:%s", v.Addr.Address, s.Port)
+		err = s.snip.configureTarget(ctx, s.Iqn, addr, s.Attributes)
+		if err != nil {
+			if len(s.Connections) <= 1 {
+				return fmt.Errorf("iscsi: configureTarget: %w", err)
+			}
+
+			logs.FromCtx(ctx).Error("iscsi: configureTarget failed", "address", addr, "error", err.Error())
+			continue
+		}
+		err = s.snip.connect(ctx, s.Iqn, addr)
+		if err != nil {
+			if len(s.Connections) <= 1 {
+				return fmt.Errorf("iscsi: connect: %w", err)
+			}
+
+			logs.FromCtx(ctx).Error("iscsi: connect failed", "address", addr, "error", err.Error())
+			continue
+		}
+
+		successCount++
+	}
+	if successCount == 0 {
+		return fmt.Errorf("all %d iscsi multipath connections failed", len(s.Connections))
+	}
+
+	return nil
+}
+
+func (s *state) GetDevices(ctx context.Context) ([]string, error) {
+	is, err := s.snip.findSessions(ctx, s.Iqn)
 	if err != nil {
 		return nil, fmt.Errorf("find iscsi sessions: %w", err)
 	}
@@ -46,7 +110,7 @@ func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 		// /sys/class/iscsi_connection/connectionX\:0/state
 		statePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/state", v.index)
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-			stateBytes, err := tr.Cmds().Read(ctx, statePath, true)
+			stateBytes, err := s.tr.Cmds().Read(ctx, statePath, true)
 			if err != nil {
 				// runtime errors should be self-explanatory
 				return err
@@ -63,10 +127,10 @@ func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		deviceLink := fmt.Sprintf(s.con.commonConfig.DevFolder+"/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
+		deviceLink := fmt.Sprintf(s.DevFolder+"/disk/by-path/ip-%s-iscsi-%s-lun-0", v.address, v.iqn)
 		// iscsi creates links in background, need to wait for it to appear
 		err = transport.Retry(time.Millisecond*100, time.Second, func() error {
-			stat, err := tr.Cmds().Stat(ctx, deviceLink)
+			stat, err := s.tr.Cmds().Stat(ctx, deviceLink)
 			if err != nil {
 				// runtime errors should be self-explanatory
 				return err
@@ -93,15 +157,12 @@ func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 }
 
 func (s *state) Disconnect(ctx context.Context) error {
-	tr := s.con.commonConfig.Tr
-	snip := newIscsiSnippets(tr, ctx, s.con.config.IscsiadmCmd)
-
-	is, err := snip.findSessions(s.Iqn)
+	is, err := s.snip.findSessions(ctx, s.Iqn)
 	if err != nil {
 		return fmt.Errorf("find iscsi sessions: %w", err)
 	}
 	for _, v := range is {
-		err = snip.disconnect(s.Iqn, v.address)
+		err = s.snip.disconnect(ctx, s.Iqn, v.address)
 		if err != nil {
 			return fmt.Errorf("iscsi disconnect from %s: %w", v.address, err)
 		}
@@ -110,10 +171,8 @@ func (s *state) Disconnect(ctx context.Context) error {
 }
 
 func (s *state) Expand(ctx context.Context) error {
-	tr := s.con.commonConfig.Tr
-	snip := newIscsiSnippets(tr, ctx, s.con.config.IscsiadmCmd)
 	// TODO rescan only target devices?
-	err := snip.rescanAll()
+	err := s.snip.rescanAll(ctx)
 	if err != nil {
 		return err
 	}
@@ -134,11 +193,20 @@ func (s *state) Serialize() (string, error) {
 }
 
 func (s *state) Validate() error {
-	if s.con == nil {
-		return fmt.Errorf("parent connector is not set")
+	if s.tr == nil {
+		return fmt.Errorf("transport is not set")
+	}
+	if s.snip == nil {
+		return fmt.Errorf("snippets is not set")
 	}
 	if s.Iqn == "" {
 		return fmt.Errorf("missing iqn")
+	}
+	if s.Attributes == nil {
+		return fmt.Errorf("missing attributes")
+	}
+	if s.Connections == nil {
+		return fmt.Errorf("missing Connections")
 	}
 	return nil
 }

@@ -12,10 +12,9 @@ type Sender interface {
 }
 
 type PluginRequest struct {
-	Method        string            `json:"method"`
-	Preset        map[string]string `json:"preset"`
-	State         string            `json:"state"`
-	SerializedArg string            `json:"serializedArg"`
+	Method        string `json:"method"`
+	State         string `json:"state"`
+	SerializedArg string `json:"serializedArg"`
 }
 
 type PluginResponse struct {
@@ -32,11 +31,13 @@ const ResponseStatusOk = "ok"
 const (
 	MethodGetCapabilities = "/capabilities"
 	MethodGetInfo         = "/get_info"
-	MethodConnect         = "/connect"
+	MethodMakeHandle      = "/make_handle"
 )
 
 // state methods
 const (
+	MethodConnectBlock  = "/connect_block"
+	MethodConnectFolder = "/connect_folder"
 	MethodGetDeviceList = "/get_device_list"
 	MethodDisconnect    = "/disconnect"
 	MethodExpand        = "/expand"

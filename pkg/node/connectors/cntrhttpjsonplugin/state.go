@@ -14,7 +14,7 @@ type state struct {
 	RemoteState string `json:"remoteState"`
 }
 
-var _ connectors.State = &state{}
+var _ connectors.ConnectionHandle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -25,10 +25,41 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
+func (s *state) ConnectBlock(ctx context.Context) error {
+	req := PluginRequest{
+		Method:        MethodConnectBlock,
+		State:         s.RemoteState,
+		SerializedArg: "",
+	}
+	_, err := s.con.remote.Send(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *state) ConnectFolder(ctx context.Context, cReq connectors.ConnectFolderRequest) error {
+	serializedArg, err := json.Marshal(cReq)
+	if err != nil {
+		return fmt.Errorf("serialize connect request: %w", err)
+	}
+	req := PluginRequest{
+		Method:        MethodConnectFolder,
+		State:         s.RemoteState,
+		SerializedArg: string(serializedArg),
+	}
+	_, err = s.con.remote.Send(ctx, req)
+	if err != nil {
+		return  err
+	}
+
+	return nil
+}
+
 func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 	req := PluginRequest{
 		Method:        MethodGetDeviceList,
-		Preset:        s.con.conf.Preset,
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
@@ -57,7 +88,6 @@ func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 func (s *state) Disconnect(ctx context.Context) error {
 	req := PluginRequest{
 		Method:        MethodDisconnect,
-		Preset:        s.con.conf.Preset,
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
@@ -72,7 +102,6 @@ func (s *state) Disconnect(ctx context.Context) error {
 func (s *state) Expand(ctx context.Context) error {
 	req := PluginRequest{
 		Method:        MethodExpand,
-		Preset:        s.con.conf.Preset,
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}

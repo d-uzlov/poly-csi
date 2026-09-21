@@ -3,10 +3,8 @@ package cntrnfs
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 type connector struct {
@@ -33,10 +31,7 @@ func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) (connectors.State, error) {
-	if req.AccessMount == nil {
-		return nil, fmt.Errorf("nfs does not support block mounting")
-	}
+func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("nfs connector does not support more than one address")
 	}
@@ -52,33 +47,19 @@ func (c *connector) Connect(ctx context.Context, req connectors.ConnectRequest) 
 
 	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
 
-	mi, err := fsutils.New(c.conf.Tr).EnsureMounted(ctx, nfsPath, req.FsMountPath, req.AccessMount.FsType, req.AccessMount.MountFlags)
-	if err != nil {
-		return nil, err
-	}
-	if mi == nil {
-		return nil, fmt.Errorf("mount succeeded but fs info is nil")
-	}
-	if !strings.HasPrefix(mi.FsType, "nfs") {
-		return nil, fmt.Errorf("fs is already mounted with different fs type: %s != nfs, at mountpoint %s", mi.FsType, mi.MountPoint)
-	}
-	if mi.Source != nfsPath {
-		return nil, fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, nfsPath, mi.MountPoint)
-	}
-
 	return &state{
-		con:  c,
-		Path: nfsPath,
+		tr:         c.conf.Tr,
+		NfsPath:    nfsPath,
 	}, nil
 }
 
-func (c *connector) ParseState(serializedConnectorData string) (connectors.State, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err
 	}
 
-	res.con = c
+	res.tr = c.conf.Tr
 
 	return res, nil
 }

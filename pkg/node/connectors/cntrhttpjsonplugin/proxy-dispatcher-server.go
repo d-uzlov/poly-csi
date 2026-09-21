@@ -37,7 +37,6 @@ func (d *DispatcherServer) Process(ctx context.Context, req PluginRequest) (resu
 	conf := connectors.CommonConfig{
 		Tr:        d.tr,
 		DevFolder: d.devFolder,
-		Preset:    req.Preset,
 	}
 	err = con.Configure(ctx, conf, d.opaqueConfig)
 	if err != nil {
@@ -49,27 +48,36 @@ func (d *DispatcherServer) Process(ctx context.Context, req PluginRequest) (resu
 		return con.Capabilities(ctx)
 	case MethodGetInfo:
 		return con.GetInfo(ctx)
-	case MethodConnect:
+	case MethodMakeHandle:
 		var cr connectors.ConnectRequest
 		err = json.Unmarshal([]byte(req.SerializedArg), &cr)
 		if err != nil {
 			return nil, fmt.Errorf("parse arg: %w", err)
 		}
-		state, err := con.Connect(ctx, cr)
+		state, err := con.GetHandle(ctx, cr)
 		if err != nil {
-			return nil, fmt.Errorf("con.Connect: %w", err)
+			return nil, fmt.Errorf("con.GetHandle: %w", err)
 		}
 		serialized, err := state.Serialize()
 		if err != nil {
 			return nil, fmt.Errorf("state.Serialize: %w", err)
 		}
 		return serialized, nil
-	case MethodGetDeviceList, MethodDisconnect, MethodExpand:
-		state, err := con.ParseState(req.State)
+	case MethodConnectBlock, MethodConnectFolder, MethodGetDeviceList, MethodDisconnect, MethodExpand:
+		state, err := con.ParseHandle(req.State)
 		if err != nil {
 			return nil, fmt.Errorf("con.ParseState: %w", err)
 		}
 		switch req.Method {
+		case MethodConnectBlock:
+			return nil, state.ConnectBlock(ctx)
+		case MethodConnectFolder:
+			var cr connectors.ConnectFolderRequest
+			err = json.Unmarshal([]byte(req.SerializedArg), &cr)
+			if err != nil {
+				return nil, fmt.Errorf("parse arg: %w", err)
+			}
+			return nil, state.ConnectFolder(ctx, cr)
 		case MethodGetDeviceList:
 			devices, err := state.GetDevices(ctx)
 			if err != nil {

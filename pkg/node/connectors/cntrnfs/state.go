@@ -4,17 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
 
 type state struct {
-	con *connector
+	tr transport.Transport `json:"-"`
 
-	Path string `map:"nfs.share_path"`
+	NfsPath    string   `json:"nfsPath"`
 }
 
-var _ connectors.State = &state{}
+var _ connectors.ConnectionHandle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -23,6 +26,28 @@ func parseState(serialized string) (*state, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (s *state) ConnectBlock(ctx context.Context) (err error) {
+	return fmt.Errorf("nvme: ConnectBlock is not implemented")
+}
+
+func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
+	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.FsMountPath, req.FsType, req.MountFlags)
+	if err != nil {
+		return err
+	}
+	if mi == nil {
+		return fmt.Errorf("mount succeeded but fs info is nil")
+	}
+	if !strings.HasPrefix(mi.FsType, "nfs") {
+		return fmt.Errorf("fs is already mounted with different fs type: %s != nfs, at mountpoint %s", mi.FsType, mi.MountPoint)
+	}
+	if mi.Source != s.NfsPath {
+		return fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, s.NfsPath, mi.MountPoint)
+	}
+
+	return nil
 }
 
 func (s *state) GetDevices(ctx context.Context) ([]string, error) {
@@ -52,11 +77,11 @@ func (s *state) Serialize() (string, error) {
 }
 
 func (s *state) Validate() error {
-	if s.con == nil {
-		return fmt.Errorf("parent connector is not set")
+	if s.tr == nil {
+		return fmt.Errorf("missing transport")
 	}
-	if s.Path == "" {
-		return fmt.Errorf("missing share path")
+	if s.NfsPath == "" {
+		return fmt.Errorf("missing nfs share path")
 	}
 	return nil
 }

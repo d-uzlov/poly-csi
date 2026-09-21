@@ -73,7 +73,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	err = connector.Configure(ctx, connectors.CommonConfig{
 		Tr:        tr,
 		DevFolder: n.conf.DevFolder,
-		Preset:    fullPreset,
 	}, conTemplate.Conf.ByteConfig)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
@@ -84,7 +83,40 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}
 
+	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
+	if err != nil {
+		return nil, fmt.Errorf("ExtractSecretFromMap: %w", err)
+	}
+
+	addressOptions, err := addropt.Parse(req.PublishContext)
+	if err != nil {
+		return nil, fmt.Errorf("parse address options from publish context: %w", err)
+	}
+
+	connectorContext := map[string]string{}
+	for k, v := range req.PublishContext {
+		if strings.HasPrefix(k, caps.ContextPrefix) {
+			connectorContext[k] = v
+		}
+	}
+
+	ch, err := connector.GetHandle(ctx, connectors.ConnectRequest{
+		AddressOptions:          addressOptions,
+		VolumeContext:           req.VolumeContext,
+		PublishContext:          connectorContext,
+		PublishSecret:           secretPlaintext,
+		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
+		Preset:                  fullPreset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("connector.GetHandle: %w", err)
+	}
+	if ch == nil {
+		return nil, fmt.Errorf("connector.GetHandle: nil result")
+	}
+
 	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, fullPreset)
+	nvi.conState = ch
 	defer func() {
 		saveErr := nvi.writeToDisk()
 		if err == nil {
@@ -108,29 +140,11 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}()
 
-	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
-	if err != nil {
-		return nil, fmt.Errorf("ExtractSecretFromMap: %w", err)
-	}
-
-	addressOptions, err := addropt.Parse(req.PublishContext)
-	if err != nil {
-		return nil, fmt.Errorf("parse address options from publish context: %w", err)
-	}
-
 	mountParams := req.VolumeCapability.GetMount()
 
 	switch caps.ConnectType {
 	case connectors.ConnectTypeBlock:
-		err = nvi.stageBlock(ctx, connectors.ConnectRequest{
-			FsMountPath:             "",
-			AddressOptions:          addressOptions,
-			VolumeContext:           req.VolumeContext,
-			PublishContext:          req.PublishContext,
-			AccessMount:             nil,
-			PublishSecret:           secretPlaintext,
-			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-		})
+		err = nvi.stageBlock(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("stageBlock: %w", err)
 		}
@@ -180,15 +194,14 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
 		}
 
-		err = nvi.stageFolderMount(ctx, connectors.ConnectRequest{
-			FsMountPath:             req.StagingTargetPath + stageFolderMount,
-			AddressOptions:          addressOptions,
-			VolumeContext:           req.VolumeContext,
-			PublishContext:          req.PublishContext,
-			AccessMount:             mountParams,
-			PublishSecret:           secretPlaintext,
-			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-		})
+		cr := connectors.ConnectFolderRequest{
+			FsMountPath: req.StagingTargetPath + stageFolderMount,
+			FsType:      mountParams.FsType,
+			MountFlags:  mountParams.MountFlags,
+			// MountGroup:  mountParams.VolumeMountGroup,
+		}
+
+		err = nvi.stageFolderMount(ctx, cr)
 		if err != nil {
 			return nil, fmt.Errorf("stageFolderMount: %w", err)
 		}
