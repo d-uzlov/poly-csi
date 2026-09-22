@@ -78,7 +78,9 @@ spec:
         - --v=5
         - --leader-election
         - --leader-election-namespace=$(NAMESPACE)
-        - --timeout=90s
+        - --timeout=15s
+        - --retry-interval-start=1s
+        - --retry-interval-max=1m
         - --worker-threads=10
         - --extra-create-metadata
         - --csi-address=/csi-data/csi.sock
@@ -119,6 +121,10 @@ spec:
         - --csi-address=/csi-data/csi.sock
         - --automaxprocs=true
         - --logging-format=json
+        # This csi driver supports online resize,
+        # so there is no need to have special handling for resize errors.
+        # Disabling this removes requirements for cluster-wide pod watching.
+        - --handle-volume-inuse-error=false
         resources:
           limits:
             memory: 50Mi

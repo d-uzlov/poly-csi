@@ -5,74 +5,17 @@ metadata:
   name: poly-csi-controller
   namespace: pv-poly
 ---
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: poly-csi:provisioner
-rules:
-# The following rule should be uncommented for plugins that require secrets
-# for provisioning.
-- apiGroups: [ "" ]
-  resources: [ "secrets" ]
-  verbs: [ "get", "list" ]
-- apiGroups: [ "" ]
-  resources: [ "persistentvolumes" ]
-  verbs: [ "get", "list", "watch", "create", "patch", "delete" ]
-- apiGroups: [ "" ]
-  resources: [ "persistentvolumeclaims" ]
-  verbs: [ "get", "list", "watch", "update" ]
-- apiGroups: [ "storage.k8s.io" ]
-  resources: [ "storageclasses" ]
-  verbs: [ "get", "list", "watch" ]
-- apiGroups: [ "" ]
-  resources: [ "events" ]
-  verbs: [ "list", "watch", "create", "update", "patch" ]
-- apiGroups: [ "snapshot.storage.k8s.io" ]
-  resources: [ "volumesnapshots" ]
-  verbs: [ "get", "list", "watch", "update" ]
-- apiGroups: [ "snapshot.storage.k8s.io" ]
-  resources: [ "volumesnapshotcontents" ]
-  verbs: [ "get", "list" ]
-- apiGroups: [ "storage.k8s.io" ]
-  resources: [ "csinodes" ]
-  verbs: [ "get", "list", "watch" ]
-- apiGroups: [ "" ]
-  resources: [ "nodes" ]
-  verbs: [ "get", "list", "watch" ]
-- apiGroups: [ "storage.k8s.io" ]
-  resources: [ "volumeattachments" ]
-  verbs: [ "get", "list", "watch" ]
-
-# (Alpha) Access to referencegrants is only needed when the CSI driver
-# has the CrossNamespaceVolumeDataSource controller capability.
-# In that case, external-provisioner requires "get", "list", "watch" 
-# permissions  for "referencegrants" on "gateway.networking.k8s.io".
-#- apiGroups: ["gateway.networking.k8s.io"]
-#  resources: ["referencegrants"]
-#  verbs: ["get", "list", "watch"]
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: poly-csi:provisioner
-subjects:
-- kind: ServiceAccount
-  name: poly-csi-controller
-  namespace: pv-poly
-roleRef:
-  kind: ClusterRole
-  name: poly-csi:provisioner
-  apiGroup: rbac.authorization.k8s.io
----
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: pv-poly
-  name: csi-provisioner
+  name: controller
 rules:
+# leases are needed for all controller sidecars
 - apiGroups: [ "coordination.k8s.io" ]
   resources: [ "leases" ]
   verbs: [ "get", "watch", "list", "delete", "update", "create" ]
+# used by external-provisioner
 - apiGroups: [ "storage.k8s.io" ]
   resources: [ "csistoragecapacities" ]
   verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
@@ -98,136 +41,83 @@ subjects:
   namespace: pv-poly
 roleRef:
   kind: Role
-  name: csi-provisioner
+  name: controller
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: poly-csi:attacher
+  name: poly-csi:controller
 rules:
+# used by provisioner, attacher, resizer
 - apiGroups: [ "" ]
   resources: [ "persistentvolumes" ]
-  verbs: [ "get", "list", "watch", "patch" ]
-- apiGroups: [ "storage.k8s.io" ]
-  resources: [ "csinodes" ]
-  verbs: [ "get", "list", "watch" ]
-- apiGroups: [ "storage.k8s.io" ]
-  resources: [ "volumeattachments" ]
-  verbs: [ "get", "list", "watch", "patch" ]
-- apiGroups: [ "storage.k8s.io" ]
-  resources: [ "volumeattachments/status" ]
-  verbs: [ "patch" ]
-#Secret permission is optional.
-#Enable it if you need value from secret.
-#For example, you have key `csi.storage.k8s.io/controller-publish-secret-name` in StorageClass.parameters
-#see https://kubernetes-csi.github.io/docs/secrets-and-credentials.html
-- apiGroups: [ "" ]
-  resources: [ "secrets" ]
-  verbs: [ "get", "list" ]
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: poly-csi:attacher
-subjects:
-- kind: ServiceAccount
-  name: poly-csi-controller
-  namespace: pv-poly
-roleRef:
-  kind: ClusterRole
-  name: poly-csi:attacher
-  apiGroup: rbac.authorization.k8s.io
----
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  namespace: pv-poly
-  name: csi-attacher
-rules:
-- apiGroups: [ "coordination.k8s.io" ]
-  resources: [ "leases" ]
-  verbs: [ "get", "watch", "list", "delete", "update", "create" ]
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-attacher-role-cfg
-  namespace: pv-poly
-subjects:
-- kind: ServiceAccount
-  name: poly-csi-controller
-  namespace: pv-poly
-roleRef:
-  kind: Role
-  name: csi-attacher
-  apiGroup: rbac.authorization.k8s.io
----
-# Resizer must be able to work with PVCs, PVs, SCs.
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: poly-csi:resizer
-rules:
-# The following rule should be uncommented for plugins that require secrets
-# for provisioning.
-- apiGroups: [ "" ]
-  resources: [ "secrets" ]
-  verbs: [ "get", "list", "watch" ]
-- apiGroups: [ "" ]
-  resources: [ "persistentvolumes" ]
-  verbs: [ "get", "list", "watch", "patch" ]
+  verbs: [ "get", "list", "watch", "create", "patch", "delete" ]
+# used by provisioner, resizer
 - apiGroups: [ "" ]
   resources: [ "persistentvolumeclaims" ]
-  verbs: [ "get", "list", "watch" ]
-- apiGroups: [ "" ]
-  resources: [ "pods" ]
-  verbs: [ "get", "list", "watch" ]
+  verbs: [ "get", "list", "watch", "update" ]
+# used by resizer
 - apiGroups: [ "" ]
   resources: [ "persistentvolumeclaims/status" ]
   verbs: [ "patch" ]
+# used by provisioner
+- apiGroups: [ "storage.k8s.io" ]
+  resources: [ "storageclasses" ]
+  verbs: [ "get", "list", "watch" ]
+# used by provisioner, resizer
 - apiGroups: [ "" ]
   resources: [ "events" ]
   verbs: [ "list", "watch", "create", "update", "patch" ]
+# used by provisioner to protect snapshots from being deleted during provisioning
+- apiGroups: [ "snapshot.storage.k8s.io" ]
+  resources: [ "volumesnapshots" ]
+  verbs: [ "get", "list", "watch", "update" ]
+# used by provisioner to protect snapshots from being deleted during provisioning
+- apiGroups: [ "snapshot.storage.k8s.io" ]
+  resources: [ "volumesnapshotcontents" ]
+  verbs: [ "get", "list" ]
+# used by provisioner, attacher
+- apiGroups: [ "storage.k8s.io" ]
+  resources: [ "csinodes" ]
+  verbs: [ "get", "list", "watch" ]
+# used by provisioner
+- apiGroups: [ "" ]
+  resources: [ "nodes" ]
+  verbs: [ "get", "list", "watch" ]
+# used by provisioner, attacher
+- apiGroups: [ "storage.k8s.io" ]
+  resources: [ "volumeattachments" ]
+  verbs: [ "get", "list", "watch" ]
+# used by attacher
+- apiGroups: [ "storage.k8s.io" ]
+  resources: [ "volumeattachments/status" ]
+  verbs: [ "patch" ]
+# used by resizer?
 - apiGroups: [ "storage.k8s.io" ]
   resources: [ "volumeattributesclasses" ]
   verbs: [ "get", "list", "watch" ]
+# used by resizer, when it needs to enforce offline volume resizing
+# - apiGroups: [ "" ]
+#   resources: [ "pods" ]
+#   verbs: [ "get", "list", "watch" ]
+
+# used by external-provisioner
+#- apiGroups: ["gateway.networking.k8s.io"]
+#  resources: ["referencegrants"]
+#  verbs: ["get", "list", "watch"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: poly-csi:resizer
+  name: poly-csi:provisioner
 subjects:
 - kind: ServiceAccount
   name: poly-csi-controller
   namespace: pv-poly
 roleRef:
   kind: ClusterRole
-  name: poly-csi:resizer
-  apiGroup: rbac.authorization.k8s.io
----
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  namespace: pv-poly
-  name: csi-resizer
-rules:
-- apiGroups: [ "coordination.k8s.io" ]
-  resources: [ "leases" ]
-  verbs: [ "get", "watch", "list", "delete", "update", "create" ]
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-resizer-role-cfg
-  namespace: pv-poly
-subjects:
-- kind: ServiceAccount
-  name: poly-csi-controller
-  namespace: pv-poly
-roleRef:
-  kind: Role
-  name: csi-resizer
+  name: poly-csi:controller
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -238,9 +128,6 @@ rules:
 - apiGroups: [ "" ]
   resources: [ "events" ]
   verbs: [ "list", "watch", "create", "update", "patch" ]
-- apiGroups: [ "" ]
-  resources: [ "secrets" ]
-  verbs: [ "get", "list" ]
 - apiGroups: [ "snapshot.storage.k8s.io" ]
   resources: [ "volumesnapshotclasses" ]
   verbs: [ "get", "list", "watch" ]
@@ -272,27 +159,3 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: poly-csi:snapshotter
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  namespace: pv-poly
-  name: csi-snapshotter
-rules:
-- apiGroups: [ "coordination.k8s.io" ]
-  resources: [ "leases" ]
-  verbs: [ "get", "watch", "list", "delete", "update", "create" ]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  namespace: pv-poly
-  name: csi-snapshotter
-subjects:
-- kind: ServiceAccount
-  namespace: pv-poly
-  name: csi-snapshotter
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: csi-snapshotter
