@@ -12,29 +12,23 @@ podCgroupRoot: /sys/fs/cgroup/kubepods
 execConfig: {}
 
 multipath:
-  id: multipath
-  type: builtin
-  subtype: local
+  type: local
   config:
     mapperFolder: /host/dev/mapper
     multipathdCmd: [ multipathd ]
 
 connectors:
 - id: nfs
-  type: builtin
-  subtype: nfs
+  type: nfs
 - id: smb
-  type: builtin
-  subtype: cifs
+  type: cifs
 - id: nvme
-  type: builtin
-  subtype: nvme
+  type: nvme
   config:
     nvmeCmd: [ "nvme" ]
     parseKernelLog: true
 - id: iscsi
-  type: plugin
-  subtype: http.json.dev
+  type: plugin_json
   config:
     socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
 

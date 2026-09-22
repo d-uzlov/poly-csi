@@ -31,7 +31,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func NewLocalMp(tr transport.Transport, config Config, devFolder string) multipath.Multipath {
+func New(tr transport.Transport, config Config, devFolder string) multipath.Multipath {
 	return &localMp{
 		tr:        tr,
 		config:    config,

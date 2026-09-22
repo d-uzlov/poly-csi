@@ -11,7 +11,6 @@ import (
 type ConnectorSpec struct {
 	Id      string         `yaml:"id"`
 	Type    string         `yaml:"type"`
-	Subtype string         `yaml:"subtype"`
 	Config  map[string]any `yaml:"config"`
 
 	ByteConfig []byte `yaml:"-"`
@@ -44,7 +43,7 @@ func ParseConnector(ctx context.Context, c *ConnectorSpec) *ParsedConnector {
 	}
 	c.ByteConfig = byteConfig
 
-	inflater, err := GetByType(c.Type, c.Subtype)
+	inflater, err := GetByType(c.Type)
 	if err != nil {
 		logger.Error("mount_config: could not create", "id", c.Id, "error", err.Error())
 		return &ParsedConnector{

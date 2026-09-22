@@ -10,9 +10,7 @@ import (
 )
 
 type MultipathConfig struct {
-	Id      string         `yaml:"id"`
 	Type    string         `yaml:"type"`
-	Subtype string         `yaml:"subtype"`
 	Config  map[string]any `yaml:"config"`
 }
 
@@ -26,7 +24,7 @@ func ParseMultipath(ctx context.Context, c *MultipathConfig, devFolder string) *
 	logger := slogctx.FromCtx(ctx)
 
 	if c.Type == "" {
-		logger.Error("mount_config: missing type", "id", c.Id)
+		logger.Error("multipath: missing type")
 		return &ParsedMultipath{
 			Valid: false,
 			Conf:  c,
@@ -35,16 +33,16 @@ func ParseMultipath(ctx context.Context, c *MultipathConfig, devFolder string) *
 
 	byteConfig, err := yaml.Marshal(c.Config)
 	if err != nil {
-		logger.Error("mount_config: marshal config", "id", c.Id, "error", err.Error())
+		logger.Error("multipath: marshal config", "error", err.Error())
 		return &ParsedMultipath{
 			Valid: false,
 			Conf:  c,
 		}
 	}
 
-	inflater, err := GetByType(c.Type, c.Subtype, byteConfig, devFolder)
+	inflater, err := GetByType(c.Type, byteConfig, devFolder)
 	if err != nil {
-		logger.Error("mount_config: could not create", "id", c.Id, "error", err.Error())
+		logger.Error("multipath: GetByType failed", "error", err.Error())
 		return &ParsedMultipath{
 			Valid: false,
 			Conf:  c,

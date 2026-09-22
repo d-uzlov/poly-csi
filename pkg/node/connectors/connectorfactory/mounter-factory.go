@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrcifs"
@@ -18,40 +19,24 @@ const (
 	ConnectorTypeCifs     = "cifs"
 	ConnectorTypeNvme     = "nvme"
 	ConnectorTypeIscsiadm = "iscsiadm"
+	ConnectorTypePlugin   = "plugin_json"
 )
 
-var builtinTypes = map[string]func() (connectors.InflateFunc, error){
-	ConnectorTypeNfs: func() (connectors.InflateFunc, error) {
-		return cntrnfs.New, nil
-	},
-	ConnectorTypeCifs: func() (connectors.InflateFunc, error) {
-		return cntrcifs.New, nil
-	},
-	ConnectorTypeNvme: func() (connectors.InflateFunc, error) {
-		return cntrnvme.New, nil
-	},
-	ConnectorTypeIscsiadm: func() (connectors.InflateFunc, error) {
-		return cntriscsiadm.New, nil
+var builtinTypes = map[string]func() connectors.Connector{
+	ConnectorTypeNfs:      cntrnfs.New,
+	ConnectorTypeCifs:     cntrcifs.New,
+	ConnectorTypeNvme:     cntrnvme.New,
+	ConnectorTypeIscsiadm: cntriscsiadm.New,
+	ConnectorTypePlugin: func() connectors.Connector {
+		httpClient := cntrhttpjsonplugin.NewHttpClient()
+		return cntrhttpjsonplugin.NewDispatcherClient(httpClient)
 	},
 }
 
-func GetByType(mtype string, subtype string) (connectors.InflateFunc, error) {
-	if mtype == "builtin" {
-		v, ok := builtinTypes[subtype]
-		if !ok {
-			return nil, fmt.Errorf("unknown connector subtype: '%s/%s', must be one of: %v", mtype, subtype, slices.Collect(maps.Keys(builtinTypes)))
-		}
-		return v()
+func GetByType(mtype string) (connectors.InflateFunc, error) {
+	v, ok := builtinTypes[mtype]
+	if !ok {
+		return nil, fmt.Errorf("unknown connector type: '%s', must be one of: %v", mtype, strings.Join(slices.Collect(maps.Keys(builtinTypes)), ", "))
 	}
-	if mtype == "plugin" {
-		switch subtype {
-		case "http.json.dev":
-			return func() connectors.Connector {
-				httpClient := cntrhttpjsonplugin.NewHttpClient()
-				return cntrhttpjsonplugin.NewDispatcherClient(httpClient)
-			}, nil
-		}
-		return nil, fmt.Errorf("unknown connector subtype: '%s/%s', must be one of: http.json.dev", mtype, subtype)
-	}
-	return nil, fmt.Errorf("unknown connector type: '%s', must be one of: builtin, plugin", mtype)
+	return v, nil
 }

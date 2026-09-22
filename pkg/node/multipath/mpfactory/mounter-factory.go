@@ -15,26 +15,23 @@ const (
 	MultipathTypeNone  = "none"
 )
 
-func GetByType(mtype string, subtype string, byteConfig []byte, devFolder string) (func(tr transport.Transport) multipath.Multipath, error) {
-	if mtype == "builtin" {
-		switch subtype {
-		case MultipathTypeLocal:
-			var cfg mplocal.Config
-			if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
-				return nil, fmt.Errorf("parse %s/%s config: %w", mtype, subtype, err)
-			}
-			if err := cfg.Validate(); err != nil {
-				return nil, fmt.Errorf("validate %s/%s config: %w", mtype, subtype, err)
-			}
-			return func(tr transport.Transport) multipath.Multipath {
-				return mplocal.NewLocalMp(tr, cfg, devFolder)
-			}, nil
-		case MultipathTypeNone:
-			return func(tr transport.Transport) multipath.Multipath {
-				return mpnone.NewNoneMp()
-			}, nil
+func GetByType(mtype string, byteConfig []byte, devFolder string) (func(tr transport.Transport) multipath.Multipath, error) {
+	switch mtype {
+	case MultipathTypeLocal:
+		var cfg mplocal.Config
+		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
+			return nil, fmt.Errorf("parse %s config: %w", mtype, err)
 		}
-		return nil, fmt.Errorf("unknown multipath subtype: '%s/%s', must be one of: local", mtype, subtype)
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("validate %s config: %w", mtype, err)
+		}
+		return func(tr transport.Transport) multipath.Multipath {
+			return mplocal.New(tr, cfg, devFolder)
+		}, nil
+	case MultipathTypeNone:
+		return func(tr transport.Transport) multipath.Multipath {
+			return mpnone.New()
+		}, nil
 	}
-	return nil, fmt.Errorf("unknown multipath type: '%s', must be one of: builtin, plugin", mtype)
+	return nil, fmt.Errorf("unknown multipath type '%s', must be one of: local, none", mtype)
 }

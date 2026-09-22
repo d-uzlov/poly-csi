@@ -10,7 +10,7 @@ import (
 type localMp struct {
 }
 
-func NewNoneMp() multipath.Multipath {
+func New() multipath.Multipath {
 	return &localMp{}
 }
 
