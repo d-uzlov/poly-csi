@@ -238,11 +238,7 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 		return fmt.Errorf("getMainBlockDevice: %w", err)
 	}
 
-	// TODO save 'changed' into persistent storage
-	// what are my options? what if we format fs, fail, and then the volume gets dismounted and staged at another node
-	// we probably need to wipe the fs in case of a fail, so that another node detects RunBlock changed
-	// but what if the volume was cloned? then formatting would be really bad
-	changed, err := init.RunBlock(ctx, initConfig, dev)
+	_, err = init.RunBlock(ctx, initConfig, dev)
 	if err != nil {
 		return fmt.Errorf("init.RunBlock: %w", err)
 	}
@@ -253,13 +249,11 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 	}
 	logs.FromCtx(ctx).MicroOp("mount device: success", "device", dev, "target-path", v.FsMountPath)
 
-	if changed {
-		err = init.RunFs(ctx, initConfig, v.FsMountPath)
-		if err != nil {
-			return fmt.Errorf("init.RunFs: %w", err)
-		}
-		logs.FromCtx(ctx).MicroOp("init.RunFs: success")
+	err = init.RunFs(ctx, initConfig, v.FsMountPath)
+	if err != nil {
+		return fmt.Errorf("init.RunFs: %w", err)
 	}
+	logs.FromCtx(ctx).MicroOp("init.RunFs: success")
 
 	return nil
 }
