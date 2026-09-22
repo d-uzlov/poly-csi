@@ -45,32 +45,6 @@ spec:
           name: config
         - mountPath: /poly-csi/ssh-keys
           name: ssh-keys
-      # https://github.com/kubernetes-csi/external-attacher
-      - name: external-attacher
-        image: registry.k8s.io/sig-storage/csi-attacher:v4.13.0
-        args:
-        - --v=5
-        - --leader-election
-        - --leader-election-namespace=$(NAMESPACE)
-        - --timeout=90s
-        - --worker-threads=10
-        - --csi-address=/csi-data/csi.sock
-        - --automaxprocs=true
-        - --logging-format=json
-        resources:
-          limits:
-            memory: 30Mi
-          requests:
-            memory: 20Mi
-        env:
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - mountPath: /csi-data
-          name: socket-dir
       # https://github.com/kubernetes-csi/external-provisioner
       - name: external-provisioner
         image: registry.k8s.io/sig-storage/csi-provisioner:v6.3.0
@@ -109,6 +83,34 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.name
+      # https://github.com/kubernetes-csi/external-attacher
+      - name: external-attacher
+        image: registry.k8s.io/sig-storage/csi-attacher:v4.13.0
+        args:
+        - --v=5
+        - --leader-election
+        - --leader-election-namespace=$(NAMESPACE)
+        - --timeout=15s
+        - --retry-interval-start=1s
+        - --retry-interval-max=1m
+        - --worker-threads=10
+        - --csi-address=/csi-data/csi.sock
+        - --automaxprocs=true
+        - --logging-format=json
+        resources:
+          limits:
+            memory: 30Mi
+          requests:
+            memory: 20Mi
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - mountPath: /csi-data
+          name: socket-dir
       # https://github.com/kubernetes-csi/external-resizer
       - name: external-resizer
         image: registry.k8s.io/sig-storage/csi-resizer:v2.2.1
@@ -116,7 +118,9 @@ spec:
         - --v=5
         - --leader-election
         - --leader-election-namespace=$(NAMESPACE)
-        - --timeout=90s
+        - --timeout=15s
+        - --retry-interval-start=1s
+        - --retry-interval-max=1m
         - --workers=10
         - --csi-address=/csi-data/csi.sock
         - --automaxprocs=true
@@ -146,7 +150,9 @@ spec:
         - --v=5
         - --leader-election
         - --leader-election-namespace=$(NAMESPACE)
-        - --timeout=90s
+        - --timeout=15s
+        - --retry-interval-start=1s
+        - --retry-interval-max=1m
         - --worker-threads=10
         - --csi-address=/csi-data/csi.sock
         - --automaxprocs=true
