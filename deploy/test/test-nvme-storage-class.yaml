@@ -15,13 +15,12 @@ parameters:
   dispatch.shareType: nvmet-keeper
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nvme
-  dispatch.nodePreset: nvmeCon,nvmeIoq4,cgroupIo100
+  dispatch.nodePreset: nvmeCon,nvmeIoq4
   dispatch.addressNames: storage,k8s
 
   zfs.parentDataset: rose/test
 
-  init.on: node
-  init.blockFormat: mkfs.ext4
+  init.side: node
   init.ownerUser: '0'
   init.ownerGroup: '10000'
   init.rootDirMode: '777'
@@ -31,7 +30,7 @@ parameters:
   nvmet.transportType: tcp
   nvmet.authType: chap-provision
 
-  fsType: ext4
+  fsType: xfs
 
 mountOptions:
 - noatime

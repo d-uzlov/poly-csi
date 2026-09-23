@@ -65,11 +65,19 @@ func (v *Volume) ReadState(ctx context.Context) (*storage.VolumeState, error) {
 		return nil, nil
 	}
 	if !info.IsZvol() {
-		return nil, fmt.Errorf("expected zvol but found dataset at path %s", v.Path)
+		return nil, fmt.Errorf("expected zvol but found dataset at path '%s'", v.Path)
+	}
+	blockSize, err := info.Properties.VolBlockSize.GetInt()
+	if err != nil {
+		return nil, fmt.Errorf("read volblocksize: %w", err)
 	}
 	result := storage.VolumeState{
-		FsPath: "/dev/zvol/" + v.Path,
-		Size:   info.GetSize(),
+		FsPath:           "/dev/zvol/" + v.Path,
+		Size:             info.GetSize(),
+		RMWSize:          blockSize,
+		AtomicSize:       blockSize,
+		// TODO use vdev geometry here?
+		OptimalWriteSize: blockSize,
 	}
 
 	return &result, nil

@@ -57,6 +57,17 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("parseDispatchParams: %w", err)
 	}
 
+	// parsing init here to fail fast if there is something wrong with it
+	var initConfig volumeinit.InitConfig
+	err = serialmaps.ParseRemove(req.Parameters, volumeinit.PreferredPrefix, true, &initConfig)
+	if err != nil {
+		return nil, fmt.Errorf("parse init config: %w", err)
+	}
+	err = initConfig.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate init config: %w", err)
+	}
+
 	srv, err := d.FindServerByName(dispatchParams.ServerName)
 	if err != nil {
 		return nil, fmt.Errorf("server[name=%s]: not found", dispatchParams.ServerName)
@@ -79,20 +90,11 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, err
 	}
 
-	var initConfig volumeinit.InitConfig
-	err = serialmaps.ParseRemove(req.Parameters, volumeinit.PreferredPrefix, true, &initConfig)
-	if err != nil {
-		return nil, fmt.Errorf("parse init config: %w", err)
+	if len(req.VolumeCapabilities) == 0 {
+		return nil, fmt.Errorf("request does not define volume capabilities")
 	}
-	err = initConfig.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("validate init config: %w", err)
-	}
-	for k := range req.Parameters {
-		if strings.HasPrefix(k, volumeinit.PreferredPrefix) {
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
+
+	volCapsFs := req.VolumeCapabilities[0].GetMount()
 
 	strCaps := str.GetCapabilities()
 	shrCaps := shr.GetCapabilities()
@@ -416,7 +418,8 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("read state: %w", err)
 		}
 	}
-	if strCaps.LocalPathType != "" {
+
+	if strCaps.LocalPathType != "" && volCapsFs != nil {
 		if volumeState.FsPath == "" {
 			return nil, fmt.Errorf("read state: empty fs path")
 		}
@@ -425,6 +428,18 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		err = checkFile(ctx, srv.trInstance, strCaps.LocalPathType, volumeState.FsPath)
 		if err != nil {
 			return nil, fmt.Errorf("check local file: %w", err)
+		}
+
+		initConfig.FsType = volCapsFs.FsType
+		initConfig.InitialEmpty = strCaps.BlockInitialEmpty
+		initConfig.AtomicSize = volumeState.AtomicSize
+		initConfig.RMWSize = volumeState.RMWSize
+		initConfig.OptimalWriteSize = volumeState.OptimalWriteSize
+
+		for k := range req.Parameters {
+			if strings.HasPrefix(k, volumeinit.PreferredPrefix) {
+				return nil, fmt.Errorf("unknown key '%s'", k)
+			}
 		}
 
 		init := volumeinit.NewController(srv.trInstance)

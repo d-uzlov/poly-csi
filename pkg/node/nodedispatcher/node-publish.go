@@ -62,7 +62,7 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 			if err != nil {
 				return nil, fmt.Errorf("EnsureBindMount: %w", err)
 			}
-			logs.FromCtx(ctx).MicroOp("connector.Connect: success")
+			logs.FromCtx(ctx).MicroOp("bind mount success")
 		case req.VolumeCapability.GetBlock() != nil:
 			return nil, fmt.Errorf("block mounting is not implemented")
 		default:

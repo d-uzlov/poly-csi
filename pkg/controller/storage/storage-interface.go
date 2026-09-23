@@ -87,6 +87,11 @@ type Capabilities struct {
 	// When 2 storage managers report the same LocalSendType method,
 	// dispatcher can use it for optimized storage-specific volume cloning.
 	LocalSendType string
+
+	// BlockInitialEmpty indicates that right after initial volume allocation
+	// block device can be safely used without discard and/or zeroing.
+	// Ignored for non-block devices.
+	BlockInitialEmpty bool
 }
 
 // well-known local path types
@@ -102,7 +107,17 @@ type VolumeState struct {
 	// Size is the size limit of the volume.
 	// MUST be populated correctly for block volumes.
 	// For filesystem volumes that cannot enforce a size limit on a volume value must be zero.
-	Size   int64
+	Size int64
+
+	// values below are intended for optimization of block device formatting
+	// they are all optional, and should be ignored by filesystem-based volumes
+
+	// minimum write size without read-modify-write
+	RMWSize int64
+	// minimum size for performance
+	OptimalWriteSize int64
+	// maximum size that is guaranteed to atomically succeed of fail
+	AtomicSize int64
 }
 
 const (

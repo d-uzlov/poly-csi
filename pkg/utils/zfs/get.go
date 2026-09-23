@@ -24,6 +24,7 @@ type DatasetState struct {
 type DatasetProperties struct {
 	Used           ZfsProperty `json:"used"`
 	VolSize        ZfsProperty `json:"volsize"`
+	VolBlockSize   ZfsProperty `json:"volblocksize"`
 	LogicalUsed    ZfsProperty `json:"logicalused"`
 	Referenced     ZfsProperty `json:"referenced"`
 	Quota          ZfsProperty `json:"quota"`
@@ -95,6 +96,7 @@ func (s *Snippets) GetProperties(ctx context.Context, path string) (*DatasetStat
 	properties := []string{
 		"used",
 		"volsize",
+		"volblocksize",
 		"logicalused",
 		"referenced",
 		"quota",

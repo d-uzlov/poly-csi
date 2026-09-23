@@ -148,6 +148,23 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		if err != nil {
 			return nil, fmt.Errorf("stageBlock: %w", err)
 		}
+		switch {
+		case mountParams != nil:
+			var initConfig volumeinit.InitConfig
+			err = serialmaps.Parse(req.PublishContext, volumeinit.PreferredPrefix, &initConfig)
+			if err != nil {
+				return nil, fmt.Errorf("parse init config: %w", err)
+			}
+			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags, initConfig)
+			if err != nil {
+				return nil, fmt.Errorf("stageBlockMount: %w", err)
+			}
+			logger.MicroOp("stageBlockMount: success")
+		case req.VolumeCapability.GetBlock() != nil:
+			return nil, fmt.Errorf("block mounting is not implemented")
+		default:
+			return nil, fmt.Errorf("unknown mount mode")
+		}
 		if n.conf.PodCgroupRoot != "" {
 			dev, err := nvi.getMainBlockDevice(ctx)
 			if err != nil {
@@ -165,28 +182,12 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 					return nil, fmt.Errorf("readLink(%s): %w", dev, err)
 				}
 				bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
+				// TODO this also affects csi-driver itself
 				err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
 				if err != nil {
 					return nil, fmt.Errorf("SetCgroupsIoLimit: %w", err)
 				}
 			}
-		}
-		switch {
-		case mountParams != nil:
-			var initConfig volumeinit.InitConfig
-			err = serialmaps.Parse(req.PublishContext, volumeinit.PreferredPrefix, &initConfig)
-			if err != nil {
-				return nil, fmt.Errorf("parse init config: %w", err)
-			}
-			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags, initConfig)
-			if err != nil {
-				return nil, fmt.Errorf("stageBlockMount: %w", err)
-			}
-			logger.MicroOp("stageBlockMount: success")
-		case req.VolumeCapability.GetBlock() != nil:
-			return nil, fmt.Errorf("block mounting is not implemented")
-		default:
-			return nil, fmt.Errorf("unknown mount mode")
 		}
 
 	case connectors.ConnectTypeFolder:

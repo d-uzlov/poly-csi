@@ -189,6 +189,13 @@ func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string, devFolder
 			return fmt.Errorf("resize2fs: %w", err)
 		}
 		return nil
+	case "xfs":
+		cmd := []string{"xfs_growfs", devicePath}
+		err := transport.CheckedRun(ctx, s.tr, cmd)
+		if err != nil {
+			return fmt.Errorf("xfs_growfs: %w", err)
+		}
+		return nil
 	}
 	return fmt.Errorf("filesystem %s is not supported", mi.FsType)
 }
@@ -311,6 +318,7 @@ type StatsResult struct {
 
 func (s *FsSnippets) GetMountStats(targetPath string) (StatsResult, error) {
 	var stat syscall.Statfs_t
+	// TODO change to transport
 	err := syscall.Statfs(targetPath, &stat)
 	if err != nil {
 		return StatsResult{}, err

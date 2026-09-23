@@ -19,8 +19,7 @@ parameters:
 
   zfs.parentDataset: rose/test
 
-  init.on: controller
-  init.blockFormat: mkfs.ext4
+  init.side: controller
   init.ownerUser: '0'
   init.ownerGroup: '10000'
   init.rootDirMode: '777'

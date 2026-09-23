@@ -25,13 +25,14 @@ WORKDIR /
 #     nvme-cli        : nvme
 #     e2fsprogs       : mkfs.ext*
 #     e2fsprogs-extra : resize2fs
-#     open-iscsi      : iscsiadm
+#     xfsprogs        : mkfs.xfs, xfs_growfs
 #     util-linux      : mount (with advanced options)
 #     nfs-utils       : <nfs address resolution when running `mount`>
 RUN apk add \
   nvme-cli=2.16-r1 \
   e2fsprogs=1.47.4-r0 \
   e2fsprogs-extra=1.47.4-r0 \
+  xfsprogs=7.0.1-r0 \
   cifs-utils=7.5-r0 \
   multipath-tools=0.13.0-r0 \
   util-linux=2.42.3-r1 \

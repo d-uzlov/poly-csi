@@ -238,10 +238,12 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 		return fmt.Errorf("getMainBlockDevice: %w", err)
 	}
 
+	blockFormatStart := time.Now()
 	_, err = init.RunBlock(ctx, initConfig, dev)
 	if err != nil {
 		return fmt.Errorf("init.RunBlock: %w", err)
 	}
+	logs.FromCtx(ctx).MicroOp("init.RunBlock: success", "duration", time.Since(blockFormatStart).String())
 
 	_, err = fsnip.EnsureMounted(ctx, dev, v.FsMountPath, "", mountFlags)
 	if err != nil {
@@ -249,11 +251,12 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 	}
 	logs.FromCtx(ctx).MicroOp("mount device: success", "device", dev, "target-path", v.FsMountPath)
 
+	fsAdjStart := time.Now()
 	err = init.RunFs(ctx, initConfig, v.FsMountPath)
 	if err != nil {
 		return fmt.Errorf("init.RunFs: %w", err)
 	}
-	logs.FromCtx(ctx).MicroOp("init.RunFs: success")
+	logs.FromCtx(ctx).MicroOp("init.RunFs: success", "duration", time.Since(fsAdjStart).String())
 
 	return nil
 }
