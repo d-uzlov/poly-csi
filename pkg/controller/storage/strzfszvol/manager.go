@@ -39,7 +39,7 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	info, err := m.snip.GetProperties(ctx, p.parentDataset)
+	info, err := m.snip.GetProperties(ctx, p.ParentDataset)
 	if err != nil {
 		return 0, err
 	}
@@ -73,7 +73,10 @@ func (m *manager) CreateVolume(req storage.CreateRequest) (storage.Volume, error
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}
+	if p == nil {
+		return nil, fmt.Errorf("parse params: nil result")
+	}
 
-	datasetPath := fmt.Sprintf("%s/%s", p.parentDataset, req.Id)
-	return newVolume(datasetPath, m.snip), nil
+	datasetPath := fmt.Sprintf("%s/%s", p.ParentDataset, req.Id)
+	return newVolume(*p, datasetPath, m.snip), nil
 }

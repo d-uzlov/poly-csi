@@ -8,14 +8,20 @@ import (
 )
 
 type ZvolConfig struct {
-	Size int64
+	Size         int64
+	Volblocksize int64
+	Reservation  int64
 }
 
 func (s *Snippets) CreateZvol(ctx context.Context, path string, config ZvolConfig) (alreadyExisted bool, err error) {
 	cmd := append(zfsCmd,
 		"create", path,
 		"-V", fmt.Sprintf("%d", config.Size),
+		"-o", fmt.Sprintf("refreservation=%d", config.Reservation),
 	)
+	if config.Volblocksize != 0 {
+		cmd = append(cmd, "-o", fmt.Sprintf("volblocksize=%d", config.Volblocksize))
+	}
 	recovered, err := transport.RelaxedRun(ctx, s.tr, cmd, "dataset already exists", transport.WithSudo(true))
 	if err != nil {
 		return false, fmt.Errorf("zfs create: %w", err)

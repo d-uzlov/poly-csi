@@ -4,23 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
 type Volume struct {
-	Path string `json:"path"`
-	snip zfs.Snippets
+	Params params       `json:"params"`
+	Path   string       `json:"path"`
+	snip   zfs.Snippets `json:"-"`
 }
 
 var _ storage.Volume = &Volume{}
 
-func newVolume(path string, snip zfs.Snippets) *Volume {
+func newVolume(p params, path string, snip zfs.Snippets) *Volume {
 	return &Volume{
-		Path: path,
-		snip: snip,
+		Params: p,
+		Path:   path,
+		snip:   snip,
 	}
 }
 
@@ -46,9 +50,28 @@ func (v *Volume) Serialize() (string, error) {
 }
 
 func (v *Volume) CreateState(ctx context.Context, size int64) error {
-	_, err := v.snip.CreateZvol(ctx, v.Path, zfs.ZvolConfig{
-		Size: size,
-	})
+	cfg := zfs.ZvolConfig{
+		Size:        size,
+		Reservation: size,
+	}
+	if v.Params.VolBlockSize != "" {
+		if strings.HasSuffix(v.Params.VolBlockSize, "k") {
+			v.Params.VolBlockSize = v.Params.VolBlockSize + "i"
+		}
+		value, err := humanize.ParseBytes(v.Params.VolBlockSize)
+		if err != nil {
+			return fmt.Errorf("parse VolBlockSize: %w", err)
+		}
+		cfg.Volblocksize = int64(value)
+	}
+	if v.Params.ReservationPercent != "" {
+		percent, _, err := humanize.ParseSI(v.Params.ReservationPercent)
+		if err != nil {
+			return fmt.Errorf("parse ReservationPercent: %w", err)
+		}
+		cfg.Reservation = int64(percent * float64(size) / 100.0)
+	}
+	_, err := v.snip.CreateZvol(ctx, v.Path, cfg)
 	if err != nil {
 		return fmt.Errorf("create zvol: %w", err)
 	}
@@ -72,10 +95,10 @@ func (v *Volume) ReadState(ctx context.Context) (*storage.VolumeState, error) {
 		return nil, fmt.Errorf("read volblocksize: %w", err)
 	}
 	result := storage.VolumeState{
-		FsPath:           "/dev/zvol/" + v.Path,
-		Size:             info.GetSize(),
-		RMWSize:          blockSize,
-		AtomicSize:       blockSize,
+		FsPath:     "/dev/zvol/" + v.Path,
+		Size:       info.GetSize(),
+		RMWSize:    blockSize,
+		AtomicSize: blockSize,
 		// TODO use vdev geometry here?
 		OptimalWriteSize: blockSize,
 	}
