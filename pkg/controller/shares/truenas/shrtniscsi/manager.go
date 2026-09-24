@@ -33,19 +33,19 @@ func (sh *manager) GetCapabilities() shares.Capabilities {
 }
 
 func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
-	return nil, fmt.Errorf("unimplemented")
-	// p, err := parseParams(req.StaticParams, req.MutableParams)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("parse params: %w", err)
-	// }
-	// _ = p
+	p, err := parseParams(req.StaticParams, req.MutableParams)
+	if err != nil {
+		return nil, fmt.Errorf("parse params: %w", err)
+	}
+	_ = p
 
-	// return &share{
-	// 	tr:   m.tr,
-	// 	gp:   m.gp,
-	// 	Iqn:  iqn,
-	// 	Zvol: zfsVol.Path,
-	// }, nil
+	iqn := fmt.Sprintf("%s:%s", m.gp.iqnBase, req.ShareId)
+
+	return &share{
+		tr:   m.tr,
+		gp:   m.gp,
+		Iqn:  iqn,
+	}, nil
 }
 
 func (m *manager) ParseShare(shareData string) (shares.Share, error) {

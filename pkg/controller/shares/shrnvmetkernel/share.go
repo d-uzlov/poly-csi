@@ -54,7 +54,7 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+func (sh *share) SharePath(ctx context.Context, fsPath string) error {
 	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
 	}
@@ -86,6 +86,10 @@ func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
 		return fmt.Errorf("nvmet_save: %w", err)
 	}
 	return nil
+}
+
+func (sh *share) ShareVolume(ctx context.Context, volume any) error {
+	return fmt.Errorf("unimplemented")
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {

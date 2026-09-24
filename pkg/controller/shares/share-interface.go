@@ -16,7 +16,11 @@ type ShareManager interface {
 
 type Share interface {
 	Validate() error
-	MakeShare(ctx context.Context, fsPath string) error
+	// SharePath configures sharing of an object in the filesystem
+	SharePath(ctx context.Context, fsPath string) error
+	// ShareVolume configures sharing of a volume, when some storage-specific info is required.
+	// Implementation can cast the volume object to expected type to extract info from it.
+	ShareVolume(ctx context.Context, volume any) error
 	Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
 	Unpublish(ctx context.Context, serializedLocalData string) error
 	UnpublishAll(ctx context.Context) error

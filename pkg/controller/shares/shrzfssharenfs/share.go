@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
+	"meoe.io/poly-csi/pkg/controller/storage/strzfsdataset"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
 	"meoe.io/poly-csi/pkg/transport"
@@ -15,8 +16,9 @@ import (
 type share struct {
 	tr transport.Transport
 
-	Dataset string `json:"dataset"`
-	Folder  string `json:"folder"`
+	ShareOptions string `json:"shareOptions"`
+	Dataset      string `json:"dataset"`
+	Folder       string `json:"folder"`
 }
 
 var _ shares.Share = &share{}
@@ -51,15 +53,33 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
-	// snip := zfs.NewSnippets(sh.tr)
-
-	// err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
+func (sh *share) SharePath(ctx context.Context, fsPath string) error {
 	return fmt.Errorf("unimplemented")
+}
+
+func (sh *share) ShareVolume(ctx context.Context, volume any) error {
+
+	dataset, ok := volume.(*strzfsdataset.Volume)
+	if !ok {
+		return fmt.Errorf("storage volume is not a zfs dataset: %T", volume)
+	}
+
+	sh.Dataset = dataset.Path
+
+	state, err := dataset.ReadState(ctx)
+	if err != nil {
+		return fmt.Errorf("read dataset state: %w", err)
+	}
+	sh.Folder = state.FsPath
+
+	snip := zfs.NewSnippets(sh.tr)
+
+	err = snip.SetShareNfs(ctx, dataset.Path, sh.ShareOptions)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {

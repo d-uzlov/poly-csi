@@ -4,17 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"uuid"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
+	"meoe.io/poly-csi/pkg/controller/storage/strzfszvol"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type share struct {
-	tr transport.Transport
-	gp globalParams
+	tr transport.Transport `json:"-"`
+	gp globalParams        `json:"-"`
 
-	Iqn  string
-	Zvol string
+	Iqn  string `json:"iqn"`
+	Zvol string `json:"zvol"`
 }
 
 var _ shares.Share = &share{}
@@ -52,28 +54,29 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+func (sh *share) SharePath(ctx context.Context, fsPath string) error {
 	return fmt.Errorf("unimplemented")
+}
 
-	// zfsVol, ok := req.Volume.(*strzfszvol.Volume)
-	// if !ok {
-	// 	return nil, fmt.Errorf("storage volume is not zfs zvol: %T", req.Volume)
-	// }
+func (sh *share) ShareVolume(ctx context.Context, volume any) error {
+	zfsVol, ok := volume.(*strzfszvol.Volume)
+	if !ok {
+		return fmt.Errorf("storage volume is not zfs zvol: %T", volume)
+	}
+	sh.Zvol = zfsVol.Path
 
-	// iqn := fmt.Sprintf("%s:%s", m.gp.iqnBase, req.ShareId)
+	snip := newSnippets(sh.tr)
 
-	// snip := newSnippets(m.tr)
+	err := snip.setupTarget(ctx, tnIscsiRequest{
+		extentName: uuid.NewV7().String(),
+		iqn:        sh.Iqn,
+		zvol:       zfsVol.Path,
+	})
+	if err != nil {
+		return err
+	}
 
-	// err = snip.setupTarget(ctx, tnIscsiRequest{
-	// 	extentName: uuid.New().String(),
-	// 	iqn:        iqn,
-	// 	zvol:       zfsVol.Path,
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// return nil
+	return nil
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {

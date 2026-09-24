@@ -57,7 +57,7 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+func (sh *share) SharePath(ctx context.Context, fsPath string) error {
 	snip := newSambaSnippets(sh.tr, sh.gp)
 
 	userName := fmt.Sprintf("smb-for-%s", sh.ShareName)
@@ -77,6 +77,10 @@ func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
 	}
 
 	return nil
+}
+
+func (sh *share) ShareVolume(ctx context.Context, volume any) error {
+	return fmt.Errorf("unimplemented")
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {
