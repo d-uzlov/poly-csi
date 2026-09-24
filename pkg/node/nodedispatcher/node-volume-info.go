@@ -27,6 +27,7 @@ type NodeVolumeInfo struct {
 	// ConnectorId holds id of the connector, so that deserialization can create an instance.
 	ConnectorId              string            `json:"connector_id"`
 	MountType                string            `json:"mount_type"`
+	FsRootDirMode            string            `json:"fs_root_dir_mode"`
 	FsMountPath              string            `json:"folder_path"`
 	SerializedMultipathData  string            `json:"multipath_data"`
 	SerializedConnectorState string            `json:"connector_data"`
@@ -251,13 +252,33 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 	}
 	logs.FromCtx(ctx).MicroOp("mount device: success", "device", dev, "target-path", v.FsMountPath)
 
-	fsAdjStart := time.Now()
-	err = init.RunFs(ctx, initConfig, v.FsMountPath)
+	cmd := []string{"chmod", v.FsRootDirMode, v.FsMountPath}
+	err = transport.CheckedRun(ctx, v.tr, cmd, transport.WithSudo(true))
 	if err != nil {
-		return fmt.Errorf("init.RunFs: %w", err)
+		return fmt.Errorf("chmod: %w", err)
 	}
-	logs.FromCtx(ctx).MicroOp("init.RunFs: success", "duration", time.Since(fsAdjStart).String())
 
+	return nil
+}
+
+// TODO use
+func (v *NodeVolumeInfo) adjustPermissions(ctx context.Context, group string) error {
+	fsAdjStart := time.Now()
+	sr, err := v.tr.Cmds().Stat(ctx, v.FsMountPath)
+	if err != nil {
+		return fmt.Errorf("stat path: %w", err)
+	}
+	if !sr.FileExists {
+		return fmt.Errorf("target path does not exist")
+	}
+	if group == "" || group == sr.Gid {
+		return nil
+	}
+	err = v.tr.SudoCmds().Chown(ctx, v.FsMountPath, sr.Uid, group, true)
+	if err != nil {
+		return fmt.Errorf("chown: %w", err)
+	}
+	logs.FromCtx(ctx).MicroOp("chown: success", "duration", time.Since(fsAdjStart).String())
 	return nil
 }
 

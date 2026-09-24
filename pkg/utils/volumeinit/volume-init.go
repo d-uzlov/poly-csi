@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -15,16 +14,13 @@ import (
 const PreferredPrefix = "init."
 
 const (
-	placeController = "controller"
-	placeNode       = "node"
+	PlaceController = "controller"
+	PlaceNode       = "node"
 )
 
 type InitConfig struct {
 	Side          string `map:"side"          json:"side"`
 	FsType        string `map:"fsType"        json:"fs_type"`
-	OwnerUser     string `map:"ownerUser"     json:"owner_user"`
-	OwnerGroup    string `map:"ownerGroup"    json:"owner_group"`
-	RootDirMode   string `map:"rootDirMode"   json:"root_dir_mode"`
 	BytesPerInode string `map:"bytesPerInode" json:"bytes_per_inode"`
 
 	// guarantees reported by storage
@@ -38,19 +34,9 @@ func (c *InitConfig) Validate() error {
 	switch c.Side {
 	case "":
 		return fmt.Errorf("missing 'init.side' setting")
-	case placeNode, placeController:
+	case PlaceNode, PlaceController:
 	default:
 		return fmt.Errorf("unknown value for 'init.side': %s", c.Side)
-	}
-
-	if c.OwnerUser == "" {
-		return fmt.Errorf("missing owner user")
-	}
-	if c.OwnerGroup == "" {
-		return fmt.Errorf("missing owner group")
-	}
-	if c.RootDirMode == "" {
-		return fmt.Errorf("missing root dir mode")
 	}
 
 	return nil
@@ -63,14 +49,14 @@ type Init struct {
 
 func NewController(tr transport.Transport) Init {
 	return Init{
-		place: placeController,
+		place: PlaceController,
 		tr:    tr,
 	}
 }
 
 func NewNode(tr transport.Transport) Init {
 	return Init{
-		place: placeNode,
+		place: PlaceNode,
 		tr:    tr,
 	}
 }
@@ -172,71 +158,4 @@ func (n *Init) RunBlock(ctx context.Context, cfg InitConfig, devicePath string) 
 	logs.FromCtx(ctx).MicroOp("fs format success", "device", devicePath)
 
 	return true, nil
-}
-
-func (n *Init) RunFsWithTmpMount(ctx context.Context, cfg InitConfig, devicePath string) error {
-	if cfg.Side != n.place {
-		return nil
-	}
-
-	tmpMount := fmt.Sprintf("/tmp/%s", uuidctx.FromCtx(ctx))
-	err := n.tr.Cmds().Mkdir(ctx, tmpMount, false)
-	if err != nil {
-		return fmt.Errorf("mkdir for temp mount: %w", err)
-	}
-	defer func() {
-		cleanupErr := n.tr.Cmds().RmDir(ctx, tmpMount)
-		if cleanupErr != nil {
-			logs.FromCtx(ctx).Error("failed to cleanup temp dir", "path", tmpMount, "error", cleanupErr.Error())
-		}
-	}()
-
-	fsnip := fsutils.New(n.tr)
-	_, err = fsnip.EnsureMounted(ctx, devicePath, tmpMount, "", nil)
-	if err != nil {
-		return fmt.Errorf("tmp mount: %w", err)
-	}
-	defer func() {
-		deferErr := fsnip.Unmount(ctx, tmpMount)
-		if err == nil {
-			err = fmt.Errorf("cleanup tmp mount: %w", deferErr)
-		} else {
-			logs.FromCtx(ctx).Error("failed to cleanup tmp mount", "device", devicePath, "path", tmpMount, "error", deferErr.Error())
-		}
-	}()
-
-	return n.RunFs(ctx, cfg, tmpMount)
-}
-
-func (n *Init) RunFs(ctx context.Context, cfg InitConfig, fsPath string) error {
-	if cfg.Side != n.place {
-		return nil
-	}
-
-	var cmd []string
-	var err error
-	fsnip := fsutils.New(n.tr)
-
-	user := ""
-	group := ""
-	if cfg.OwnerUser != "-" {
-		user = cfg.OwnerUser
-	}
-	if cfg.OwnerGroup != "-" {
-		group = cfg.OwnerGroup
-	}
-	if user != "" || group != "" {
-		err = fsnip.ChownHeuristic(ctx, fsPath, user, group)
-		if err != nil {
-			return fmt.Errorf("chown: %w", err)
-		}
-	}
-
-	cmd = []string{"chmod", cfg.RootDirMode, fsPath}
-	err = transport.CheckedRun(ctx, n.tr, cmd, transport.WithSudo(true))
-	if err != nil {
-		return fmt.Errorf("chmod: %w", err)
-	}
-
-	return nil
 }

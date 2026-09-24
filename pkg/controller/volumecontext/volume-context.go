@@ -10,6 +10,7 @@ type VolumeContext struct {
 	ShareType     string `map:"share_type"`
 	ConnectorId   string `map:"connector_id"`
 	PresetName    string `map:"preset"`
+	FsRootDirMode string `map:"fs_root_dir_mode"`
 	FsGroupMethod string `map:"fs_group_method"`
 	Uuid          string `map:"uuid"`
 }

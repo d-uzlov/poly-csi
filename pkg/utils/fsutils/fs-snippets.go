@@ -332,24 +332,3 @@ func (s *FsSnippets) GetMountStats(targetPath string) (StatsResult, error) {
 		InodesUsed:      int64(stat.Files) - int64(stat.Ffree),
 	}, nil
 }
-
-func (s *FsSnippets) ChownHeuristic(ctx context.Context, path string, user string, group string) error {
-	sr, err := s.tr.Cmds().Stat(ctx, path)
-	if err != nil {
-		return fmt.Errorf("stat path: %w", err)
-	}
-	if !sr.FileExists {
-		return fmt.Errorf("target path does not exist")
-	}
-	needChanges := false
-	if user != "" && user != sr.Uid {
-		needChanges = true
-	}
-	if group != "" && group != sr.Gid {
-		needChanges = true
-	}
-	if !needChanges {
-		return nil
-	}
-	return s.tr.SudoCmds().Chown(ctx, path, user, group, true)
-}

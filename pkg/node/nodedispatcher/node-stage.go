@@ -117,6 +117,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 
 	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, fullPreset)
 	nvi.conState = ch
+	nvi.FsRootDirMode = vc.FsRootDirMode
 	defer func() {
 		saveErr := nvi.writeToDisk()
 		if err == nil {
