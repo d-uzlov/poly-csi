@@ -11,8 +11,8 @@ import (
 )
 
 type Volume struct {
-	Path string `json:"path"`
-	snip zfs.Snippets
+	Path string       `json:"path"`
+	snip zfs.Snippets `json:"-"`
 }
 
 var _ storage.Volume = &Volume{}

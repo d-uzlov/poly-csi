@@ -63,7 +63,7 @@ func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityReques
 // }
 
 func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
@@ -72,12 +72,12 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	vol, err := strInstance.ParseVolume(mh.vi.StorageData)
+	vol, err := strInstance.ParseVolume(mh.vi.Storage.StorageData)
 	if err != nil {
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
@@ -131,7 +131,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	logger := logs.FromCtx(ctx)
 
-	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
@@ -140,12 +140,12 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	vol, err := strInstance.ParseVolume(mh.vi.StorageData)
+	vol, err := strInstance.ParseVolume(mh.vi.Storage.StorageData)
 	if err != nil {
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
@@ -166,7 +166,7 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 		return nil, fmt.Errorf("ReadState: nil result")
 	}
 
-	mh.vi.Size = volumeState.Size
+	mh.vi.Storage.Size = volumeState.Size
 
 	err = mh.wrapper.SetVolumeInfo(ctx, *mh.vi)
 	if err != nil {
@@ -183,7 +183,7 @@ func (d *Dispatcher) ControllerGetVolumeHealth(ctx context.Context, req *csi.Con
 	// logger := logs.FromCtx(ctx)
 	result := []*csi.VolumeHealth_VolumeHealthEntry{}
 
-	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
@@ -192,11 +192,11 @@ func (d *Dispatcher) ControllerGetVolumeHealth(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
-	vol, err := strInstance.ParseVolume(mh.vi.StorageData)
+	vol, err := strInstance.ParseVolume(mh.vi.Storage.StorageData)
 	if err != nil {
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
@@ -205,23 +205,23 @@ func (d *Dispatcher) ControllerGetVolumeHealth(ctx context.Context, req *csi.Con
 		return nil, fmt.Errorf("read volume state: %w", err)
 	}
 
-	if mh.vi.Size != 0 {
-		if volState.Size != mh.vi.Size {
+	if mh.vi.Storage.Size != 0 {
+		if volState.Size != mh.vi.Storage.Size {
 			result = append(result, &csi.VolumeHealth_VolumeHealthEntry{
 				Status:  csi.VolumeHealthErrorType_DEGRADED,
 				Reason:  "wrong_size",
-				Message: fmt.Sprintf("size of the volume changed: initial %d, current %d", mh.vi.Size, volState.Size),
+				Message: fmt.Sprintf("size of the volume changed: initial %d, current %d", mh.vi.Storage.Size, volState.Size),
 			})
 		}
 	}
 
-	if mh.vi.LocalPathType == storage.VolFolder && mh.vi.Size != 0 {
+	if mh.vi.Storage.LocalPathType == storage.VolFolder && mh.vi.Storage.Size != 0 {
 		df, err := mh.srv.trInstance.Cmds().Df(ctx, volState.FsPath)
 		if err != nil {
 			return nil, fmt.Errorf("check free space: %w", err)
 		}
 
-		if df.Used+df.Available < mh.vi.Size {
+		if df.Used+df.Available < mh.vi.Storage.Size {
 			result = append(result, &csi.VolumeHealth_VolumeHealthEntry{
 				Status:  csi.VolumeHealthErrorType_DEGRADED,
 				Reason:  "out_of_space",

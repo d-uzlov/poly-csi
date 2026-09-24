@@ -20,7 +20,7 @@ import (
 func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	logger := logs.FromCtx(ctx)
 
-	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
@@ -144,7 +144,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 }
 
 func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	mh, err := d.getVolumeInfo(ctx, req.VolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}

@@ -13,13 +13,7 @@ import (
 
 const PreferredPrefix = "init."
 
-const (
-	PlaceController = "controller"
-	PlaceNode       = "node"
-)
-
 type InitConfig struct {
-	Side          string `map:"side"          json:"side"`
 	FsType        string `map:"fsType"        json:"fs_type"`
 	BytesPerInode string `map:"bytesPerInode" json:"bytes_per_inode"`
 
@@ -31,14 +25,6 @@ type InitConfig struct {
 }
 
 func (c *InitConfig) Validate() error {
-	switch c.Side {
-	case "":
-		return fmt.Errorf("missing 'init.side' setting")
-	case PlaceNode, PlaceController:
-	default:
-		return fmt.Errorf("unknown value for 'init.side': %s", c.Side)
-	}
-
 	return nil
 }
 
@@ -49,23 +35,17 @@ type Init struct {
 
 func NewController(tr transport.Transport) Init {
 	return Init{
-		place: PlaceController,
 		tr:    tr,
 	}
 }
 
 func NewNode(tr transport.Transport) Init {
 	return Init{
-		place: PlaceNode,
 		tr:    tr,
 	}
 }
 
 func (n *Init) RunBlock(ctx context.Context, cfg InitConfig, devicePath string) (changed bool, err error) {
-	if cfg.Side != n.place {
-		return false, nil
-	}
-
 	fsnip := fsutils.New(n.tr)
 
 	fsInfo, err := fsnip.GetBlkid(ctx, devicePath)

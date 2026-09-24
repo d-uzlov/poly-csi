@@ -19,9 +19,17 @@ type DispatchParams struct {
 	AddressNames      string `map:"addressNames"`
 	ServerName        string `map:"serverName"`
 	FsGroupPolicy     string `map:"fsGroupPolicy"`
+	FsFormatSide      string `map:"fsFormatSide"`
+	JournalVolume     string `map:"journalVolume"`
 }
 
+const (
+	FsFormatController = "controller"
+	FsFormatNodeNode   = "node"
+)
+
 const paramsPrefix = "dispatch."
+const paramsJournalPrefix = "journal."
 
 const (
 	keyStorageType       = "dispatch.storageType"
@@ -75,6 +83,12 @@ func parseDispatchParams(global map[string]string, static map[string]string, mut
 	}
 	if result.OnFailPolicy == "" {
 		result.OnFailPolicy = "cleanup"
+	}
+	if result.FsFormatSide == "" {
+		result.FsFormatSide = FsFormatController
+	}
+	if result.JournalVolume == "" {
+		result.JournalVolume = "none"
 	}
 
 	return result, nil

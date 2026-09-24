@@ -10,7 +10,7 @@ import (
 )
 
 func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	mh, err := d.getVolumeInfo(ctx, req.SourceVolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.SourceVolumeId)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
@@ -21,12 +21,12 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 
 	snapshotId := createSnapshotId(mh.srv.Conf.StableId, mh.volumeName, req.Name)
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.StorageType, mh.srv.Conf.GlobalParams)
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.StorageType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
 
-	vol, err := strInstance.ParseVolume(mh.vi.StorageData)
+	vol, err := strInstance.ParseVolume(mh.vi.Storage.StorageData)
 	if err != nil {
 		return nil, fmt.Errorf("parse storage data: %w", err)
 	}
@@ -51,7 +51,7 @@ func (d *Dispatcher) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshot
 
 	err = mh.wrapper.SetSnapshotData(ctx, req.Name, &voldbwrapper.SnapshotInfo{
 		SnapshotType:   "native",
-		StorageType:    mh.vi.StorageType,
+		StorageType:    mh.vi.Storage.StorageType,
 		SerializedData: snapData,
 	})
 	if err != nil {

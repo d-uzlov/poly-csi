@@ -11,17 +11,39 @@ import (
 
 const mainVolumeModule = "volume.json"
 
+type VolumeStorageInfo struct {
+	// NeedsControllerFormat indicates if the controller is expected to format the volume.
+	//
+	// Always false if storage is file-based.
+	//
+	// False if CO requests raw block device. False if user requests node-side format. False if already formatted.
+	NeedsControllerFormat bool
+
+	// DataSource can be 'scratch' for volumes without a data source, or volume_id, or snapshot_id
+	// When empty, indicates that volume is not initialized.
+	DataSource string `json:"data_source"`
+	// StorageType is the id of the storage manager
+	StorageType string `json:"storage_type"`
+	// StorageData is the value returned by storage.Volume.Serialize()
+	StorageData string `json:"volume_data"`
+
+	// LocalPathType is the saved value from storage.StorageManager.GetCapabilities().LocalPathType
+	LocalPathType string `json:"local_type"`
+	// Size is the saved value of storage.Volume.GetState().Size
+	Size int64 `json:"size"`
+}
+
 type VolumeInfo struct {
-	ConnectorId   string                      `json:"mount_id"`
+	Storage    VolumeStorageInfo     `json:"storage"`
+	InitConfig volumeinit.InitConfig `json:"init_config"`
+
+	ShareType string `json:"share_type"`
+	ShareData string `json:"share_data"`
+
+	// VolumeContext is the literal volume_context map, as sent to CO in CreateVolume
 	VolumeContext volumecontext.VolumeContext `json:"volume_context"`
+	ConnectorId   string                      `json:"connector_id"`
 	AddressIds    []string                    `json:"address_ids"`
-	StorageType   string                      `json:"storage_type"`
-	StorageData   string                      `json:"volume"`
-	ShareType     string                      `json:"share_type"`
-	ShareData     string                      `json:"share_data"`
-	InitConfig    volumeinit.InitConfig       `json:"init_config"`
-	Size          int64                       `json:"size"`
-	LocalPathType string                      `json:"local_type"`
 }
 
 func (w Wrapper) SetVolumeInfo(ctx context.Context, info VolumeInfo) error {
