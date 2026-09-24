@@ -51,6 +51,17 @@ func (sh *share) Validate() error {
 	return nil
 }
 
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	// snip := zfs.NewSnippets(sh.tr)
+
+	// err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	return fmt.Errorf("unimplemented")
+}
+
 func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := zfs.NewSnippets(sh.tr)
 

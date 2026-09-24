@@ -3,21 +3,22 @@ package shares
 import (
 	"context"
 
-	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
 type ShareManager interface {
 	GetCapabilities() Capabilities
-	CreateShare(ctx context.Context, req CreateShareRequest) (Share, error)
+	// CreateShare parses request parameters and creates a handle that can be used to actually manage the share.
+	CreateShare(req CreateShareRequest) (Share, error)
 	// ParseShare recreates share handle from result of Share.Serialize
 	ParseShare(shareData string) (Share, error)
 }
 
 type Share interface {
 	Validate() error
+	MakeShare(ctx context.Context, fsPath string) error
 	Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
-	Unpublish(ctx context.Context, serialized string) error
+	Unpublish(ctx context.Context, serializedLocalData string) error
 	UnpublishAll(ctx context.Context) error
 	DeleteShare(ctx context.Context) error
 	Serialize() (string, error)
@@ -37,12 +38,21 @@ type Capabilities struct {
 }
 
 type CreateShareRequest struct {
-	ShareId       string
-	StaticParams  map[string]string
+	// ShareId should be used as the main id for this share, if possible.
+	// It is user-supplied, so it helps the user identify share-related resources
+	// when accessing them for any kind of maintenance or debugging.
+	ShareId string
+	// StaticParams is an opaque set of parameters specifying the share properties
+	StaticParams map[string]string
+	// MutableParams override StaticParams.
+	// Implementation must fail if MutableParams contains something that can not be dynamically changed.
 	MutableParams map[string]string
-	LocalVolume   string // TODO remove this?
-	FsPath        string
-	Volume        storage.Volume
+	// LocalVolume is a type of local volume the share is dealing with (folder or block device).
+	// The caller will make sure that LocalVolume is one of the values listed in share Capabilities.LocalVolume
+	LocalVolume string // TODO remove this?
+	// Volume is the actual storage.Volume object.
+	// Implementation can cast this to expected volume type to obtain storage-specific parameters.
+	// Volume any
 }
 
 type PublishContext struct {

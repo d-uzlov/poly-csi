@@ -10,14 +10,14 @@ var nfsReloadCmd = []string{"nfs_reload"}
 type globalParams struct {
 }
 
-type params struct {
+type Params struct {
 	shareOptions string
 }
 
 const paramsPrefix = "nfs."
 
 const (
-	keyShareOptions  = "nfs.shareOptions"
+	keyShareOptions = "nfs.shareOptions"
 )
 
 func parseGlobalParams(src map[string]string) (globalParams, error) {
@@ -36,8 +36,8 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (params, error) {
-	result := params{}
+func parseParams(static map[string]string, mutable map[string]string) (Params, error) {
+	result := Params{}
 
 	for k, v := range static {
 		if !strings.HasPrefix(k, paramsPrefix) {
@@ -47,7 +47,7 @@ func parseParams(static map[string]string, mutable map[string]string) (params, e
 		case keyShareOptions:
 			result.shareOptions = v
 		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
+			return Params{}, fmt.Errorf("unknown key '%s'", k)
 		}
 	}
 
@@ -57,9 +57,9 @@ func parseParams(static map[string]string, mutable map[string]string) (params, e
 		}
 		switch k {
 		case keyShareOptions:
-			return params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
+			return Params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
 		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
+			return Params{}, fmt.Errorf("unknown key '%s'", k)
 		}
 	}
 

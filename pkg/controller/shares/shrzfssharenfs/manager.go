@@ -1,14 +1,11 @@
 package shrzfssharenfs
 
 import (
-	"context"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/controller/storage/strzfsdataset"
 	"meoe.io/poly-csi/pkg/transport"
-	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
 type manager struct {
@@ -29,31 +26,25 @@ func (m *manager) GetCapabilities() shares.Capabilities {
 	}
 }
 
-func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest) (shares.Share, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
-	if err != nil {
-		return nil, fmt.Errorf("parse params: %w", err)
-	}
+func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
+	return nil, fmt.Errorf("unimplemented")
+	// p, err := parseParams(req.StaticParams, req.MutableParams)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("parse params: %w", err)
+	// }
 
-	zfsVol, ok := req.Volume.(*strzfsdataset.Volume)
-	if !ok {
-		return nil, fmt.Errorf("storage volume is not a zfs dataset: %T", req.Volume)
-	}
+	// zfsVol, ok := req.Volume.(*strzfsdataset.Volume)
+	// if !ok {
+	// 	return nil, fmt.Errorf("storage volume is not a zfs dataset: %T", req.Volume)
+	// }
 
-	snip := zfs.NewSnippets(m.tr)
+	// c := share{
+	// 	tr:      m.tr,
+	// 	Dataset: zfsVol.Path,
+	// 	Folder:  req.FsPath,
+	// }
 
-	err = snip.SetShareNfs(ctx, zfsVol.Path, p.ShareOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	c := share{
-		tr:      m.tr,
-		Dataset: zfsVol.Path,
-		Folder:  req.FsPath,
-	}
-
-	return &c, nil
+	// return &c, nil
 }
 
 func (m *manager) ParseShare(shareData string) (shares.Share, error) {

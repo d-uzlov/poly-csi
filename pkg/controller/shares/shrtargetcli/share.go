@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"uuid"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/transport"
@@ -49,15 +50,59 @@ func (sh *share) Validate() error {
 	if sh.Iqn == "" {
 		return fmt.Errorf("missing iqn")
 	}
-	if sh.BackstoreName == "" {
-		return fmt.Errorf("missing backstoreName")
-	}
+	// if sh.BackstoreName == "" {
+	// 	return fmt.Errorf("missing backstoreName")
+	// }
 	if sh.Port == "" {
 		return fmt.Errorf("missing port")
 	}
 	if sh.Transport == "" {
 		return fmt.Errorf("missing transport")
 	}
+	return nil
+}
+
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	if !testReady(ctx, sh.tr) {
+		return fmt.Errorf("targetcli is not ready")
+	}
+
+	snip := newTargetcliSnippets(sh.tr)
+
+	sh.BackstoreName = uuid.NewV7().String()
+	err := snip.configureBackstore(ctx, sh.BackstoreName, fsPath)
+	if err != nil {
+		return fmt.Errorf("configure backstore: %w", err)
+	}
+
+	enforceAuth := true
+	disableAuth := false
+	switch sh.AuthType {
+	case authTypeNone:
+		enforceAuth = false
+		disableAuth = true
+	case authTypeIqn:
+		enforceAuth = false
+		disableAuth = false
+	case authTypeChapProvision:
+		enforceAuth = true
+		disableAuth = false
+	}
+	err = snip.configureTarget(ctx, iscsiTargetConfig{
+		iqn:           sh.Iqn,
+		backstoreName: sh.BackstoreName,
+		auth:          enforceAuth,
+		demo:          disableAuth,
+	})
+	if err != nil {
+		return fmt.Errorf("configure target: %w", err)
+	}
+
+	err = snip.save(ctx)
+	if err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
 	return nil
 }
 

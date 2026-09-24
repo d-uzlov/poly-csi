@@ -8,7 +8,6 @@ import (
 )
 
 type nfsShareConfig struct {
-	name        string
 	path        string
 	globalFlags string
 	clients     []nfsClientOptions
@@ -29,7 +28,7 @@ func newNfsSnippets(tr transport.Transport) nfsSnippets {
 	}
 }
 
-func (s nfsSnippets) configureNfsShare(ctx context.Context, share nfsShareConfig) (string, error) {
+func (s nfsSnippets) configureNfsShare(ctx context.Context, name string, share nfsShareConfig) (error) {
 	line := share.path
 	if share.globalFlags != "" {
 		line = fmt.Sprintf("%s -%s", line, share.globalFlags)
@@ -41,23 +40,24 @@ func (s nfsSnippets) configureNfsShare(ctx context.Context, share nfsShareConfig
 			line = fmt.Sprintf("%s %s(%s)", line, v.id, v.flags)
 		}
 	}
-	exportsFile := fmt.Sprintf("/etc/exports.d/%s.exports", share.name)
+	exportsFile := fmt.Sprintf("/etc/exports.d/%s.exports", name)
 
 	err := s.tr.SudoCmds().Write(ctx, exportsFile, []byte(line))
 	if err != nil {
-		return "", fmt.Errorf("write '%s': %w", exportsFile, err)
+		return fmt.Errorf("write '%s': %w", exportsFile, err)
 	}
 	err = transport.CheckedRun(ctx, s.tr, nfsReloadCmd)
 	if err != nil {
-		return "", fmt.Errorf("nfs reload: %w", err)
+		return  fmt.Errorf("nfs reload: %w", err)
 	}
-	return exportsFile, nil
+	return nil
 }
 
-func (s nfsSnippets) removeNfsShare(ctx context.Context, token string) error {
-	err := s.tr.SudoCmds().RmFile(ctx, token)
+func (s nfsSnippets) removeNfsShare(ctx context.Context, name string) error {
+	exportsFile := fmt.Sprintf("/etc/exports.d/%s.exports", name)
+	err := s.tr.SudoCmds().RmFile(ctx, exportsFile)
 	if err != nil {
-		return fmt.Errorf("remove '%s': %w", token, err)
+		return fmt.Errorf("remove '%s': %w", exportsFile, err)
 	}
 	err = transport.CheckedRun(ctx, s.tr, nfsReloadCmd)
 	if err != nil {

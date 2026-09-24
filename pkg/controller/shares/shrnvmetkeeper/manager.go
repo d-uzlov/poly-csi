@@ -1,13 +1,11 @@
 package shrnvmetkeeper
 
 import (
-	"context"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/transport"
-	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
 type manager struct {
@@ -34,7 +32,7 @@ func (m *manager) GetCapabilities() shares.Capabilities {
 	}
 }
 
-func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest) (shares.Share, error) {
+func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
 	p, err := parseParams(req.StaticParams, req.MutableParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
@@ -42,46 +40,14 @@ func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest
 
 	nqn := fmt.Sprintf("%s:%s", m.gp.nqnBase, req.ShareId)
 
-	allowAnyHost := false
-	if p.AuthType == authTypeNone {
-		allowAnyHost = true
-	}
-
-	cmd := append(nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
+	return &share{
+		tr:           m.tr,
 		Nqn:          nqn,
-		AllowAnyHost: allowAnyHost,
-	}.Json())
-	err = transport.CheckedRun(ctx, m.tr, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("subsys create: %w", err)
-	}
-
-	cmd = append(nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
-		Nqn:        nqn,
-		Nsid:       "1",
-		DevicePath: req.FsPath,
-		Enabled:    true,
-	}.Json())
-	err = transport.CheckedRun(ctx, m.tr, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("namespace create: %w", err)
-	}
-
-	cmd = append(nvmetKeeperCmd, "subsys", "attach", nqn, p.NvmetPortName)
-	err = transport.CheckedRun(ctx, m.tr, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("subsys attach: %w", err)
-	}
-
-	sh := share{
-		tr:        m.tr,
-		Nqn:       nqn,
-		Port:      p.ConnectPort,
-		Transport: p.TransportType,
-		AuthType:  p.AuthType,
-	}
-
-	return &sh, nil
+		TcpPort:      p.ConnectPort,
+		NvmePortName: p.NvmetPortName,
+		Transport:    p.TransportType,
+		AuthType:     p.AuthType,
+	}, nil
 }
 
 func (m *manager) ParseShare(shareData string) (shares.Share, error) {

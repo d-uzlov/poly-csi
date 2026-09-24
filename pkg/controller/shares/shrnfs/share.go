@@ -14,8 +14,9 @@ import (
 type share struct {
 	tr transport.Transport
 
-	ExportsFile string `json:"exports_file"`
-	Folder      string `json:"folder"`
+	Name   string `json:"name"`
+	FsPath string `json:"fs_path"`
+	Params Params `json:"params"`
 }
 
 var _ shares.Share = &share{}
@@ -41,25 +42,39 @@ func (sh *share) Validate() error {
 	if sh.tr == nil {
 		return fmt.Errorf("transport is nil")
 	}
-	if sh.ExportsFile == "" {
-		return fmt.Errorf("missing exports_file")
+	if sh.Name == "" {
+		return fmt.Errorf("missing name")
 	}
-	if sh.Folder == "" {
-		return fmt.Errorf("missing folder")
+	if sh.FsPath == "" {
+		return fmt.Errorf("missing FsPath")
 	}
 	return nil
+}
+
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	snip := newNfsSnippets(sh.tr)
+
+	sh.FsPath = fsPath
+
+	return snip.configureNfsShare(ctx, sh.Name, nfsShareConfig{
+		path:        fsPath,
+		globalFlags: sh.Params.shareOptions,
+		clients: []nfsClientOptions{
+			{id: "*"},
+		},
+	})
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := newNfsSnippets(sh.tr)
 
-	return snip.removeNfsShare(ctx, sh.ExportsFile)
+	return snip.removeNfsShare(ctx, sh.Name)
 }
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
 		Public: cntrnfs.PublicContext{
-			Path: sh.Folder,
+			Path: sh.FsPath,
 		},
 	}, nil
 }

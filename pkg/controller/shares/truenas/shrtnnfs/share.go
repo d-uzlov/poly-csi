@@ -14,7 +14,7 @@ import (
 type share struct {
 	tr transport.Transport
 
-	Folder string `json:"folder"`
+	FsPath string `json:"folder"`
 }
 
 var _ shares.Share = &share{}
@@ -40,16 +40,29 @@ func (sh *share) Validate() error {
 	if sh.tr == nil {
 		return fmt.Errorf("transport is nil")
 	}
-	if sh.Folder == "" {
+	if sh.FsPath == "" {
 		return fmt.Errorf("missing folder")
 	}
+	return nil
+}
+
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	snip := newNfsSnippets(sh.tr)
+
+	err := snip.configureNfsShare(ctx, fsPath)
+	if err != nil {
+		return err
+	}
+
+	sh.FsPath = fsPath
+
 	return nil
 }
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
 		Public: cntrnfs.PublicContext{
-			Path: sh.Folder,
+			Path: sh.FsPath,
 		},
 	}, nil
 }
@@ -65,5 +78,5 @@ func (sh *share) UnpublishAll(ctx context.Context) error {
 func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := newNfsSnippets(sh.tr)
 
-	return snip.removeNfsShare(ctx, sh.Folder)
+	return snip.removeNfsShare(ctx, sh.FsPath)
 }

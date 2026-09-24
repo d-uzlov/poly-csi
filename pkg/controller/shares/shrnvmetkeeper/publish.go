@@ -105,7 +105,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 			HostNqn:       hostNqn,
 			HostId:        hostId,
 			AuthType:      authType,
-			ConnectPort:   sh.Port,
+			ConnectPort:   sh.TcpPort,
 			TransportType: sh.Transport,
 		},
 		Secret: secret,

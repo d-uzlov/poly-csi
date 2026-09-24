@@ -1,14 +1,11 @@
 package shrnvmetkernel
 
 import (
-	"context"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
-	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
 type manager struct {
@@ -35,54 +32,20 @@ func (m *manager) GetCapabilities() shares.Capabilities {
 	}
 }
 
-func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest) (shares.Share, error) {
-	if !testReady(ctx, m.tr) {
-		return nil, fmt.Errorf("nvmet is not ready")
-	}
+func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
 	p, err := parseParams(req.StaticParams, req.MutableParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}
-	logs.FromCtx(ctx).Args("args: nvmet share", "params", p)
 
 	nqn := fmt.Sprintf("%s:%s", m.gp.nqnBase, req.ShareId)
 
-	snip := nvmet.NewSnippets(ctx, m.tr, true)
-
-	err = snip.ConfigureSubsys(nvmet.Subsys{
-		Nqn:          nqn,
-		AllowAnyHost: false,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("configure subsystem: %w", err)
-	}
-	err = snip.ConfigureNamespace(nvmet.Ns{
-		Nqn:        nqn,
-		Nsid:       "1",
-		DevicePath: req.FsPath,
-		Enabled:    true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("configure namespace: %w", err)
-	}
-	err = snip.AttachSubsysToPort(nqn, "1")
-	if err != nil {
-		return nil, fmt.Errorf("attach port: %w", err)
-	}
-
-	err = saveState(ctx, m.tr)
-	if err != nil {
-		return nil, fmt.Errorf("nvmet_save: %w", err)
-	}
-
-	c := share{
+	return &share{
 		tr:        m.tr,
 		Nqn:       nqn,
 		Port:      p.ConnectPort,
 		Transport: p.TransportType,
-	}
-
-	return &c, nil
+	}, nil
 }
 
 func (m *manager) ParseShare(shareData string) (shares.Share, error) {

@@ -26,15 +26,11 @@ const shareTemplate = `
 `
 
 type ShareParameters struct {
-	ShareName string
 	Path      string
 	User      string
 }
 
 func (sp ShareParameters) validate() error {
-	if sp.ShareName == "" {
-		return fmt.Errorf("share name missing")
-	}
 	if sp.Path == "" {
 		return fmt.Errorf("share path missing")
 	}
@@ -86,38 +82,39 @@ func (s snippets) deleteUser(ctx context.Context, name string) error {
 	return nil
 }
 
-func (s snippets) configureShare(ctx context.Context, config ShareParameters) (string, error) {
+func (s snippets) configureShare(ctx context.Context, name string, config ShareParameters) error {
 	err := config.validate()
 	if err != nil {
-		return "", fmt.Errorf("validate share config: %w", err)
+		return fmt.Errorf("validate share config: %w", err)
 	}
 	t, err := template.New("").Parse(shareTemplate)
 	if err != nil {
-		return "", err
+		return err
 	}
 	var buf bytes.Buffer
 	err = t.Execute(&buf, config)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	configFile := fmt.Sprintf("%s/%s.conf", s.gp.sambaConfigDir, config.ShareName)
+	configFile := fmt.Sprintf("%s/%s.conf", s.gp.sambaConfigDir, name)
 
 	err = s.tr.SudoCmds().Write(ctx, configFile, buf.Bytes())
 	if err != nil {
-		return "", fmt.Errorf("write '%s': %w", configFile, err)
+		return fmt.Errorf("write '%s': %w", configFile, err)
 	}
 	err = transport.CheckedRun(ctx, s.tr, sambaRefreshCmd)
 	if err != nil {
-		return "", fmt.Errorf("smb refresh: %w", err)
+		return fmt.Errorf("smb refresh: %w", err)
 	}
-	return configFile, nil
+	return nil
 }
 
-func (s snippets) removeShare(ctx context.Context, token string) error {
-	err := s.tr.SudoCmds().RmFile(ctx, token)
+func (s snippets) removeShare(ctx context.Context, name string) error {
+	configFile := fmt.Sprintf("%s/%s.conf", s.gp.sambaConfigDir, name)
+	err := s.tr.SudoCmds().RmFile(ctx, configFile)
 	if err != nil {
-		return fmt.Errorf("remove '%s': %w", token, err)
+		return fmt.Errorf("remove '%s': %w", configFile, err)
 	}
 	err = transport.CheckedRun(ctx, s.tr, sambaRefreshCmd)
 	if err != nil {

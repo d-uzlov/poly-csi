@@ -13,6 +13,7 @@ import (
 type share struct {
 	tr transport.Transport
 
+	// FsPath    string `json:"fs_path"`
 	Nqn       string `json:"nqn"`
 	Port      string `json:"port"`
 	Transport string `json:"transport"`
@@ -49,6 +50,40 @@ func (sh *share) Validate() error {
 	}
 	if sh.Transport == "" {
 		return fmt.Errorf("missing transport")
+	}
+	return nil
+}
+
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	if !testReady(ctx, sh.tr) {
+		return fmt.Errorf("nvmet is not ready")
+	}
+	snip := nvmet.NewSnippets(ctx, sh.tr, true)
+
+	err := snip.ConfigureSubsys(nvmet.Subsys{
+		Nqn:          sh.Nqn,
+		AllowAnyHost: false,
+	})
+	if err != nil {
+		return fmt.Errorf("configure subsystem: %w", err)
+	}
+	err = snip.ConfigureNamespace(nvmet.Ns{
+		Nqn:        sh.Nqn,
+		Nsid:       "1",
+		DevicePath: fsPath,
+		Enabled:    true,
+	})
+	if err != nil {
+		return fmt.Errorf("configure namespace: %w", err)
+	}
+	err = snip.AttachSubsysToPort(sh.Nqn, "1")
+	if err != nil {
+		return fmt.Errorf("attach port: %w", err)
+	}
+
+	err = saveState(ctx, sh.tr)
+	if err != nil {
+		return fmt.Errorf("nvmet_save: %w", err)
 	}
 	return nil
 }

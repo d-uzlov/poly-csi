@@ -1,7 +1,6 @@
 package shrnfs
 
 import (
-	"context"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
@@ -33,30 +32,16 @@ func (m *manager) GetCapabilities() shares.Capabilities {
 	}
 }
 
-func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest) (shares.Share, error) {
+func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
 	p, err := parseParams(req.StaticParams, req.MutableParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}
 
-	snip := newNfsSnippets(m.tr)
-
-	token, err := snip.configureNfsShare(ctx, nfsShareConfig{
-		name:        req.ShareId,
-		path:        req.FsPath,
-		globalFlags: p.shareOptions,
-		clients: []nfsClientOptions{
-			{id: "*"},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	return &share{
-		tr:          m.tr,
-		ExportsFile: token,
-		Folder:      req.FsPath,
+		tr:     m.tr,
+		Name:   req.ShareId,
+		Params: p,
 	}, nil
 }
 

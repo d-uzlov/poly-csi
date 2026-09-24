@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"uuid"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/transport"
@@ -13,10 +14,9 @@ type share struct {
 	tr transport.Transport
 	gp globalParams
 
-	ConfigFile string `json:"config_file"`
-	ShareName  string `json:"share_name"`
-	UserName   string `json:"user_name"`
-	UserPass   string `json:"user_pass"`
+	ShareName string `json:"share_name"`
+	UserName  string `json:"user_name"`
+	UserPass  string `json:"user_pass"`
 }
 
 var _ shares.Share = &share{}
@@ -45,25 +45,44 @@ func (sh *share) Validate() error {
 	if sh.gp.sambaConfigDir == "" {
 		return fmt.Errorf("missing samba config dir")
 	}
-	if sh.ConfigFile == "" {
-		return fmt.Errorf("missing config_file")
-	}
 	if sh.ShareName == "" {
-		return fmt.Errorf("missing share_name")
+		return fmt.Errorf("missing ShareName")
 	}
-	if sh.UserName == "" {
-		return fmt.Errorf("missing user_name")
+	// if sh.UserName == "" {
+	// 	return fmt.Errorf("missing UserName")
+	// }
+	// if sh.UserPass == "" {
+	// 	return fmt.Errorf("missing UserPass")
+	// }
+	return nil
+}
+
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	snip := newSambaSnippets(sh.tr, sh.gp)
+
+	userName := fmt.Sprintf("smb-for-%s", sh.ShareName)
+	userPassword := uuid.NewV4().String()
+
+	err := snip.configureUser(ctx, userName, userPassword)
+	if err != nil {
+		return fmt.Errorf("configure user: %w", err)
 	}
-	if sh.UserPass == "" {
-		return fmt.Errorf("missing user_pass")
+
+	err = snip.configureShare(ctx, sh.ShareName, ShareParameters{
+		Path: fsPath,
+		User: userName,
+	})
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := newSambaSnippets(sh.tr, sh.gp)
 
-	err := snip.removeShare(ctx, sh.ConfigFile)
+	err := snip.removeShare(ctx, sh.ShareName)
 	if err != nil {
 		return fmt.Errorf("remove share config: %w", err)
 	}

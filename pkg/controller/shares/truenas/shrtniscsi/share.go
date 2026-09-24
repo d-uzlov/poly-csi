@@ -52,6 +52,30 @@ func (sh *share) Validate() error {
 	return nil
 }
 
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	return fmt.Errorf("unimplemented")
+
+	// zfsVol, ok := req.Volume.(*strzfszvol.Volume)
+	// if !ok {
+	// 	return nil, fmt.Errorf("storage volume is not zfs zvol: %T", req.Volume)
+	// }
+
+	// iqn := fmt.Sprintf("%s:%s", m.gp.iqnBase, req.ShareId)
+
+	// snip := newSnippets(m.tr)
+
+	// err = snip.setupTarget(ctx, tnIscsiRequest{
+	// 	extentName: uuid.New().String(),
+	// 	iqn:        iqn,
+	// 	zvol:       zfsVol.Path,
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// return nil
+}
+
 func (sh *share) DeleteShare(ctx context.Context) error {
 	snip := newSnippets(sh.tr)
 

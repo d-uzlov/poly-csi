@@ -1,8 +1,6 @@
 package shrtnnfs
 
 import (
-	"context"
-
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/transport"
@@ -26,20 +24,10 @@ func (sh *manager) GetCapabilities() shares.Capabilities {
 	}
 }
 
-func (m *manager) CreateShare(ctx context.Context, req shares.CreateShareRequest) (shares.Share, error) {
-	snip := newNfsSnippets(m.tr)
-
-	err := snip.configureNfsShare(ctx, req.FsPath)
-	if err != nil {
-		return nil, err
-	}
-
-	c := share{
+func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
+	return &share{
 		tr:     m.tr,
-		Folder: req.FsPath,
-	}
-
-	return &c, nil
+	}, nil
 }
 
 func (m *manager) ParseShare(shareData string) (shares.Share, error) {

@@ -7,15 +7,17 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
 type share struct {
 	tr transport.Transport
 
-	Nqn       string `json:"nqn"`
-	Port      string `json:"port"`
-	Transport string `json:"transport"`
-	AuthType  string `json:"auth_type"`
+	Nqn          string `json:"nqn"`
+	TcpPort      string `json:"tcp_port"`
+	NvmePortName string `json:"nvme_port_name"`
+	Transport    string `json:"transport"`
+	AuthType     string `json:"auth_type"`
 }
 
 var _ shares.Share = &share{}
@@ -44,7 +46,7 @@ func (sh *share) Validate() error {
 	if sh.Nqn == "" {
 		return fmt.Errorf("missing nqn")
 	}
-	if sh.Port == "" {
+	if sh.TcpPort == "" {
 		return fmt.Errorf("missing port")
 	}
 	if sh.Transport == "" {
@@ -56,8 +58,43 @@ func (sh *share) Validate() error {
 	return nil
 }
 
+func (sh *share) MakeShare(ctx context.Context, fsPath string) error {
+	allowAnyHost := false
+	if sh.AuthType == authTypeNone {
+		allowAnyHost = true
+	}
+
+	cmd := append(nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
+		Nqn:          sh.Nqn,
+		AllowAnyHost: allowAnyHost,
+	}.Json())
+	err := transport.CheckedRun(ctx, sh.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("subsys create: %w", err)
+	}
+
+	cmd = append(nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
+		Nqn:        sh.Nqn,
+		Nsid:       "1",
+		DevicePath: fsPath,
+		Enabled:    true,
+	}.Json())
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("namespace create: %w", err)
+	}
+
+	cmd = append(nvmetKeeperCmd, "subsys", "attach", sh.Nqn, sh.NvmePortName)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("subsys attach: %w", err)
+	}
+
+	return nil
+}
+
 func (sh *share) DeleteShare(ctx context.Context) error {
-	cmd := append(nvmetKeeperCmd, "subsys", "detach", sh.Nqn, sh.Port)
+	cmd := append(nvmetKeeperCmd, "subsys", "detach", sh.Nqn, sh.TcpPort)
 	err := transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys detach: %w", err)
