@@ -16,13 +16,9 @@ parameters:
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: iscsi
   dispatch.addressNames: storage,k8s
+  dispatch.fsFormatSide: controller
 
   zfs.parentDataset: tulip/test-guid
-
-  init.side: controller
-  init.ownerUser: '0'
-  init.ownerGroup: '10000'
-  init.rootDirMode: '777'
 
   lio.transport: tcp
   lio.listenPort: '3260'

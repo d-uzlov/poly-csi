@@ -19,11 +19,6 @@ parameters:
 
   zfs.parentDataset: rose/test
 
-  init.side: controller
-  init.ownerUser: '0'
-  init.ownerGroup: '10000'
-  init.rootDirMode: '777'
-
   fsType: cifs
 
 # mountOptions:

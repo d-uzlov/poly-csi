@@ -60,20 +60,21 @@ func (sh *share) Validate() error {
 func (sh *share) SharePath(ctx context.Context, fsPath string) error {
 	snip := newSambaSnippets(sh.tr, sh.gp)
 
-	userName := fmt.Sprintf("smb-for-%s", sh.ShareName)
-	userPassword := uuid.NewV4().String()
+	sh.UserName = fmt.Sprintf("smb-for-%s", sh.ShareName)
+	sh.UserPass = uuid.NewV4().String()
 
-	err := snip.configureUser(ctx, userName, userPassword)
+	err := snip.configureUser(ctx, sh.UserName, sh.UserPass)
 	if err != nil {
 		return fmt.Errorf("configure user: %w", err)
 	}
 
 	err = snip.configureShare(ctx, sh.ShareName, ShareParameters{
-		Path: fsPath,
-		User: userName,
+		ShareName: sh.ShareName,
+		Path:      fsPath,
+		User:      sh.UserName,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("configureShare: %w", err)
 	}
 
 	return nil

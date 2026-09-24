@@ -47,7 +47,7 @@ func (s *Snippets) ConfigureDataset(ctx context.Context, path string, config Dat
 
 func (s *Snippets) SetShareNfs(ctx context.Context, path string, nfsOptions string) error {
 	cmd := append(zfsCmd, "set", "sharenfs="+nfsOptions, path)
-	err := transport.CheckedRun(ctx, s.tr, cmd)
+	err := transport.CheckedRun(ctx, s.tr, cmd, transport.WithSudo(true))
 	if err != nil {
 		return fmt.Errorf("zfs set sharenfs: %w", err)
 	}

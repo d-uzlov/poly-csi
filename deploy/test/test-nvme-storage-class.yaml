@@ -17,20 +17,30 @@ parameters:
   dispatch.connectorId: nvme
   dispatch.nodePreset: nvmeCon,nvmeIoq4
   dispatch.addressNames: storage,k8s
+  dispatch.fsFormatSide: node
+
+  # none, sameShare, sameServer, separate
+  # dispatch.journalVolume: sameShare
+
+  # journal.serverName: rose
+  # journal.storageType: zfs-zvol
+  # journal.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  # # journal.shareType: nvmet-keeper
+  # journal.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  # # journal.connectorId: nvme
+  # # journal.nodePreset: nvmeCon,nvmeIoq4
+  # # journal.addressNames: storage,k8s
 
   zfs.parentDataset: rose/test
-
-  init.side: node
-  init.ownerUser: '0'
-  init.ownerGroup: '10000'
-  init.rootDirMode: '777'
+  zfs.reservedPercent: 0%
+  zfs.volblocksize: 32k
 
   nvmet.nvmetPortName: '4420'
   nvmet.connectPort: '4420'
   nvmet.transportType: tcp
   nvmet.authType: chap-provision
 
-  fsType: xfs
+  fsType: ext4
 
 mountOptions:
 - noatime

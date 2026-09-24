@@ -19,11 +19,6 @@ parameters:
 
   zfs.parentDataset: tulip/test-guid
 
-  init.side: controller
-  init.ownerUser: '0'
-  init.ownerGroup: '10000'
-  init.rootDirMode: '777'
-
   nfs.shareOptions: rw,no_subtree_check,no_root_squash
 
   fsType: nfs4

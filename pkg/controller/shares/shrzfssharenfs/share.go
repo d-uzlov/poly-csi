@@ -44,12 +44,6 @@ func (sh *share) Validate() error {
 	if sh.tr == nil {
 		return fmt.Errorf("transport is nil")
 	}
-	if sh.Dataset == "" {
-		return fmt.Errorf("missing dataset")
-	}
-	if sh.Folder == "" {
-		return fmt.Errorf("missing folder")
-	}
 	return nil
 }
 

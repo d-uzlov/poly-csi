@@ -26,6 +26,7 @@ const shareTemplate = `
 `
 
 type ShareParameters struct {
+	ShareName string
 	Path      string
 	User      string
 }

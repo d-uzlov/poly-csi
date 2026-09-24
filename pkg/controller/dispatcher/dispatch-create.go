@@ -85,6 +85,8 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 		return fmt.Errorf("volume name must not contain '/' symbol")
 	}
 
+	dc.rawName = req.Name
+
 	dc.size = req.CapacityRange.RequiredBytes
 
 	dispatchParams, err := parseDispatchParams(nil, req.Parameters, req.MutableParameters)
@@ -133,6 +135,7 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 		return fmt.Errorf("server[name=%s]: not found", dc.p.ServerName)
 	}
 	srv.mutex.RLock()
+	dc.srv = srv
 	dc.srvRelease = srv.mutex.RUnlock
 
 	err = srv.Check()
@@ -494,7 +497,6 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			if clone == nil {
 				return nil, fmt.Errorf("get source snapshot: nil result")
 			}
-			defer clone.srvRelease()
 			err = dc.createFromSnapshot(ctx, *clone)
 			if err != nil {
 				return nil, fmt.Errorf("createFromSnapshot: %w", err)
