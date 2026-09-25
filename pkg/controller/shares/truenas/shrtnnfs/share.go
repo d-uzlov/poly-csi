@@ -46,7 +46,11 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error {
+func (sh *share) PrepareShare(ctx context.Context) error {
+	return nil
+}
+
+func (sh *share) AttachPath(ctx context.Context, fsPath string, index int) error {
 	snip := newNfsSnippets(sh.tr)
 
 	err := snip.configureNfsShare(ctx, fsPath)
@@ -59,7 +63,7 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 	return nil
 }
 
-func (sh *share) ShareVolume(ctx context.Context, volume any, index int) error {
+func (sh *share) AttachVolume(ctx context.Context, volume any, index int) error {
 	return fmt.Errorf("unimplemented")
 }
 

@@ -58,7 +58,7 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error {
+func (sh *share) PrepareShare(ctx context.Context) error {
 	allowAnyHost := false
 	if sh.AuthType == authTypeNone {
 		allowAnyHost = true
@@ -73,17 +73,6 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 		return fmt.Errorf("subsys create: %w", err)
 	}
 
-	cmd = append(nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
-		Nqn:        sh.Nqn,
-		Nsid:       fmt.Sprintf("%d", index + 1),
-		DevicePath: fsPath,
-		Enabled:    true,
-	}.Json())
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
-	if err != nil {
-		return fmt.Errorf("namespace create: %w", err)
-	}
-
 	cmd = append(nvmetKeeperCmd, "subsys", "attach", sh.Nqn, sh.NvmePortName)
 	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
@@ -93,7 +82,22 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 	return nil
 }
 
-func (sh *share) ShareVolume(ctx context.Context, volume any, index int) error {
+func (sh *share) AttachPath(ctx context.Context, fsPath string, index int) error {
+	cmd := append(nvmetKeeperCmd, "namespace", "create", nvmet.Ns{
+		Nqn:        sh.Nqn,
+		Nsid:       fmt.Sprintf("%d", index+1),
+		DevicePath: fsPath,
+		Enabled:    true,
+	}.Json())
+	err := transport.CheckedRun(ctx, sh.tr, cmd)
+	if err != nil {
+		return fmt.Errorf("namespace create: %w", err)
+	}
+
+	return nil
+}
+
+func (sh *share) AttachVolume(ctx context.Context, volume any, index int) error {
 	return fmt.Errorf("unimplemented")
 }
 

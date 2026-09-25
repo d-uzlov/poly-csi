@@ -54,11 +54,16 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error {
+func (sh *share) PrepareShare(ctx context.Context) error {
+	// TODO split configuration
+	return nil
+}
+
+func (sh *share) AttachPath(ctx context.Context, fsPath string, index int) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (sh *share) ShareVolume(ctx context.Context, volume any, index int) error {
+func (sh *share) AttachVolume(ctx context.Context, volume any, index int) error {
 	zfsVol, ok := volume.(*strzfszvol.Volume)
 	if !ok {
 		return fmt.Errorf("storage volume is not zfs zvol: %T", volume)

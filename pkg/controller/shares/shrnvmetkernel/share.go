@@ -54,7 +54,7 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error {
+func (sh *share) PrepareShare(ctx context.Context) error {
 	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
 	}
@@ -67,7 +67,17 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 	if err != nil {
 		return fmt.Errorf("configure subsystem: %w", err)
 	}
-	err = snip.ConfigureNamespace(nvmet.Ns{
+	err = snip.AttachSubsysToPort(sh.Nqn, "1")
+	if err != nil {
+		return fmt.Errorf("attach port: %w", err)
+	}
+	return nil
+}
+
+func (sh *share) AttachPath(ctx context.Context, fsPath string, index int) error {
+	snip := nvmet.NewSnippets(ctx, sh.tr, true)
+
+	err := snip.ConfigureNamespace(nvmet.Ns{
 		Nqn:        sh.Nqn,
 		Nsid:       fmt.Sprintf("%d", index+1),
 		DevicePath: fsPath,
@@ -76,11 +86,6 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 	if err != nil {
 		return fmt.Errorf("configure namespace: %w", err)
 	}
-	err = snip.AttachSubsysToPort(sh.Nqn, "1")
-	if err != nil {
-		return fmt.Errorf("attach port: %w", err)
-	}
-
 	err = saveState(ctx, sh.tr)
 	if err != nil {
 		return fmt.Errorf("nvmet_save: %w", err)
@@ -88,7 +93,7 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 	return nil
 }
 
-func (sh *share) ShareVolume(ctx context.Context, volume any, index int) error {
+func (sh *share) AttachVolume(ctx context.Context, volume any, index int) error {
 	return fmt.Errorf("unimplemented")
 }
 

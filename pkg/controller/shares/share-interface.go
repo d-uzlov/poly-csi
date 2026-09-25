@@ -16,12 +16,14 @@ type ShareManager interface {
 
 type Share interface {
 	Validate() error
-	// SharePath configures sharing of an object in the filesystem.
+	// PrepareShare configures a skeleton for a share.
+	PrepareShare(ctx context.Context) error
+	// AttachPath configures sharing of an object in the filesystem.
 	// If Capabilities.MultiShare is enabled, can be called multiple times, but the first call MUST be with index=0
-	SharePath(ctx context.Context, fsPath string, index int) error
-	// ShareVolume configures sharing of a volume, when some storage-specific info is required.
+	AttachPath(ctx context.Context, fsPath string, index int) error
+	// AttachVolume configures sharing of a volume, when some storage-specific info is required.
 	// Implementation can cast the volume object to expected type to extract info from it.
-	ShareVolume(ctx context.Context, volume any, index int) error
+	AttachVolume(ctx context.Context, volume any, index int) error
 	Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
 	Unpublish(ctx context.Context, serializedLocalData string) error
 	UnpublishAll(ctx context.Context) error
