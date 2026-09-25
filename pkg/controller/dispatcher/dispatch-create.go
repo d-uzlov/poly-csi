@@ -590,12 +590,12 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	}
 
 	if dc.shareViaVolume {
-		err = dc.shareHandle.ShareVolume(ctx, dc.volMain)
+		err = dc.shareHandle.ShareVolume(ctx, dc.volMain, 0)
 		if err != nil {
 			return nil, fmt.Errorf("ShareVolume: %w", err)
 		}
 	} else {
-		err = dc.shareHandle.SharePath(ctx, volumeState.FsPath)
+		err = dc.shareHandle.SharePath(ctx, volumeState.FsPath, 0)
 		if err != nil {
 			return nil, fmt.Errorf("SharePath: %w", err)
 		}

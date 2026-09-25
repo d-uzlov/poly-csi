@@ -47,11 +47,11 @@ func (sh *share) Validate() error {
 	return nil
 }
 
-func (sh *share) SharePath(ctx context.Context, fsPath string) error {
+func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (sh *share) ShareVolume(ctx context.Context, volume any) error {
+func (sh *share) ShareVolume(ctx context.Context, volume any, index int) error {
 
 	dataset, ok := volume.(*strzfsdataset.Volume)
 	if !ok {
