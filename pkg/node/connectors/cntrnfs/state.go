@@ -50,7 +50,7 @@ func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderR
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context) ([]string, error) {
+func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 	return nil, fmt.Errorf("nfs does not create block devices")
 }
 

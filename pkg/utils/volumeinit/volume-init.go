@@ -9,11 +9,23 @@ import (
 const PreferredPrefix = "init."
 
 type FilesystemHelper interface {
-	Configure(params map[string]string, props StorageProperties) error
-	Format(ctx context.Context, tr transport.Transport, devicePath string) error
+	Capabilities() Capabilities
+	Configure(params map[string]string) error
+	SetVolumeProps(props StorageProperties, journalProps StorageProperties) error
+	CalcPreferredJournalSize(dataSize int64) int64
+	SetSingleDevice(devicePath string)
+	SetWithJournal(mainDevice string, journalDevice string)
+	Format(ctx context.Context, tr transport.Transport) error
+	GetMountOptions() []string
+	Resize(ctx context.Context, tr transport.Transport) error
 	Serialize() (string, error)
 	// Inflate restores internal state from Serialize() result
 	Inflate(serialized string) error
+}
+
+type Capabilities struct {
+	MinFsSize       int64
+	ExternalJournal bool
 }
 
 type StorageProperties struct {

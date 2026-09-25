@@ -14,7 +14,8 @@ type VolumeContext struct {
 	FsGroupMethod string `map:"fs_group_method"`
 	Uuid          string `map:"uuid"`
 	FsType        string `map:"fs_type"`
-	FormatData    string `map:"format_data"`
+	FsData        string `map:"fs_data"`
+	JournalVolume string `map:"journal_volume"`
 }
 
 func (v *VolumeContext) Validate() error {

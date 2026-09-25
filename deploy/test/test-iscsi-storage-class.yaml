@@ -28,4 +28,5 @@ parameters:
 
 mountOptions:
 - noatime
+- nodiratime
 - discard

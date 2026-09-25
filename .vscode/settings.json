@@ -94,6 +94,7 @@
     "nodeinfo",
     "noderegistry",
     "nodeserver",
+    "nodiratime",
     "nodiscard",
     "nodregremote",
     "nodremotereg",

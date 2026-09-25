@@ -47,22 +47,27 @@ func generateId(tmplName string, tmpl string, requestName string, staticParams m
 }
 
 type dispatchCreate struct {
-	rawName          string
-	rawStaticParams  map[string]string
-	rawMutableParams map[string]string
-	size             int64
-	p                DispatchParams
-	// j       DispatchParams
+	rawName              string
+	rawStaticParams      map[string]string
+	rawMutableParams     map[string]string
+	journalStaticParams  map[string]string
+	journalMutableParams map[string]string
+	size                 int64
+	p                    DispatchParams
+	j                    DispatchParams
 
 	volCapsFs *csi.VolumeCapability_MountVolume
 
 	srv        *parsedServer
 	srvRelease func()
 
-	format volumeinit.FilesystemHelper
+	fs volumeinit.FilesystemHelper
 
 	str     storage.StorageManager
 	volMain storage.Volume
+
+	strJ       storage.StorageManager
+	volJournal storage.Volume
 
 	shr            shares.ShareManager
 	shareHandle    shares.Share
@@ -95,12 +100,12 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 	}
 	dc.p = dispatchParams
 
-	// journalParams := dispatchParams
-	// err = serialmaps.ParseRemove(req.Parameters, paramsJournalPrefix, true, &journalParams)
-	// if err != nil {
-	// 	return fmt.Errorf("parse journal params: %w", err)
-	// }
-	// dc.j = journalParams
+	journalParams := dispatchParams
+	err = serialmaps.ParseRemove(req.Parameters, paramsJournalPrefix, true, &journalParams)
+	if err != nil {
+		return fmt.Errorf("parse journal params: %w", err)
+	}
+	dc.j = journalParams
 
 	if len(req.VolumeCapabilities) == 0 {
 		return fmt.Errorf("request does not define volume capabilities")
@@ -108,14 +113,37 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 
 	dc.volCapsFs = req.VolumeCapabilities[0].GetMount()
 	if dc.volCapsFs != nil {
-		dc.format = volumeinit.GetFromType(dc.volCapsFs.FsType)
-		if dc.format == nil {
+		dc.fs = volumeinit.GetFromType(dc.volCapsFs.FsType)
+		if dc.fs == nil {
 			return fmt.Errorf("filesystem handler for fs type '%s' is not found", dc.volCapsFs.FsType)
+		}
+		dc.fs.Configure(dc.rawStaticParams)
+
+		caps := dc.fs.Capabilities()
+		if dc.size < caps.MinFsSize {
+			dc.size = caps.MinFsSize
 		}
 	}
 
 	dc.rawStaticParams = req.Parameters
 	dc.rawMutableParams = req.MutableParameters
+
+	dc.journalStaticParams = map[string]string{}
+	dc.journalMutableParams = map[string]string{}
+
+	for k, v := range dc.rawStaticParams {
+		kk, ok := strings.CutPrefix(k, paramsJournalPrefix)
+		if ok {
+			dc.journalStaticParams[kk] = v
+		}
+	}
+
+	for k, v := range dc.rawMutableParams {
+		kk, ok := strings.CutPrefix(k, paramsJournalPrefix)
+		if ok {
+			dc.journalMutableParams[kk] = v
+		}
+	}
 
 	return nil
 }
@@ -135,6 +163,11 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	}
 
 	dc.str, err = storagefactory.StorageFromType(srv.trInstance, dc.p.StorageType, srv.Conf.GlobalParams)
+	if err != nil {
+		return err
+	}
+
+	dc.strJ, err = storagefactory.StorageFromType(srv.trInstance, dc.j.StorageType, srv.Conf.GlobalParams)
 	if err != nil {
 		return err
 	}
@@ -165,10 +198,12 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	}
 
 	strCaps := dc.str.GetCapabilities()
+	strJCaps := dc.strJ.GetCapabilities()
 	shrCaps := dc.shr.GetCapabilities()
 
+	// storage-to-share checks
 	if strCaps.LocalPathType == "" && strCaps.OpaqueVolumeType == "" {
-		return fmt.Errorf("storage reported empty both LocalPathType and OpaqueVolumeType")
+		return fmt.Errorf("storage reported empty for both LocalPathType and OpaqueVolumeType")
 	}
 
 	if shrCaps.LocalVolume != "" && shrCaps.LocalVolume != strCaps.LocalPathType {
@@ -182,6 +217,30 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 		dc.shareViaVolume = true
 	}
 
+	// journal-to-share checks
+
+	if dc.p.JournalVolume != "none" {
+		if !shrCaps.MultiShare {
+			return fmt.Errorf("share '%s' does not support multiple volumes", dc.p.ShareType)
+		}
+
+		if strJCaps.LocalPathType == "" && strJCaps.OpaqueVolumeType == "" {
+			return fmt.Errorf("journal storage reported empty for both LocalPathType and OpaqueVolumeType")
+		}
+
+		if shrCaps.LocalVolume != "" && shrCaps.LocalVolume != strJCaps.LocalPathType {
+			return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.LocalVolume, dc.j.StorageType, strCaps.LocalPathType)
+		}
+
+		if shrCaps.OpaqueVolume != "" {
+			if shrCaps.OpaqueVolume == strJCaps.OpaqueVolumeType {
+				return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.j.StorageType, strCaps.OpaqueVolumeType)
+			}
+			dc.shareViaVolume = true
+		}
+	}
+
+	// main volume
 	storageId := dc.rawName
 	if dc.p.StorageIdTemplate != "" {
 		storageId, err = generateId("storageIdTemplate", dc.p.StorageIdTemplate, dc.rawName, dc.rawStaticParams)
@@ -200,6 +259,32 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	}
 	if dc.volMain == nil {
 		return fmt.Errorf("storage[%s]:CreateVolume: nil result", dc.p.StorageType)
+	}
+
+	// journal volume
+	if dc.p.JournalVolume != "none" {
+		storageIdJ := dc.rawName
+		if dc.j.StorageIdTemplate != "" {
+			storageIdJ, err = generateId("storageIdTemplate(journal)", dc.j.StorageIdTemplate, dc.rawName, dc.rawStaticParams)
+			if err != nil {
+				return fmt.Errorf("generate journal storage id: %w", err)
+			}
+		}
+		if storageIdJ == storageId {
+			return fmt.Errorf("main_storage_id == journal_storage_id")
+		}
+
+		dc.volJournal, err = dc.strJ.CreateVolume(storage.CreateRequest{
+			Id:            storageIdJ,
+			StaticParams:  dc.journalStaticParams,
+			MutableParams: dc.journalMutableParams,
+		})
+		if err != nil {
+			return fmt.Errorf("storage[%s]:CreateVolume(journal): %w", dc.j.StorageType, err)
+		}
+		if dc.volJournal == nil {
+			return fmt.Errorf("storage[%s]:CreateVolume(journal): nil result", dc.j.StorageType)
+		}
 	}
 
 	shareId := dc.rawName
@@ -227,6 +312,16 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 		return fmt.Errorf("validate share handle: %w", err)
 	}
 
+	switch dc.p.JournalVolume {
+	case "none":
+	case "sameShare":
+		if !dc.shr.GetCapabilities().MultiShare {
+			return fmt.Errorf("can't use journalVolume=sameShare because share '%s' does not support multiple volumes", dc.p.ShareType)
+		}
+	default:
+		return fmt.Errorf("unsupported JournalVolume: '%s'", dc.p.JournalVolume)
+	}
+
 	return nil
 }
 
@@ -235,7 +330,14 @@ func (dc *dispatchCreate) createFromScratch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("CreateState: %w", err)
 	}
-	logs.FromCtx(ctx).Info("storage.CreateVolume: success")
+	if dc.p.JournalVolume != "none" {
+		size := dc.fs.CalcPreferredJournalSize(dc.size)
+		err = dc.volJournal.CreateState(ctx, size)
+		if err != nil {
+			return fmt.Errorf("CreateState(journal): %w", err)
+		}
+	}
+	logs.FromCtx(ctx).Info("storage.CreateState: success")
 	return nil
 }
 
@@ -507,6 +609,13 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("volMain.Serialize: %w", err)
 	}
+	if dc.p.JournalVolume != "none" {
+		vi.Storage.JournalStorageType = dc.j.StorageType
+		vi.Storage.JournalStorageData, err = dc.volJournal.Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("volMain.Serialize: %w", err)
+		}
+	}
 	err = wrapped.SetVolumeInfo(ctx, *vi)
 	if err != nil {
 		return nil, fmt.Errorf("SetVolumeInfo: %w", err)
@@ -530,8 +639,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("check local file: %w", err)
 		}
 	}
-	if volumeState.Size < req.CapacityRange.RequiredBytes {
-		err = dc.volMain.SetSize(ctx, req.CapacityRange.RequiredBytes)
+	// TODO do we even need this check?
+	if volumeState.Size < dc.size {
+		err = dc.volMain.SetSize(ctx, dc.size)
 		if err != nil {
 			return nil, fmt.Errorf("SetSize: %w", err)
 		}
@@ -556,14 +666,51 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		FsRootDirMode: "777",
 	}
 
-	dc.format.Configure(dc.rawStaticParams, volumeinit.StorageProperties{
+	switch dc.p.JournalVolume {
+	case "none":
+		vi.VolumeContext.JournalVolume = "none"
+	case "sameShare":
+		vi.VolumeContext.JournalVolume = "sameShare"
+	default:
+		return nil, fmt.Errorf("unsupported JournalVolume type: '%s'", dc.p.JournalVolume)
+	}
+
+	journalProps := volumeinit.StorageProperties{}
+	var journalState *storage.VolumeState
+	if dc.p.JournalVolume != "none" {
+		journalState, err = dc.volJournal.ReadState(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read journal state: %w", err)
+		}
+		if journalState == nil {
+			return nil, fmt.Errorf("read journal state: nil result")
+		}
+		if dc.strJ.GetCapabilities().LocalPathType != "" {
+			if journalState.FsPath == "" {
+				return nil, fmt.Errorf("storage did not set journal FsPath")
+			}
+			// when using local volumes, we can check common stuff here, to avoid repeating it in each share
+			err = checkFile(ctx, dc.srv.trInstance, strCaps.LocalPathType, journalState.FsPath)
+			if err != nil {
+				return nil, fmt.Errorf("check journal local file: %w", err)
+			}
+		}
+
+		journalProps = volumeinit.StorageProperties{
+			InitialEmpty:     dc.strJ.GetCapabilities().BlockInitialEmpty,
+			RMWSize:          journalState.RMWSize,
+			OptimalWriteSize: journalState.OptimalWriteSize,
+			AtomicSize:       journalState.AtomicSize,
+		}
+	}
+	dc.fs.SetVolumeProps(volumeinit.StorageProperties{
 		InitialEmpty:     strCaps.BlockInitialEmpty,
 		RMWSize:          volumeState.RMWSize,
 		OptimalWriteSize: volumeState.OptimalWriteSize,
 		AtomicSize:       volumeState.AtomicSize,
-	})
+	}, journalProps)
 	vi.VolumeContext.FsType = dc.volCapsFs.FsType
-	vi.VolumeContext.FormatData, err = dc.format.Serialize()
+	vi.VolumeContext.FsData, err = dc.fs.Serialize()
 	if err != nil {
 		return nil, fmt.Errorf("format.Serialize: %w", err)
 	}
@@ -578,7 +725,13 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("read state: empty fs path")
 		}
 
-		err = dc.format.Format(ctx, dc.srv.trInstance, volumeState.FsPath)
+		if dc.p.JournalVolume != "none" {
+			dc.fs.SetWithJournal(volumeState.FsPath, journalState.FsPath)
+		} else {
+			dc.fs.SetSingleDevice(volumeState.FsPath)
+		}
+
+		err = dc.fs.Format(ctx, dc.srv.trInstance)
 		if err != nil {
 			return nil, fmt.Errorf("run format: %w", err)
 		}
@@ -597,17 +750,35 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	if dc.shareViaVolume {
 		err = dc.shareHandle.AttachVolume(ctx, dc.volMain, 0)
 		if err != nil {
-			return nil, fmt.Errorf("ShareVolume: %w", err)
+			return nil, fmt.Errorf("AttachVolume: %w", err)
 		}
 	} else {
 		err = dc.shareHandle.AttachPath(ctx, volumeState.FsPath, 0)
 		if err != nil {
-			return nil, fmt.Errorf("SharePath: %w", err)
+			return nil, fmt.Errorf("AttachPath: %w", err)
 		}
+	}
+	switch dc.p.JournalVolume {
+	case "none":
+	case "sameShare":
+		if dc.shareViaVolume {
+			err = dc.shareHandle.AttachVolume(ctx, dc.volJournal, 1)
+			if err != nil {
+				return nil, fmt.Errorf("AttachVolume(journal): %w", err)
+			}
+		} else {
+			err = dc.shareHandle.AttachPath(ctx, journalState.FsPath, 1)
+			if err != nil {
+				return nil, fmt.Errorf("AttachPath(journal): %w", err)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported JournalVolume: '%s'", dc.p.JournalVolume)
 	}
 
 	logger.Info("share.CreateShare: success")
 	defer func() {
+		// TODO change cleanup to use dispatchCreate struct
 		if success {
 			return
 		}

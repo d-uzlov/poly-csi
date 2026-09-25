@@ -9,14 +9,14 @@ import (
 )
 
 func ensureMultipathDisabled(ctx context.Context, nvi *NodeVolumeInfo, mp multipath.Multipath) error {
-	if nvi.SerializedMultipathData == "" {
+	if nvi.MultipathData == "" {
 		return nil
 	}
 	if mp == nil {
 		return fmt.Errorf("multipath instance is nil")
 	}
 	logs.FromCtx(ctx).MicroOp("multipath.Destroy: request")
-	err := mp.Destroy(ctx, nvi.SerializedMultipathData)
+	err := mp.Destroy(ctx, nvi.MultipathData)
 	if err != nil {
 		return err
 	}

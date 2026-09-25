@@ -73,33 +73,41 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
 
-	if nvi.SerializedConnectorState != "" {
+	if nvi.ConnectorData != "" {
 		err = nvi.conState.Expand(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("connector.Expand: %w", err)
 		}
 		logs.FromCtx(ctx).MicroOp("connector.Expand: success")
 	}
-	if nvi.SerializedMultipathData != "" {
-		err = mp.Expand(ctx, nvi.SerializedMultipathData)
+	if nvi.MultipathData != "" {
+		err = mp.Expand(ctx, nvi.MultipathData)
 		if err != nil {
 			return nil, fmt.Errorf("multipath.Expand: %w", err)
 		}
 		logs.FromCtx(ctx).MicroOp("multipath.Expand: success")
 	}
 
-	fsnip := fsutils.New(tr)
-
 	// Dispatcher expand manages filesystems mounted from block devices.
 	// Other cases should be handled in connectors.
 	if nvi.MountType == mountTypeBlock {
-		err = fsnip.ExpandFs(ctx, nvi.FsMountPath, conf.DevFolder)
+		if nvi.fs == nil {
+			return nil, fmt.Errorf("nvi.fs is not initialized")
+		}
+		// TODO add support for journal
+		devices, err := nvi.conState.GetDevices(ctx, 0)
+		if err != nil {
+			return nil, fmt.Errorf("get connection devices: %w", err)
+		}
+		nvi.fs.SetSingleDevice(devices[0])
+		err = nvi.fs.Resize(ctx, tr)
 		if err != nil {
 			return nil, fmt.Errorf("ExpandFs: %w", err)
 		}
 		logs.FromCtx(ctx).MicroOp("ExpandFs: success")
 	}
 
+	fsnip := fsutils.New(tr)
 	stats, err := fsnip.GetMountStats(req.VolumePath)
 	if err != nil {
 		return nil, fmt.Errorf("GetMountStats: %w", err)

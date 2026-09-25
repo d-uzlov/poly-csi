@@ -95,7 +95,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context) ([]string, error) {
+func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 	is, err := s.snip.findSessions(ctx, s.Iqn)
 	if err != nil {
 		return nil, fmt.Errorf("find iscsi sessions: %w", err)

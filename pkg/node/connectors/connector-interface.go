@@ -30,7 +30,9 @@ type ConnectionHandle interface {
 	ConnectBlock(ctx context.Context) error
 	// GetDevices returns list of block devices associated connection.
 	// It's irrelevant for connectors that don't create block devices.
-	GetDevices(ctx context.Context) ([]string, error)
+	// The returned list contains devices with the same storage backend (for external multipath setup).
+	// Index can enumerate independent devices, starting with 0.
+	GetDevices(ctx context.Context, index int) ([]string, error)
 
 	ConnectFolder(ctx context.Context, req ConnectFolderRequest) error
 

@@ -18,6 +18,8 @@ type ExecParams struct {
 	// When set to 0, exec transport should use its default timeout.
 	// Using timeout should be equivalent to using context.WithTimeout before calling RunCommand
 	Timeout time.Duration
+
+	Env map[string]string
 }
 
 type ExecOption func(o *ExecParams)
@@ -68,5 +70,15 @@ func WithoutStdout() ExecOption {
 func WithTimeout(value time.Duration) ExecOption {
 	return func(o *ExecParams) {
 		o.Timeout = value
+	}
+}
+
+// see ExecParams.Env
+func WithEnv(key string, value string) ExecOption {
+	return func(o *ExecParams) {
+		if o.Env == nil {
+			o.Env = map[string]string{}
+		}
+		o.Env[key] = value
 	}
 }

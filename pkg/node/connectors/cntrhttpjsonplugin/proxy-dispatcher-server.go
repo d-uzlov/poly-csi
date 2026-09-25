@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
@@ -79,7 +80,11 @@ func (d *DispatcherServer) Process(ctx context.Context, req PluginRequest) (resu
 			}
 			return nil, state.ConnectFolder(ctx, cr)
 		case MethodGetDeviceList:
-			devices, err := state.GetDevices(ctx)
+			index, err := strconv.Atoi(req.SerializedArg)
+			if err != nil {
+				return nil, err
+			}
+			devices, err := state.GetDevices(ctx, index)
 			if err != nil {
 				return nil, err
 			}

@@ -21,6 +21,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/blockdevice"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
+	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 const stageFolderMount = "/fs_mount"
@@ -117,6 +118,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, fullPreset)
 	nvi.conState = ch
 	nvi.FsRootDirMode = vc.FsRootDirMode
+	nvi.JournalVolume = vc.JournalVolume
 	defer func() {
 		saveErr := nvi.writeToDisk()
 		if err == nil {
@@ -150,7 +152,13 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 		switch {
 		case mountParams != nil:
-			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags, vc.FsType, vc.FormatData)
+			nvi.FsType = vc.FsType
+			nvi.fs = volumeinit.GetFromType(vc.FsType)
+			err = nvi.fs.Inflate(vc.FsData)
+			if err != nil {
+				return nil, fmt.Errorf("fs.Inflate: %w", err)
+			}
+			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags)
 			if err != nil {
 				return nil, fmt.Errorf("stageBlockMount: %w", err)
 			}

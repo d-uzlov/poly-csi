@@ -87,6 +87,9 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 	logs.FromCtx(ctx).Command("local exec: running command", "cmd", cmdString)
 
 	ec := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
+	for k, v := range options.Env {
+		ec.Env = append(ec.Env, k + "=" + v)
+	}
 
 	stderrBuf := bytes.Buffer{}
 	ec.Stderr = &stderrBuf

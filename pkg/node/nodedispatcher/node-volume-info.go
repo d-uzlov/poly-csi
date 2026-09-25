@@ -31,16 +31,21 @@ type NodeVolumeInfo struct {
 	// FsRootDirMode sets access more for mount root dir
 	FsRootDirMode string `json:"fs_root_dir_mode"`
 	// FsMountPath points to the root folder of the mount
-	FsMountPath              string            `json:"folder_path"`
-	SerializedMultipathData  string            `json:"multipath_data"`
-	SerializedConnectorState string            `json:"connector_data"`
-	Preset                   map[string]string `json:"preset"`
+	FsMountPath          string            `json:"folder_path"`
+	JournalVolume        string            `json:"journal_volume"`
+	MultipathData        string            `json:"multipath_data"`
+	MultipathJournalData string            `json:"multipath_journal_data"`
+	ConnectorData        string            `json:"connector_data"`
+	FsType               string            `json:"fs_type"`
+	FsData               string            `json:"fs_data"`
+	Preset               map[string]string `json:"preset"`
 
 	tr           transport.Transport         `json:"-"`
 	connector    connectors.Connector        `json:"-"`
 	conState     connectors.ConnectionHandle `json:"-"`
 	mp           multipath.Multipath         `json:"-"`
 	parentFolder string                      `json:"-"`
+	fs           volumeinit.FilesystemHelper `json:"-"`
 }
 
 type SavedParams struct {
@@ -105,15 +110,23 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}
 
-	state, err := connector.ParseHandle(result.SerializedConnectorState)
+	state, err := connector.ParseHandle(result.ConnectorData)
 	if err != nil {
-		return nil, fmt.Errorf("connector.ParseState(%s): %w", result.SerializedConnectorState, err)
+		return nil, fmt.Errorf("connector.ParseState(%s): %w", result.ConnectorData, err)
 	}
 	err = state.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("connector.State.Validate: %w", err)
 	}
 	result.conState = state
+
+	if result.FsType != "" {
+		result.fs = volumeinit.GetFromType(result.FsType)
+		err = result.fs.Inflate(result.FsData)
+		if err != nil {
+			return nil, fmt.Errorf("inflate fs helper: %w", err)
+		}
+	}
 
 	result.parentFolder = parentFolder
 	result.tr = tr
@@ -126,13 +139,36 @@ func (v *NodeVolumeInfo) getMainBlockDevice(ctx context.Context) (string, error)
 	if v.MountType != mountTypeBlock {
 		return "", fmt.Errorf("trying to get block device on non-block connection")
 	}
-	if v.SerializedMultipathData != "" {
-		return v.mp.GetDevice(ctx, v.SerializedMultipathData)
+	if v.MultipathData != "" {
+		return v.mp.GetDevice(ctx, v.MultipathData)
 	}
 	if v.conState == nil {
 		return "", fmt.Errorf("connection state object is not initialized")
 	}
-	devices, err := v.conState.GetDevices(ctx)
+	devices, err := v.conState.GetDevices(ctx, 0)
+	if err != nil {
+		return "", err
+	}
+	if len(devices) == 0 {
+		return "", fmt.Errorf("state.GetDevices did not return any devices")
+	}
+	if len(devices) > 1 {
+		return "", fmt.Errorf("state.GetDevices returned several devices, but multipath is not set up: %v", devices)
+	}
+	return devices[0], nil
+}
+
+func (v *NodeVolumeInfo) getJournalDevice(ctx context.Context) (string, error) {
+	if v.MountType != mountTypeBlock {
+		return "", fmt.Errorf("trying to get block device on non-block connection")
+	}
+	if v.MultipathJournalData != "" {
+		return v.mp.GetDevice(ctx, v.MultipathJournalData)
+	}
+	if v.conState == nil {
+		return "", fmt.Errorf("connection state object is not initialized")
+	}
+	devices, err := v.conState.GetDevices(ctx, 1)
 	if err != nil {
 		return "", err
 	}
@@ -158,11 +194,25 @@ func (v *NodeVolumeInfo) deleteFromDisk(ctx context.Context) error {
 }
 
 func (v *NodeVolumeInfo) writeToDisk() error {
+	if v.conState == nil {
+		return fmt.Errorf("v.conState == nil")
+	}
 	serialized, err := v.conState.Serialize()
 	if err != nil {
 		return fmt.Errorf("connector.State.Serialize: %w", err)
 	}
-	v.SerializedConnectorState = serialized
+	v.ConnectorData = serialized
+
+	if v.FsType != "" {
+		if v.fs == nil {
+			return fmt.Errorf("v.fs == nil")
+		}
+		serializedFs, err := v.fs.Serialize()
+		if err != nil {
+			return fmt.Errorf("fs.Serialize: %w", err)
+		}
+		v.FsData = serializedFs
+	}
 
 	encoded, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -178,58 +228,77 @@ func (v *NodeVolumeInfo) stageBlock(ctx context.Context) error {
 		return fmt.Errorf("conState.ConnectBlock: %w", err)
 	}
 
-	devices, err := v.conState.GetDevices(ctx)
+	v.MountType = mountTypeBlock
+
+	devices, err := v.conState.GetDevices(ctx, 0)
 	if err != nil {
 		return fmt.Errorf("GetDevices: %w", err)
 	}
+	v.MultipathData, err = v.setupMultipath(ctx, devices)
+	if err != nil {
+		return fmt.Errorf("setupMultipath: %w", err)
+	}
+
+	if v.JournalVolume != "none" {
+		devices, err := v.conState.GetDevices(ctx, 1)
+		if err != nil {
+			return fmt.Errorf("GetDevices(journal): %w", err)
+		}
+		v.MultipathJournalData, err = v.setupMultipath(ctx, devices)
+		if err != nil {
+			return fmt.Errorf("setupMultipath(journal): %w", err)
+		}
+	}
+	return nil
+}
+
+func (v *NodeVolumeInfo) setupMultipath(ctx context.Context, devices []string) (mpData string, err error) {
 	if len(devices) == 0 {
-		return fmt.Errorf("connector did not set device list")
+		return "", fmt.Errorf("connector did not set device list")
 	}
 	logs.FromCtx(ctx).MicroOp("got device list", "devices", devices)
-
-	v.MountType = mountTypeBlock
 
 	fsnip := fsutils.New(v.tr)
 
 	devices = fsnip.WaitForBlockDeviceList(ctx, devices, time.Second, time.Millisecond*50)
 	if len(devices) == 0 {
-		return fmt.Errorf("connector device list has no valid devices")
+		return "", fmt.Errorf("connector device list has no valid devices")
 	}
 	logs.FromCtx(ctx).MicroOp("got device list", "devices", devices)
 
-	if len(devices) == 1 {
-		return nil
+	if len(devices) <= 1 {
+		return "", nil
 	}
 
 	logs.FromCtx(ctx).MicroOp("multipath.Setup: request", "devices", devices)
-	mpData, err := v.mp.Setup(ctx, devices)
+	mpData, err = v.mp.Setup(ctx, devices)
 	if err != nil {
-		return fmt.Errorf("multipath.Setup: %w", err)
+		return "", fmt.Errorf("multipath.Setup: %w", err)
 	}
 	if mpData == "" {
-		return fmt.Errorf("multipath did not set data")
+		return "", fmt.Errorf("multipath did not set data")
 	}
 	logs.FromCtx(ctx).MicroOp("multipath.Setup: success")
 
-	v.SerializedMultipathData = mpData
-
 	device, err := v.mp.GetDevice(ctx, mpData)
 	if err != nil {
-		return fmt.Errorf("multipath.GetDevice: %w", err)
+		err = fmt.Errorf("multipath.GetDevice: %w", err)
+		return
 	}
 	if device == "" {
-		return fmt.Errorf("multipath did not set device")
+		err = fmt.Errorf("multipath did not set device")
+		return
 	}
 
 	err = fsnip.WaitForBlockDevice(ctx, device, time.Second, time.Millisecond*50)
 	if err != nil {
-		return fmt.Errorf("wait for device: %w", err)
+		err = fmt.Errorf("wait for device: %w", err)
+		return
 	}
-
-	return nil
+	return
 }
 
-func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string, mountFlags []string, fsType string, formatData string) error {
+func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string, mountFlags []string) error {
 	var err error
 	v.FsMountPath = targetPath
 
@@ -245,20 +314,21 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 		return fmt.Errorf("GetBlkid: %w", err)
 	}
 
-	if fsInfo == nil {
-		logs.FromCtx(ctx).MicroOp("no filesystem on device, will format", "device", dev, "fs-type", fsType)
-
-		format := volumeinit.GetFromType(fsType)
-		if format == nil {
-			return fmt.Errorf("filesystem helper for fs '%s' is not found", fsType)
-		}
-		err = format.Inflate(formatData)
+	if v.JournalVolume == "none" {
+		v.fs.SetSingleDevice(dev)
+	} else {
+		jDev, err := v.getJournalDevice(ctx)
 		if err != nil {
-			return fmt.Errorf("inflate format: %w", err)
+			return fmt.Errorf("getJournalDevice: %w", err)
 		}
+		v.fs.SetWithJournal(dev, jDev)
+	}
+
+	if fsInfo == nil {
+		logs.FromCtx(ctx).MicroOp("no filesystem on device, will format", "device", dev)
 
 		blockFormatStart := time.Now()
-		err = format.Format(ctx, v.tr, dev)
+		err = v.fs.Format(ctx, v.tr)
 		if err != nil {
 			return fmt.Errorf("format: %w", err)
 		}
@@ -266,6 +336,9 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 	} else {
 		logs.FromCtx(ctx).MicroOp("will not format over existing fs", "device", dev, "fs-type", fsInfo.FsType)
 	}
+
+	extraOpts := v.fs.GetMountOptions()
+	mountFlags = append(mountFlags, extraOpts...)
 
 	_, err = fsnip.EnsureMounted(ctx, dev, v.FsMountPath, "", mountFlags)
 	if err != nil {
@@ -406,13 +479,13 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context) (err error) {
 			return fmt.Errorf("cleanupMount: %w", err)
 		}
 
-		if v.SerializedMultipathData != "" {
+		if v.MultipathData != "" {
 			err = ensureMultipathDisabled(ctx, v, v.mp)
 			if err != nil {
 				return fmt.Errorf("ensureMultipathDisabled: %w", err)
 			}
 			logs.FromCtx(ctx).MicroOp("ManagedOps: multipath disabled OK")
-			v.SerializedMultipathData = ""
+			v.MultipathData = ""
 		}
 
 	case mountTypeFolder:
@@ -428,13 +501,13 @@ func (v *NodeVolumeInfo) cleanup(ctx context.Context) (err error) {
 		// v.MountType is not initialized, nothing to do here
 	}
 
-	if v.SerializedConnectorState != "" {
+	if v.ConnectorData != "" {
 		err = v.conState.Disconnect(ctx)
 		if err != nil {
 			return fmt.Errorf("connector.Disconnect: %w", err)
 		}
 		logs.FromCtx(ctx).MicroOp("connector.Disconnect: success")
-		v.SerializedConnectorState = ""
+		v.ConnectorData = ""
 	}
 
 	// best-effort unmount, in case steps above failed

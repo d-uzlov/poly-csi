@@ -156,8 +156,8 @@ func (s *FsSnippets) EnsureMounted(ctx context.Context, sourcePath string, targe
 	return mi, nil
 }
 
-func (s *FsSnippets) findBlockDevice(ctx context.Context, minMaj string) (string, error) {
-	link := fmt.Sprintf("/sys/dev/block/%s/", minMaj)
+func (s *FsSnippets) FindBlockDevice(ctx context.Context, majorMinor string) (string, error) {
+	link := fmt.Sprintf("/sys/dev/block/%s/", majorMinor)
 	sr, err := s.tr.Cmds().Stat(ctx, link)
 	if err != nil {
 		return "", fmt.Errorf("failed to get device link: %w", err)
@@ -169,35 +169,6 @@ func (s *FsSnippets) findBlockDevice(ctx context.Context, minMaj string) (string
 		return "", fmt.Errorf("file is not a directory:  %v", sr.Type)
 	}
 	return filepath.Base(sr.Path), nil
-}
-
-func (s *FsSnippets) ExpandFs(ctx context.Context, mountedPath string, devFolder string) error {
-	mi, err := s.FindMount(ctx, mountedPath)
-	if err != nil {
-		return err
-	}
-
-	deviceName, err := s.findBlockDevice(ctx, mi.MajorMinor)
-	devicePath := fmt.Sprintf("%s/%s", devFolder, deviceName)
-
-	logs.FromCtx(ctx).Info("ExpandFs", "mi.FsType", mi.FsType)
-	switch mi.FsType {
-	case "ext4":
-		cmd := []string{"resize2fs", devicePath}
-		err := transport.CheckedRun(ctx, s.tr, cmd)
-		if err != nil {
-			return fmt.Errorf("resize2fs: %w", err)
-		}
-		return nil
-	case "xfs":
-		cmd := []string{"xfs_growfs", devicePath}
-		err := transport.CheckedRun(ctx, s.tr, cmd)
-		if err != nil {
-			return fmt.Errorf("xfs_growfs: %w", err)
-		}
-		return nil
-	}
-	return fmt.Errorf("filesystem %s is not supported", mi.FsType)
 }
 
 type bindMountParams struct {

@@ -61,6 +61,10 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 	}
 	defer session.Close()
 
+	for k, v := range options.Env {
+		session.Setenv(k, v)
+	}
+
 	stderrBuf := bytes.Buffer{}
 	session.Stderr = &stderrBuf
 

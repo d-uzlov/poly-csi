@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
@@ -57,11 +58,11 @@ func (s *state) ConnectFolder(ctx context.Context, cReq connectors.ConnectFolder
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context) ([]string, error) {
+func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 	req := PluginRequest{
 		Method:        MethodGetDeviceList,
 		State:         s.RemoteState,
-		SerializedArg: "",
+		SerializedArg: strconv.Itoa(index),
 	}
 	resp, err := s.con.remote.Send(ctx, req)
 	if err != nil {

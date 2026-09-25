@@ -26,5 +26,6 @@ parameters:
 mountOptions:
 - soft
 - noatime
+- nodiratime
 - rsize=262144
 - wsize=262144

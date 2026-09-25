@@ -22,8 +22,8 @@ type state struct {
 	ConExtra    ConnectExtra         `json:"conExtra"`
 	Connections []ExpectedConnection `json:"connections"`
 
-	DeviceName string `json:"device_name"`
-	Serial     string `json:"serial"`
+	Devices map[int]string `json:"devices"`
+	Serial  string         `json:"serial"`
 }
 
 type ExpectedConnection struct {
@@ -77,13 +77,11 @@ func (s *state) ConnectBlock(ctx context.Context) error {
 	if len(subsys.Namespaces) == 0 {
 		return fmt.Errorf("subsystem does not have any namespaces")
 	}
+	s.Devices = map[int]string{}
 	for _, ns := range subsys.Namespaces {
-		if ns.NSID == 1 {
-			s.DeviceName = ns.NameSpace
-			break
-		}
+		s.Devices[ns.NSID-1] = ns.NameSpace
 	}
-	if s.DeviceName == "" {
+	if len(s.Devices) == 0 {
 		return fmt.Errorf("could not find namespace block device")
 	}
 	if len(subsys.Controllers) == 0 {
@@ -105,8 +103,12 @@ func (s *state) ConnectBlock(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context) ([]string, error) {
-	namespaceDevicePath := s.DevFolder + "/" + s.DeviceName
+func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
+	dev, ok := s.Devices[index]
+	if !ok {
+		return nil, fmt.Errorf("device not found")
+	}
+	namespaceDevicePath := s.DevFolder + "/" + dev
 	return []string{namespaceDevicePath}, nil
 }
 
@@ -238,8 +240,8 @@ func (s *state) Validate() error {
 	if s.Connections == nil {
 		return fmt.Errorf("missing connections list")
 	}
-	if s.DeviceName == "" {
-		return fmt.Errorf("missing DeviceName")
+	if len(s.Devices) == 0 {
+		return fmt.Errorf("missing devices")
 	}
 	if s.Serial == "" {
 		return fmt.Errorf("missing Serial")
