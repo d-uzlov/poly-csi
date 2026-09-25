@@ -69,7 +69,7 @@ func (sh *share) SharePath(ctx context.Context, fsPath string, index int) error 
 	}
 	err = snip.ConfigureNamespace(nvmet.Ns{
 		Nqn:        sh.Nqn,
-		Nsid:       "1",
+		Nsid:       fmt.Sprintf("%d", index+1),
 		DevicePath: fsPath,
 		Enabled:    true,
 	})

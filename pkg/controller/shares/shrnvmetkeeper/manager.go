@@ -29,6 +29,7 @@ func (m *manager) GetCapabilities() shares.Capabilities {
 		UnpublishAll: false,
 		LocalVolume:  storage.VolDevice,
 		OpaqueVolume: "",
+		MultiShare:   true,
 	}
 }
 
