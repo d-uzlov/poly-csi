@@ -55,10 +55,11 @@ type dispatchCreate struct {
 	// j       DispatchParams
 
 	volCapsFs *csi.VolumeCapability_MountVolume
-	init      volumeinit.InitConfig
 
 	srv        *parsedServer
 	srvRelease func()
+
+	format volumeinit.FilesystemHelper
 
 	str     storage.StorageManager
 	volMain storage.Volume
@@ -88,7 +89,7 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 
 	dc.size = req.CapacityRange.RequiredBytes
 
-	dispatchParams, err := parseDispatchParams(nil, req.Parameters, req.MutableParameters)
+	dispatchParams, err := parseDispatchParams(paramsPrefix, nil, req.Parameters, req.MutableParameters)
 	if err != nil {
 		return fmt.Errorf("parseDispatchParams: %w", err)
 	}
@@ -101,25 +102,16 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 	// }
 	// dc.j = journalParams
 
-	var initConfig volumeinit.InitConfig
-	err = serialmaps.ParseRemove(req.Parameters, volumeinit.PreferredPrefix, true, &initConfig)
-	if err != nil {
-		return fmt.Errorf("parse init config: %w", err)
-	}
-	err = initConfig.Validate()
-	if err != nil {
-		return fmt.Errorf("validate init config: %w", err)
-	}
-
 	if len(req.VolumeCapabilities) == 0 {
 		return fmt.Errorf("request does not define volume capabilities")
 	}
 
 	dc.volCapsFs = req.VolumeCapabilities[0].GetMount()
-
-	dc.init = initConfig
 	if dc.volCapsFs != nil {
-		dc.init.FsType = dc.volCapsFs.FsType
+		dc.format = volumeinit.GetFromType(dc.volCapsFs.FsType)
+		if dc.format == nil {
+			return fmt.Errorf("filesystem handler for fs type '%s' is not found", dc.volCapsFs.FsType)
+		}
 	}
 
 	dc.rawStaticParams = req.Parameters
@@ -552,6 +544,30 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 	vi.Storage.Size = volumeState.Size
 	vi.Storage.LocalPathType = strCaps.LocalPathType
 
+	vi.VolumeContext = volumecontext.VolumeContext{
+		Uuid:          callUuid,
+		ServerName:    dc.p.ServerName,
+		StorageType:   dc.p.StorageType,
+		ShareType:     dc.p.ShareType,
+		ConnectorId:   dc.p.ConnectorId,
+		PresetName:    dc.p.NodePreset,
+		FsGroupMethod: dc.p.FsGroupPolicy,
+		// TODO customize
+		FsRootDirMode: "777",
+	}
+
+	dc.format.Configure(dc.rawStaticParams, volumeinit.StorageProperties{
+		InitialEmpty:     strCaps.BlockInitialEmpty,
+		RMWSize:          volumeState.RMWSize,
+		OptimalWriteSize: volumeState.OptimalWriteSize,
+		AtomicSize:       volumeState.AtomicSize,
+	})
+	vi.VolumeContext.FsType = dc.volCapsFs.FsType
+	vi.VolumeContext.FormatData, err = dc.format.Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("format.Serialize: %w", err)
+	}
+
 	if dc.volCapsFs == nil ||
 		strCaps.LocalPathType != storage.VolDevice ||
 		dc.p.FsFormatSide != FsFormatController {
@@ -562,27 +578,12 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 			return nil, fmt.Errorf("read state: empty fs path")
 		}
 
-		dc.init.InitialEmpty = strCaps.BlockInitialEmpty
-		dc.init.AtomicSize = volumeState.AtomicSize
-		dc.init.RMWSize = volumeState.RMWSize
-		dc.init.OptimalWriteSize = volumeState.OptimalWriteSize
-
-		for k := range req.Parameters {
-			if strings.HasPrefix(k, volumeinit.PreferredPrefix) {
-				return nil, fmt.Errorf("unknown key '%s'", k)
-			}
-		}
-
-		init := volumeinit.NewController(dc.srv.trInstance)
-		logs.FromCtx(ctx).MicroOp("running volume init", "volume-type", strCaps.LocalPathType)
-		_, err = init.RunBlock(ctx, dc.init, volumeState.FsPath)
+		err = dc.format.Format(ctx, dc.srv.trInstance, volumeState.FsPath)
 		if err != nil {
-			return nil, fmt.Errorf("init block: %w", err)
+			return nil, fmt.Errorf("run format: %w", err)
 		}
 		vi.Storage.NeedsControllerFormat = false
 	}
-
-	vi.InitConfig = dc.init
 
 	err = wrapped.SetVolumeInfo(ctx, *vi)
 	if err != nil {
@@ -624,17 +625,6 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("serialize share: %w", err)
 	}
 
-	vi.VolumeContext = volumecontext.VolumeContext{
-		Uuid:          callUuid,
-		ServerName:    dc.p.ServerName,
-		StorageType:   dc.p.StorageType,
-		ShareType:     dc.p.ShareType,
-		ConnectorId:   dc.p.ConnectorId,
-		PresetName:    dc.p.NodePreset,
-		FsGroupMethod: dc.p.FsGroupPolicy,
-		// TODO customize
-		FsRootDirMode: "777",
-	}
 	err = vi.VolumeContext.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("validate volume context: %w", err)
@@ -664,6 +654,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 }
 
 func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	// TODO save intermediate deletion results, to avoid double deletion ??
 	logger := logs.FromCtx(ctx)
 
 	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
@@ -680,18 +671,10 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 		return nil, fmt.Errorf("unpublish before delete: %w", err)
 	}
 
-	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.StorageType, mh.srv.Conf.GlobalParams)
-	if err != nil {
-		return nil, err
-	}
-
 	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
 	if err != nil {
 		return nil, err
 	}
-
-	logger.MicroOp("initialized managers", "storage", mh.vi.Storage.StorageType, "share", mh.vi.ShareType)
-
 	shareHandle, err := shrInstance.ParseShare(mh.vi.ShareData)
 	if err != nil {
 		return nil, fmt.Errorf("parse share data: %w", err)
@@ -709,16 +692,43 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 	}
 	logger.Info("share.DeleteShare: success")
 
+	if mh.vi.Storage.JournalStorageType != "" {
+		journalStorage, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.JournalStorageType, mh.srv.Conf.GlobalParams)
+		if err != nil {
+			return nil, err
+		}
+
+		vol, err := journalStorage.ParseVolume(mh.vi.Storage.JournalStorageData)
+		if err != nil {
+			return nil, fmt.Errorf("parse journal storage data: %w", err)
+		}
+		if vol == nil {
+			return nil, fmt.Errorf("parse journal storage data: nil result")
+		}
+
+		err = vol.DeleteState(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("delete storage[%s](journal ): %w", mh.vi.Storage.StorageType, err)
+		}
+	}
+
+	strInstance, err := storagefactory.StorageFromType(mh.srv.trInstance, mh.vi.Storage.StorageType, mh.srv.Conf.GlobalParams)
+	if err != nil {
+		return nil, err
+	}
 	vol, err := strInstance.ParseVolume(mh.vi.Storage.StorageData)
 	if err != nil {
 		return nil, fmt.Errorf("parse storage data: %w", err)
+	}
+	if vol == nil {
+		return nil, fmt.Errorf("parse storage data: nil result")
 	}
 
 	err = vol.DeleteState(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("delete storage[%s]: %w", mh.vi.Storage.StorageType, err)
 	}
-	logger.Info("storage.DeleteVolume: success")
+	logger.Info("vol.DeleteState: success")
 
 	err = mh.wrapper.Delete(ctx)
 	if err != nil {

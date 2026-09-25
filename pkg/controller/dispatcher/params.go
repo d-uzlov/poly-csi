@@ -41,7 +41,7 @@ const (
 	keyServerName        = "dispatch.serverName"
 )
 
-func parseDispatchParams(global map[string]string, static map[string]string, mutable map[string]string) (DispatchParams, error) {
+func parseDispatchParams(prefix string, global map[string]string, static map[string]string, mutable map[string]string) (DispatchParams, error) {
 	for k := range global {
 		if !strings.HasPrefix(k, paramsPrefix) {
 			continue
@@ -56,7 +56,7 @@ func parseDispatchParams(global map[string]string, static map[string]string, mut
 	}
 
 	result := DispatchParams{}
-	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	err := serialmaps.ParseRemove(static, prefix, true, &result)
 	if err != nil {
 		return DispatchParams{}, fmt.Errorf("static params: %w", err)
 	}

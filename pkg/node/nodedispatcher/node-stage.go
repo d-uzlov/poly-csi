@@ -21,7 +21,6 @@ import (
 	"meoe.io/poly-csi/pkg/utils/blockdevice"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
-	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 const stageFolderMount = "/fs_mount"
@@ -151,12 +150,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 		switch {
 		case mountParams != nil:
-			var initConfig volumeinit.InitConfig
-			err = serialmaps.Parse(req.PublishContext, volumeinit.PreferredPrefix, &initConfig)
-			if err != nil {
-				return nil, fmt.Errorf("parse init config: %w", err)
-			}
-			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags, initConfig)
+			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags, vc.FsType, vc.FormatData)
 			if err != nil {
 				return nil, fmt.Errorf("stageBlockMount: %w", err)
 			}

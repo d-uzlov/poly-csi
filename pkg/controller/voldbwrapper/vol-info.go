@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/volumecontext"
-	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 const mainVolumeModule = "volume.json"
@@ -27,6 +26,9 @@ type VolumeStorageInfo struct {
 	// StorageData is the value returned by storage.Volume.Serialize()
 	StorageData string `json:"volume_data"`
 
+	JournalStorageType string `json:"journal_storage_type"`
+	JournalStorageData string `json:"journal_storage_data"`
+
 	// LocalPathType is the saved value from storage.StorageManager.GetCapabilities().LocalPathType
 	LocalPathType string `json:"local_type"`
 	// Size is the saved value of storage.Volume.GetState().Size
@@ -34,8 +36,7 @@ type VolumeStorageInfo struct {
 }
 
 type VolumeInfo struct {
-	Storage    VolumeStorageInfo     `json:"storage"`
-	InitConfig volumeinit.InitConfig `json:"init_config"`
+	Storage    VolumeStorageInfo `json:"storage"`
 
 	ShareType string `json:"share_type"`
 	ShareData string `json:"share_data"`

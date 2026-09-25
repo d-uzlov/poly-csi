@@ -13,6 +13,8 @@ type VolumeContext struct {
 	FsRootDirMode string `map:"fs_root_dir_mode"`
 	FsGroupMethod string `map:"fs_group_method"`
 	Uuid          string `map:"uuid"`
+	FsType        string `map:"fs_type"`
+	FormatData    string `map:"format_data"`
 }
 
 func (v *VolumeContext) Validate() error {

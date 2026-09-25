@@ -15,7 +15,7 @@ import (
 // ==== misc ====
 
 func (d *Dispatcher) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	dispatchParams, err := parseDispatchParams(nil, req.Parameters, nil)
+	dispatchParams, err := parseDispatchParams(paramsPrefix, nil, req.Parameters, nil)
 	if err != nil {
 		return nil, fmt.Errorf("parseDispatchParams: %w", err)
 	}

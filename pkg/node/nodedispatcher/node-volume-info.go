@@ -25,9 +25,12 @@ const (
 
 type NodeVolumeInfo struct {
 	// ConnectorId holds id of the connector, so that deserialization can create an instance.
-	ConnectorId              string            `json:"connector_id"`
-	MountType                string            `json:"mount_type"`
-	FsRootDirMode            string            `json:"fs_root_dir_mode"`
+	ConnectorId string `json:"connector_id"`
+	// MountType tells if connector provides block device or filesystem
+	MountType string `json:"mount_type"`
+	// FsRootDirMode sets access more for mount root dir
+	FsRootDirMode string `json:"fs_root_dir_mode"`
+	// FsMountPath points to the root folder of the mount
 	FsMountPath              string            `json:"folder_path"`
 	SerializedMultipathData  string            `json:"multipath_data"`
 	SerializedConnectorState string            `json:"connector_data"`
@@ -226,11 +229,9 @@ func (v *NodeVolumeInfo) stageBlock(ctx context.Context) error {
 	return nil
 }
 
-func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string, mountFlags []string, initConfig volumeinit.InitConfig) error {
+func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string, mountFlags []string, fsType string, formatData string) error {
 	var err error
 	v.FsMountPath = targetPath
-
-	init := volumeinit.NewNode(v.tr)
 
 	fsnip := fsutils.New(v.tr)
 
@@ -239,12 +240,32 @@ func (v *NodeVolumeInfo) stageBlockMount(ctx context.Context, targetPath string,
 		return fmt.Errorf("getMainBlockDevice: %w", err)
 	}
 
-	blockFormatStart := time.Now()
-	_, err = init.RunBlock(ctx, initConfig, dev)
+	fsInfo, err := fsnip.GetBlkid(ctx, dev)
 	if err != nil {
-		return fmt.Errorf("init.RunBlock: %w", err)
+		return fmt.Errorf("GetBlkid: %w", err)
 	}
-	logs.FromCtx(ctx).MicroOp("init.RunBlock: success", "duration", time.Since(blockFormatStart).String())
+
+	if fsInfo == nil {
+		logs.FromCtx(ctx).MicroOp("no filesystem on device, will format", "device", dev, "fs-type", fsType)
+
+		format := volumeinit.GetFromType(fsType)
+		if format == nil {
+			return fmt.Errorf("filesystem helper for fs '%s' is not found", fsType)
+		}
+		err = format.Inflate(formatData)
+		if err != nil {
+			return fmt.Errorf("inflate format: %w", err)
+		}
+
+		blockFormatStart := time.Now()
+		err = format.Format(ctx, v.tr, dev)
+		if err != nil {
+			return fmt.Errorf("format: %w", err)
+		}
+		logs.FromCtx(ctx).MicroOp("format: success", "duration", time.Since(blockFormatStart).String())
+	} else {
+		logs.FromCtx(ctx).MicroOp("will not format over existing fs", "device", dev, "fs-type", fsInfo.FsType)
+	}
 
 	_, err = fsnip.EnsureMounted(ctx, dev, v.FsMountPath, "", mountFlags)
 	if err != nil {
