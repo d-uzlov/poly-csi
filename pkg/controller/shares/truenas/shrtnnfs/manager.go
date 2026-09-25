@@ -19,14 +19,14 @@ func New(tr transport.Transport, globalParams map[string]string) (shares.ShareMa
 func (sh *manager) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
 		UnpublishAll: true,
-		LocalVolume:  []string{storage.VolFolder},
-		OpaqueVolume: nil,
+		LocalVolume:  storage.VolFolder,
+		OpaqueVolume: "",
 	}
 }
 
 func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, error) {
 	return &share{
-		tr:     m.tr,
+		tr: m.tr,
 	}, nil
 }
 

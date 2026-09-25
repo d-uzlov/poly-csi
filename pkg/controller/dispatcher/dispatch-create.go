@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -176,14 +175,16 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	strCaps := dc.str.GetCapabilities()
 	shrCaps := dc.shr.GetCapabilities()
 
-	if shrCaps.LocalVolume != nil {
-		if !slices.Contains(shrCaps.LocalVolume, strCaps.LocalPathType) {
-			return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.LocalVolume, dc.p.StorageType, strCaps.LocalPathType)
-		}
+	if strCaps.LocalPathType == "" && strCaps.OpaqueVolumeType == "" {
+		return fmt.Errorf("storage reported empty both LocalPathType and OpaqueVolumeType")
 	}
 
-	if shrCaps.OpaqueVolume != nil {
-		if !slices.Contains(shrCaps.OpaqueVolume, strCaps.OpaqueVolumeType) {
+	if shrCaps.LocalVolume != "" && shrCaps.LocalVolume != strCaps.LocalPathType {
+		return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.LocalVolume, dc.p.StorageType, strCaps.LocalPathType)
+	}
+
+	if shrCaps.OpaqueVolume != "" {
+		if shrCaps.OpaqueVolume == strCaps.OpaqueVolumeType {
 			return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.p.StorageType, strCaps.OpaqueVolumeType)
 		}
 		dc.shareViaVolume = true
@@ -222,7 +223,6 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 		ShareId:       shareId,
 		StaticParams:  dc.rawStaticParams,
 		MutableParams: dc.rawMutableParams,
-		LocalVolume:   strCaps.LocalPathType,
 	})
 	if err != nil {
 		return fmt.Errorf("create share: %w", err)

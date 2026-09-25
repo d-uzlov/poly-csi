@@ -27,8 +27,8 @@ func New(tr transport.Transport, globalParams map[string]string) (shares.ShareMa
 func (m *manager) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
 		UnpublishAll: false,
-		LocalVolume:  []string{storage.VolDevice},
-		OpaqueVolume: nil,
+		LocalVolume:  storage.VolDevice,
+		OpaqueVolume: "",
 	}
 }
 

@@ -21,8 +21,8 @@ func New(tr transport.Transport, globalParams map[string]string) (shares.ShareMa
 func (m *manager) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
 		UnpublishAll: true,
-		LocalVolume:  []string{storage.VolFolder},
-		OpaqueVolume: []string{"zfs-dataset"},
+		LocalVolume:  storage.VolFolder,
+		OpaqueVolume: "zfs-dataset",
 	}
 }
 

@@ -24,6 +24,7 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 	for k, v := range connectorList {
 		mi, err := v.GetInfo(ctx)
 		if err != nil {
+			// TODO transient errors are logged, but there are no confirmations when they are cleared
 			slogctx.FromCtx(ctx).Error("connector.GetInfo failed", "error", err.Error())
 			continue
 		}

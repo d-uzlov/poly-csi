@@ -27,8 +27,8 @@ func New(tr transport.Transport, globalParams map[string]string) (shares.ShareMa
 func (sh *manager) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
 		UnpublishAll: false,
-		LocalVolume:  []string{storage.VolDevice},
-		OpaqueVolume: []string{"zfs-zvol"},
+		LocalVolume:  storage.VolDevice,
+		OpaqueVolume: "zfs-zvol",
 	}
 }
 
@@ -42,9 +42,9 @@ func (m *manager) CreateShare(req shares.CreateShareRequest) (shares.Share, erro
 	iqn := fmt.Sprintf("%s:%s", m.gp.iqnBase, req.ShareId)
 
 	return &share{
-		tr:   m.tr,
-		gp:   m.gp,
-		Iqn:  iqn,
+		tr:  m.tr,
+		gp:  m.gp,
+		Iqn: iqn,
 	}, nil
 }
 

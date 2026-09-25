@@ -34,11 +34,10 @@ type Capabilities struct {
 	UnpublishAll bool
 	// LocalVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.LocalVolume.
 	// When empty, this check is skipped.
-	// TODO make this a single value instead of a list?
-	LocalVolume []string
+	LocalVolume string
 	// OpaqueVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.OpaqueVolume.
 	// When empty, this check is skipped.
-	OpaqueVolume []string
+	OpaqueVolume string
 }
 
 type CreateShareRequest struct {
@@ -51,12 +50,6 @@ type CreateShareRequest struct {
 	// MutableParams override StaticParams.
 	// Implementation must fail if MutableParams contains something that can not be dynamically changed.
 	MutableParams map[string]string
-	// LocalVolume is a type of local volume the share is dealing with (folder or block device).
-	// The caller will make sure that LocalVolume is one of the values listed in share Capabilities.LocalVolume
-	LocalVolume string // TODO remove this?
-	// Volume is the actual storage.Volume object.
-	// Implementation can cast this to expected volume type to obtain storage-specific parameters.
-	// Volume any
 }
 
 type PublishContext struct {
