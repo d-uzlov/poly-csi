@@ -2,21 +2,25 @@ FROM golang:1.27.1-alpine3.23 AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum .
+COPY go.mod go.sum /app/
+
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY ./cmd/noderegistry/ /app/cmd/noderegistry/
 COPY ./pkg/ /app/pkg/
 
 ARG APP_VERSION
+
 # prevent building with empty version
 RUN test -n "${APP_VERSION}"
-
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
   CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/noderegistry/config.externalVersion=${APP_VERSION}" ./cmd/noderegistry/
 
 FROM scratch AS runtime
 
 WORKDIR /
+
 COPY --from=builder /app/noderegistry /node_registry
+
 ENTRYPOINT ["/node_registry"]
