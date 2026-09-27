@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
+	"meoe.io/poly-csi/pkg/controller/shares/shrnbd"
 	"meoe.io/poly-csi/pkg/controller/shares/shrnfs"
 	"meoe.io/poly-csi/pkg/controller/shares/shrnvmetkeeper"
 	"meoe.io/poly-csi/pkg/controller/shares/shrnvmetkernel"
@@ -24,6 +25,7 @@ const (
 	shareTnNfs       = "truenas-nfs"
 	shareTnIscsi     = "truenas-iscsi"
 	shareSamba       = "samba"
+	shareNbd         = "nbd"
 )
 
 func ShareFromType(tr transport.Transport, vmType string, globalParams map[string]string) (shares.ShareManager, error) {
@@ -44,6 +46,8 @@ func ShareFromType(tr transport.Transport, vmType string, globalParams map[strin
 		return shrtniscsi.New(tr, globalParams)
 	case shareSamba:
 		return shrsamba.New(tr, globalParams)
+	case shareNbd:
+		return shrnbd.New(tr, globalParams)
 	}
 	return nil, fmt.Errorf("unknown share type: %s", vmType)
 }

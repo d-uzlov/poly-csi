@@ -1,0 +1,49 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: poly-csi-nbd
+provisioner: io.meoe.poly-csi
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+parameters:
+  dispatch.serverName: rose
+  dispatch.storageType: zfs-zvol
+  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  dispatch.shareType: nbd
+  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  dispatch.connectorId: nbd
+  dispatch.nodePreset: ''
+  dispatch.addressNames: storage
+  dispatch.fsFormatSide: node
+
+  # none, sameShare, sameServer, separate
+  dispatch.journalVolume: none
+
+  zfs.parentDataset: rose/test
+  zfs.reservedPercent: 0%
+  zfs.volblocksize: 16k
+
+  # journal.serverName: rose
+  journal.storageType: zfs-zvol
+  journal.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}-journal'
+  # journal.shareType: nvmet-keeper
+  # journal.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  # journal.connectorId: nvme
+  # journal.nodePreset: nvmeCon,nvmeIoq4
+  # journal.addressNames: storage,k8s
+
+  journal.zfs.parentDataset: rose/test
+  journal.zfs.reservedPercent: 105%
+  journal.zfs.volblocksize: 4k
+
+  nbd.connectPort: '10809'
+
+  fsType: ext4
+
+mountOptions:
+- noatime
+- nodiratime
+- discard
