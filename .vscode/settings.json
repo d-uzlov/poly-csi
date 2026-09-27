@@ -4,6 +4,7 @@
     "addr_trtype",
     "addropt",
     "alpanum",
+    "argconfig",
     "authmethod",
     "automaxprocs",
     "backstore",

@@ -1,4 +1,4 @@
-package config
+package argconfig
 
 import (
 	"flag"
@@ -8,7 +8,7 @@ import (
 	"github.com/kouhin/envflag"
 )
 
-type AppConfig struct {
+type ArgConfig struct {
 	LogLevel   slog.Level
 	Hostname   string
 	ConfigPath string
@@ -22,8 +22,8 @@ const (
 	CgroupFromSpecPid = "spec-pid"
 )
 
-func ParseConfig() *AppConfig {
-	result := &AppConfig{}
+func Parse() ArgConfig {
+	result := ArgConfig{}
 
 	var versionFlag bool
 	flag.BoolVar(&versionFlag, "version", false, "Print version info")

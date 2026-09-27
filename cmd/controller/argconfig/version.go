@@ -1,4 +1,4 @@
-package config
+package argconfig
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func printVersion() {
 	}
 	buildInfo.Deps = nil
 
-	fmt.Println("node connector plugin for poly-csi, using builtin components")
+	fmt.Println("poly-csi controller binary")
 
 	if externalVersion != "" {
 		fmt.Println("version", externalVersion)

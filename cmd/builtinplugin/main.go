@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/cmd/builtinplugin/config"
+	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
 	"meoe.io/poly-csi/pkg/transport/localexec"
@@ -21,10 +21,14 @@ import (
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	appConfig := config.ParseConfig()
+	// NotifyContext returns stop() instead of cancel,
+	// but in the main stop is not useful
+	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+
+	appConfig := argconfig.Parse()
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)

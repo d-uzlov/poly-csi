@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"meoe.io/poly-csi/cmd/node/config"
+	"meoe.io/poly-csi/cmd/node/argconfig"
 	"meoe.io/poly-csi/pkg/node/nodedispatcher"
 	"meoe.io/poly-csi/pkg/node/nodeserver"
 	"meoe.io/poly-csi/pkg/utils/configwatcher"
@@ -16,10 +16,14 @@ import (
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	appConfig := config.ParseConfig()
+	// NotifyContext returns stop() instead of cancel,
+	// but in the main stop is not useful
+	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+
+	appConfig := argconfig.Parse()
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)
@@ -45,7 +49,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	nodeInstance, err := nodedispatcher.New(logger, appConfig.CsiName, config.GetVersion(), appConfig.CsiNodeId)
+	nodeInstance, err := nodedispatcher.New(logger, appConfig.CsiName, argconfig.GetVersion(), appConfig.CsiNodeId)
 	if err != nil {
 		logger.Error("could not create node controller", "error", err.Error())
 		panic(err)

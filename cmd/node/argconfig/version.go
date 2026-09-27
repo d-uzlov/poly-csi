@@ -1,4 +1,4 @@
-package config
+package argconfig
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func printVersion() {
 	}
 	buildInfo.Deps = nil
 
-	fmt.Println("nvmet_keeper binary")
+	fmt.Println("poly-csi node binary")
 
 	if externalVersion != "" {
 		fmt.Println("version", externalVersion)

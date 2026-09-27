@@ -8,17 +8,21 @@ import (
 	"syscall"
 	"time"
 
-	"meoe.io/poly-csi/cmd/noderegistry/config"
+	"meoe.io/poly-csi/cmd/noderegistry/argconfig"
 	"meoe.io/poly-csi/pkg/noderegistry/noderegsrv"
 
 	slogctx "github.com/veqryn/slog-context"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	appConfig := config.ParseConfig()
+	// NotifyContext returns stop() instead of cancel,
+	// but in the main stop is not useful
+	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+
+	appConfig := argconfig.Parse()
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)

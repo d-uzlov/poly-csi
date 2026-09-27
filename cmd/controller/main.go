@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/cmd/controller/config"
+	"meoe.io/poly-csi/cmd/controller/argconfig"
 	"meoe.io/poly-csi/pkg/controller"
 	"meoe.io/poly-csi/pkg/controller/controllerserver"
 	"meoe.io/poly-csi/pkg/controller/dispatcher"
@@ -16,10 +16,14 @@ import (
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	appConfig := config.ParseConfig()
+	// NotifyContext returns stop() instead of cancel,
+	// but in the main stop is not useful
+	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+
+	appConfig := argconfig.Parse()
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)
@@ -64,7 +68,7 @@ func main() {
 		d.ReloadConfig(ctx, newConfig)
 	})
 
-	con, err := controller.CreateController(logger, d, appConfig.CsiName, config.GetVersion())
+	con, err := controller.CreateController(logger, d, appConfig.CsiName, argconfig.GetVersion())
 	if err != nil {
 		logger.Error("could not create controller", "error", err.Error())
 		panic(err)
