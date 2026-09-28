@@ -10,7 +10,7 @@ import (
 )
 
 type state struct {
-	con *DispatcherClient
+	con *DispatcherClient `json:"-"`
 
 	RemoteState string `json:"remoteState"`
 }
@@ -29,6 +29,7 @@ func parseState(serialized string) (*state, error) {
 func (s *state) ConnectBlock(ctx context.Context) error {
 	req := PluginRequest{
 		Method:        MethodConnectBlock,
+		ConnectorId:   s.con.cc.RemoteId,
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
@@ -47,6 +48,7 @@ func (s *state) ConnectFolder(ctx context.Context, cReq connectors.ConnectFolder
 	}
 	req := PluginRequest{
 		Method:        MethodConnectFolder,
+		ConnectorId:   s.con.cc.RemoteId,
 		State:         s.RemoteState,
 		SerializedArg: string(serializedArg),
 	}
@@ -61,6 +63,7 @@ func (s *state) ConnectFolder(ctx context.Context, cReq connectors.ConnectFolder
 func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 	req := PluginRequest{
 		Method:        MethodGetDeviceList,
+		ConnectorId:   s.con.cc.RemoteId,
 		State:         s.RemoteState,
 		SerializedArg: strconv.Itoa(index),
 	}
@@ -89,6 +92,7 @@ func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 func (s *state) Disconnect(ctx context.Context) error {
 	req := PluginRequest{
 		Method:        MethodDisconnect,
+		ConnectorId:   s.con.cc.RemoteId,
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
@@ -103,6 +107,7 @@ func (s *state) Disconnect(ctx context.Context) error {
 func (s *state) Expand(ctx context.Context) error {
 	req := PluginRequest{
 		Method:        MethodExpand,
+		ConnectorId:   s.con.cc.RemoteId,
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}

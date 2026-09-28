@@ -6,8 +6,8 @@ import (
 )
 
 type Config struct {
-	Socket    string                          `yaml:"socket"`
-	Connector *connectorfactory.ConnectorSpec `yaml:"connector"`
-	DevFolder string                          `yaml:"devFolder"`
-	Logs      logs.Config                     `yaml:"logs"`
+	Socket     string                            `yaml:"socket"`
+	Connectors []*connectorfactory.ConnectorSpec `yaml:"connector"`
+	DevFolder  string                            `yaml:"devFolder"`
+	Logs       logs.Config                       `yaml:"logs"`
 }

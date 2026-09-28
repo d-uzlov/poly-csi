@@ -15,6 +15,7 @@ type Sender interface {
 type PluginRequest struct {
 	Method        string `json:"method"`
 	State         string `json:"state"`
+	ConnectorId   string `json:"connectorId"`
 	SerializedArg string `json:"serializedArg"`
 }
 

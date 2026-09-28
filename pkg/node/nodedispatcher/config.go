@@ -9,9 +9,8 @@ import (
 	"net"
 	"os"
 
-	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
@@ -20,7 +19,7 @@ import (
 )
 
 func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, error) {
-	logger := slogctx.FromCtx(ctx)
+	logger := logs.FromCtx(ctx)
 
 	dec := yaml.NewDecoder(bytes.NewBuffer(raw))
 	dec.KnownFields(true)
@@ -52,41 +51,12 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 	for _, v := range config.Connectors {
 		connectorList = append(connectorList, v.Id)
 	}
-	
+
 	// TODO can we move more tr usages here?
 	tr := localexec.New(config.ExecConfig)
 
-	cons := map[string]connectors.Manager{}
 	logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
-	for i, v := range config.Connectors {
-		if v.Id == "" {
-			logger.Error(fmt.Sprintf("connector[i=%d]: missing id", i))
-			continue
-		}
-		if _, ok := cons[v.Id]; ok {
-			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: duplicate id", i, v.Id))
-			continue
-		}
-
-		if v.Type == "" {
-			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: missing type", i, v.Id))
-			continue
-		}
-		inflate, err := connectorfactory.GetByType(v.Type)
-		if err != nil {
-			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: GetByType failed", i, v.Id), "error", err)
-		}
-		con, err := inflate(connectors.CommonConfig{
-			Tr: tr,
-			DevFolder: config.DevFolder,
-			Cfg: v.Config,
-		})
-		if err != nil {
-			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: inflate failed", i, v.Id), "error", err)
-		}
-
-		cons[v.Id] = con
-	}
+	cons := connectorfactory.ParseList(logger, tr, config.DevFolder, config.Connectors)
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 

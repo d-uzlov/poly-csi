@@ -13,7 +13,7 @@ import (
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
@@ -63,18 +63,14 @@ func main() {
 	var watcherDoneCh <-chan struct{}
 	switch argConfig.PluginType {
 	case "connector":
-		inflate, err := connectorfactory.GetByType(config.Connector.Type)
-		if err != nil {
-			panic(err)
+		// TODO use this more
+		logsConfig := logs.Config{
+			LogLevel: "info",
 		}
+		logsLogger := logsConfig.MakeInstance()
+		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors)
 
-		con, err := inflate(connectors.CommonConfig{
-			Tr:        tr,
-			DevFolder: config.DevFolder,
-			Cfg:       config.Connector.Config,
-		})
-
-		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, con)
+		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
 
 		srv := cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
 

@@ -31,6 +31,7 @@ connectors:
   type: plugin_json
   config:
     socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
+    remoteId: iscsi
 
 presets:
 - name: nvmeCon

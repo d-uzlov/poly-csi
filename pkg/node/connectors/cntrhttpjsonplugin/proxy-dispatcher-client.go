@@ -11,24 +11,39 @@ import (
 type DispatcherClient struct {
 	remote Sender
 	conf   connectors.CommonConfig
+	cc     clientConfig
 }
 
 var _ connectors.Manager = &DispatcherClient{}
+
+type clientConfig struct {
+	RemoteId string `yaml:"remoteId"`
+}
 
 func NewDispatcherClient(sender Sender, conf connectors.CommonConfig) (connectors.Manager, error) {
 	err := sender.SetConfig(conf.Cfg)
 	if err != nil {
 		return nil, err
 	}
+	var cc clientConfig
+	err = conf.Cfg.Decode(&cc)
+	if err != nil {
+		return nil, err
+	}
+	if cc.RemoteId == "" {
+		return nil, fmt.Errorf("missing RemoteId")
+	}
 	return &DispatcherClient{
 		remote: sender,
-		conf: conf,
+		conf:   conf,
+		cc:     cc,
 	}, nil
 }
 
 func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	req := PluginRequest{
 		Method:        MethodGetCapabilities,
+		ConnectorId:   c.cc.RemoteId,
 		State:         "",
 		SerializedArg: "",
 	}
@@ -49,6 +64,7 @@ func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabil
 func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	req := PluginRequest{
 		Method:        MethodGetInfo,
+		ConnectorId:   c.cc.RemoteId,
 		State:         "",
 		SerializedArg: "",
 	}
@@ -73,6 +89,7 @@ func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.Connec
 	}
 	req := PluginRequest{
 		Method:        MethodMakeHandle,
+		ConnectorId:   c.cc.RemoteId,
 		State:         "",
 		SerializedArg: string(serializedArg),
 	}

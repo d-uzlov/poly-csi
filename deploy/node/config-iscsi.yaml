@@ -5,7 +5,7 @@ socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
 devFolder: /host/dev
 
 connector:
-  id: iscsi
+- id: iscsi
   type: iscsiadm
   config:
     iscsiadmCmd: [ "chroot", "/host", "iscsiadm" ]

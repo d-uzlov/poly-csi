@@ -12,24 +12,27 @@ import (
 )
 
 type DispatcherServer struct {
-	tr           transport.Transport
-	devFolder    string
-	con          connectors.Manager
+	tr        transport.Transport
+	devFolder string
+	cons      map[string]connectors.Manager
 }
 
-func NewDispatcherServer(tr transport.Transport, devFolder string, con connectors.Manager) *DispatcherServer {
+func NewDispatcherServer(tr transport.Transport, devFolder string, cons map[string]connectors.Manager) *DispatcherServer {
 	return &DispatcherServer{
-		tr:           tr,
-		devFolder:    devFolder,
-		con:          con,
+		tr:        tr,
+		devFolder: devFolder,
+		cons:      cons,
 	}
 }
 
 func (d *DispatcherServer) Process(ctx context.Context, req PluginRequest) (result any, err error) {
-	if d.con == nil {
+	if d.cons == nil {
 		return nil, fmt.Errorf("connector is not initialized")
 	}
-	con := d.con
+	con, ok := d.cons[req.ConnectorId]
+	if !ok {
+		return nil, fmt.Errorf("connector with id '%s' is not found", req.ConnectorId)
+	}
 
 	switch req.Method {
 	case MethodGetCapabilities:
