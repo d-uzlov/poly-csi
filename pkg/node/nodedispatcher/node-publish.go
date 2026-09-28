@@ -34,7 +34,7 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.FindConnectorById)
+	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.Connectors)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

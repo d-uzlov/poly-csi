@@ -11,7 +11,6 @@ import (
 
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -64,8 +63,8 @@ func newVolumeHandle(parentFolder string, tr transport.Transport, connector conn
 	}
 }
 
-func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.Transport, mp multipath.Multipath, devFolder string, findConnector func(connectorId string) *connectorfactory.ParsedConnector) (*NodeVolumeInfo, error) {
-	result, err := TryParseMountInfo(ctx, parentFolder, tr, mp, devFolder, findConnector)
+func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.Transport, mp multipath.Multipath, devFolder string, connectors map[string]connectors.Manager) (*NodeVolumeInfo, error) {
+	result, err := TryParseMountInfo(ctx, parentFolder, tr, mp, devFolder, connectors)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.
 	return result, nil
 }
 
-func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Transport, mp multipath.Multipath, devFolder string, findConnector func(connectorId string) *connectorfactory.ParsedConnector) (*NodeVolumeInfo, error) {
+func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Transport, mp multipath.Multipath, devFolder string, connectors map[string]connectors.Manager) (*NodeVolumeInfo, error) {
 	// TODO there are a lot of possibly recoverable failure conditions
 	// it would be good to recover them instead of simply returning an error
 	content, err := os.ReadFile(parentFolder + metadataFile)
@@ -92,25 +91,12 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 		return nil, fmt.Errorf("parsing mount info from %s: %w", parentFolder+metadataFile, err)
 	}
 
-	conTemplate := findConnector(result.ConnectorId)
-	if conTemplate == nil {
-		return nil, fmt.Errorf("createConnector 'id=%s': not found", result.ConnectorId)
+	con := connectors[result.ConnectorId]
+	if con == nil {
+		return nil, fmt.Errorf("connector with id '%s' is not found", result.ConnectorId)
 	}
 
-	connector := conTemplate.Inflate()
-	if connector == nil {
-		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", result.ConnectorId)
-	}
-
-	err = connector.Configure(ctx, connectors.CommonConfig{
-		Tr:        tr,
-		DevFolder: devFolder,
-	}, conTemplate.Conf.Config)
-	if err != nil {
-		return nil, fmt.Errorf("connector.Configure: %w", err)
-	}
-
-	state, err := connector.ParseHandle(result.ConnectorData)
+	state, err := con.ParseHandle(result.ConnectorData)
 	if err != nil {
 		return nil, fmt.Errorf("connector.ParseState(%s): %w", result.ConnectorData, err)
 	}
@@ -130,7 +116,7 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 
 	result.parentFolder = parentFolder
 	result.tr = tr
-	result.connector = connector
+	result.connector = con
 	result.mp = mp
 	return &result, nil
 }

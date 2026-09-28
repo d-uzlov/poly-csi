@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
@@ -16,15 +15,15 @@ type DispatcherClient struct {
 
 var _ connectors.Manager = &DispatcherClient{}
 
-func NewDispatcherClient(sender Sender) *DispatcherClient {
+func NewDispatcherClient(sender Sender, conf connectors.CommonConfig) (connectors.Manager, error) {
+	err := sender.SetConfig(conf.Cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &DispatcherClient{
 		remote: sender,
-	}
-}
-
-func (c *DispatcherClient) Configure(ctx context.Context, conf connectors.CommonConfig, cfg yaml.Node) error {
-	c.conf = conf
-	return c.remote.SetConfig(cfg)
+		conf: conf,
+	}, nil
 }
 
 func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabilities, error) {

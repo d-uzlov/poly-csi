@@ -8,11 +8,9 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
 
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
-	"meoe.io/poly-csi/pkg/transport/localexec"
 )
 
 func New(logger *slog.Logger, name string, version string, nodeId string) (*Node, error) {
@@ -38,28 +36,6 @@ type Node struct {
 }
 
 func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfig) error {
-	tr := localexec.New(newConf.ExecConfig)
-
-	mounts := map[string]connectors.Manager{}
-	for _, v := range newConf.Connectors {
-		if !v.Valid {
-			continue
-		}
-		m := v.Inflate()
-		if m == nil {
-			continue
-		}
-		err := m.Configure(ctx, connectors.CommonConfig{
-			Tr:        tr,
-			DevFolder: newConf.DevFolder,
-		}, v.Conf.Config)
-		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to initialize connector[id=%s] during reload: %w", v.Conf.Id, err)
-			continue
-		}
-		mounts[v.Conf.Id] = m
-	}
-
 	n.confMutex.Lock()
 	defer n.confMutex.Unlock()
 
@@ -80,7 +56,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 	slogctx.FromCtx(ctx).Debug("starting node info push", "presets", presetNames)
 	go nodeinfo.PeriodicInfoPush(pushCtx, newConf.GetNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
 		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
-			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, mounts, newConf.Networks, presetNames)
+			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, newConf.Connectors, newConf.Networks, presetNames)
 		}, func() {
 			close(pushCh)
 		},

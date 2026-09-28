@@ -10,9 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
+	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -26,7 +29,7 @@ func main() {
 	// but in the main stop is not useful
 	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 
-	appConfig := argconfig.Parse()
+	argConfig := argconfig.Parse()
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)
@@ -35,33 +38,47 @@ func main() {
 	})
 	logger := slog.New(logHandler)
 
-	logger = logger.With("host", appConfig.Hostname)
+	logger = logger.With("host", argConfig.Hostname)
 	ctx = slogctx.NewCtx(ctx, logger)
 
-	logger.Info("using config", "config", appConfig)
+	logger.Info("using config", "config", argConfig)
 
 	// set log level after the 'using config' log entry, so that it is always present
-	logLevel.Set(appConfig.LogLevel)
+	logLevel.Set(argConfig.LogLevel)
+
+	configContent, err := os.ReadFile(argConfig.ConfigPath)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var config connectorpluginconfig.Config
+	err = yaml.Unmarshal(configContent, &config)
+	if err != nil {
+		panic("failed to parse config: " + err.Error())
+	}
 
 	tr := localexec.New(localexec.Config{})
 
 	serverDoneCh := make(chan struct{})
-	switch appConfig.PluginType {
+	var watcherDoneCh <-chan struct{}
+	switch argConfig.PluginType {
 	case "connector":
-		configContent, err := os.ReadFile(appConfig.ConfigPath)
+		inflate, err := connectorfactory.GetByType(config.Connector.Type)
 		if err != nil {
-			panic(err.Error())
-		}
-		conf, err := connectorpluginconfig.ParseConfig(ctx, tr, configContent)
-		if err != nil {
-			panic(err.Error())
+			panic(err)
 		}
 
-		if !conf.Connector.Valid {
-			panic("connector config is not valid")
-		}
+		con, err := inflate(connectors.CommonConfig{
+			Tr:        tr,
+			DevFolder: config.DevFolder,
+			Cfg:       config.Connector.Config,
+		})
 
-		serverInstance := NewServer(ctx, conf.Config.Socket, conf.Srv)
+		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, con)
+
+		srv := cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
+
+		serverInstance := NewServer(ctx, config.Socket, srv)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {
@@ -71,6 +88,8 @@ func main() {
 			}
 			close(serverDoneCh)
 		})
+	default:
+		panic("unknown plugin type: " + argConfig.PluginType)
 	}
 
 	select {
@@ -81,6 +100,9 @@ func main() {
 		logger.Info("context cancelled")
 	}
 	<-serverDoneCh
+	if watcherDoneCh != nil {
+		<-watcherDoneCh
+	}
 	logger.Info("shutdown finished")
 }
 

@@ -60,26 +60,12 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	}
 	logs.FromCtx(ctx).MicroOp("using preset", "fullPreset", fullPreset)
 
-	conTemplate := conf.FindConnectorById(vc.ConnectorId)
-	if conTemplate == nil {
+	con := conf.Connectors[vc.ConnectorId]
+	if con == nil {
 		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
 	}
 
-	connector := conTemplate.Inflate()
-	if connector == nil {
-		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", vc.ConnectorId)
-	}
-
-	// TODO why is it even in stage? this should be in config parsing
-	err = connector.Configure(ctx, connectors.CommonConfig{
-		Tr:        tr,
-		DevFolder: n.conf.DevFolder,
-	}, conTemplate.Conf.Config)
-	if err != nil {
-		return nil, fmt.Errorf("connector.Configure: %w", err)
-	}
-
-	caps, err := connector.Capabilities(ctx)
+	caps, err := con.Capabilities(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}
@@ -101,7 +87,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}
 
-	ch, err := connector.GetHandle(ctx, connectors.ConnectRequest{
+	ch, err := con.GetHandle(ctx, connectors.ConnectRequest{
 		AddressOptions:          addressOptions,
 		VolumeContext:           req.VolumeContext,
 		PublishContext:          connectorContext,
@@ -116,7 +102,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("connector.GetHandle: nil result")
 	}
 
-	nvi := newVolumeHandle(req.StagingTargetPath, tr, connector, mp, vc.ConnectorId, fullPreset)
+	nvi := newVolumeHandle(req.StagingTargetPath, tr, con, mp, vc.ConnectorId, fullPreset)
 	nvi.conState = ch
 	nvi.FsRootDirMode = vc.FsRootDirMode
 	nvi.JournalVolume = vc.JournalVolume
@@ -236,7 +222,7 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	tr := localexec.New(conf.ExecConfig)
 	mp := conf.GetMultipath(tr)
 
-	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.FindConnectorById)
+	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.Connectors)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

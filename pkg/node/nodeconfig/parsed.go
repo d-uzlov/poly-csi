@@ -7,7 +7,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/transport"
@@ -30,7 +30,7 @@ type ParsedConfig struct {
 	Encrypt                 ParsedEncrypt
 	NodeInfoDb              NodeInfoDbConfig
 	Multipath               mpfactory.ParsedMultipath
-	Connectors              []*connectorfactory.ParsedConnector
+	Connectors              map[string]connectors.Manager
 	Presets                 map[string]map[string]string
 	Networks                []ParsedNetworks
 	DevFolder               string
@@ -85,16 +85,6 @@ func ParseCgroupIoLimits(preset map[string]string) (limit blockdevice.IoLimit, f
 		}
 	}
 	return result, foundAny, nil
-}
-
-func (c *ParsedConfig) FindConnectorById(id string) *connectorfactory.ParsedConnector {
-	for _, v := range c.Connectors {
-		if v.Conf.Id == id {
-			return v
-		}
-	}
-
-	return nil
 }
 
 func (c *ParsedConfig) GetRpcLogConfig(rpcPath string) logs.Config {

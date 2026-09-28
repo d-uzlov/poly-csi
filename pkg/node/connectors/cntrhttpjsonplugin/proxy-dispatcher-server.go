@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -15,35 +14,22 @@ import (
 type DispatcherServer struct {
 	tr           transport.Transport
 	devFolder    string
-	inflate      connectors.InflateFunc
-	opaqueConfig yaml.Node
+	con          connectors.Manager
 }
 
-func NewDispatcherServer(tr transport.Transport, devFolder string, inflate connectors.InflateFunc, opaqueConfig yaml.Node) *DispatcherServer {
+func NewDispatcherServer(tr transport.Transport, devFolder string, con connectors.Manager) *DispatcherServer {
 	return &DispatcherServer{
 		tr:           tr,
 		devFolder:    devFolder,
-		inflate:      inflate,
-		opaqueConfig: opaqueConfig,
+		con:          con,
 	}
 }
 
 func (d *DispatcherServer) Process(ctx context.Context, req PluginRequest) (result any, err error) {
-	if d.inflate == nil {
-		return nil, fmt.Errorf("inflate is not initialized")
+	if d.con == nil {
+		return nil, fmt.Errorf("connector is not initialized")
 	}
-	con := d.inflate()
-	if con == nil {
-		return nil, fmt.Errorf("inflate returned nil")
-	}
-	conf := connectors.CommonConfig{
-		Tr:        d.tr,
-		DevFolder: d.devFolder,
-	}
-	err = con.Configure(ctx, conf, d.opaqueConfig)
-	if err != nil {
-		return nil, fmt.Errorf("con.Configure: %w", err)
-	}
+	con := d.con
 
 	switch req.Method {
 	case MethodGetCapabilities:

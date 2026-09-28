@@ -8,13 +8,9 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-type InflateFunc = func() Manager
+type InflateFunc = func(conf CommonConfig) (Manager, error)
 
 type Manager interface {
-	// Configure sets universal parameters. It MUST be the first method called on the connector.
-	// It can be considered a part of the constructor, which is moved to a method for unified initialization.
-	// opaqueConfig is a YAML-encoded config with unspecified structure
-	Configure(ctx context.Context, conf CommonConfig, cfg yaml.Node) error
 	// Capabilities returns an object describing capabilities of this type of connector
 	Capabilities(ctx context.Context) (Capabilities, error)
 	// GetInfo returns opaque string containing connector-specific info about the node.
@@ -53,6 +49,7 @@ type Handle interface {
 type CommonConfig struct {
 	Tr        transport.Transport
 	DevFolder string
+	Cfg       yaml.Node
 }
 
 type Capabilities struct {

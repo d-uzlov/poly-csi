@@ -11,9 +11,11 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"go.yaml.in/yaml/v3"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
+	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
@@ -50,34 +52,40 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 	for _, v := range config.Connectors {
 		connectorList = append(connectorList, v.Id)
 	}
+	
+	// TODO can we move more tr usages here?
+	tr := localexec.New(config.ExecConfig)
 
-	ml := []*connectorfactory.ParsedConnector{}
+	cons := map[string]connectors.Manager{}
 	logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
 	for i, v := range config.Connectors {
-		parsed := connectorfactory.ParseConnector(ctx, v)
-		if parsed == nil {
-			logger.Info(fmt.Sprintf("parsing mount %d failed", i))
+		if v.Id == "" {
+			logger.Error(fmt.Sprintf("connector[i=%d]: missing id", i))
+			continue
+		}
+		if _, ok := cons[v.Id]; ok {
+			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: duplicate id", i, v.Id))
 			continue
 		}
 
-		ml = append(ml, parsed)
-
-		// el, wl := parsed.Validate()
-		// for _, iss := range el {
-		// 	logger.Error(fmt.Sprintf("servers[i=%d/id=%s].%s", i, parsed.conf.Id, iss))
-		// }
-		// for _, iss := range wl {
-		// 	logger.Warn(fmt.Sprintf("servers[i=%d/id=%s].%s", i, parsed.conf.Id, iss))
-		// }
-		// if len(el) > 0 {
-		// 	parsed.valid = false
-		// }
-
-		if parsed.Valid {
-			logger.Info(fmt.Sprintf("successfully parsed connector '%s'", parsed.Conf.Id))
-		} else {
-			logger.Error(fmt.Sprintf("parsing connector '%s' failed", parsed.Conf.Id))
+		if v.Type == "" {
+			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: missing type", i, v.Id))
+			continue
 		}
+		inflate, err := connectorfactory.GetByType(v.Type)
+		if err != nil {
+			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: GetByType failed", i, v.Id), "error", err)
+		}
+		con, err := inflate(connectors.CommonConfig{
+			Tr: tr,
+			DevFolder: config.DevFolder,
+			Cfg: v.Config,
+		})
+		if err != nil {
+			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: inflate failed", i, v.Id), "error", err)
+		}
+
+		cons[v.Id] = con
 	}
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
@@ -104,7 +112,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 		DevFolder:               config.DevFolder,
 		PodCgroupRoot:           config.PodCgroupRoot,
 		Multipath:               *mp,
-		Connectors:              ml,
+		Connectors:              cons,
 		Presets:                 presetMap,
 		Networks:                netList,
 		ExecConfig:              config.ExecConfig,

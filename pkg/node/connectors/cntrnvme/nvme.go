@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -26,25 +25,22 @@ type PresetData struct {
 	ReconnectDelay        string `map:"reconnectDelaySec"`
 }
 
-func New() connectors.Manager {
-	return &connector{}
-}
+func New(conf connectors.CommonConfig) (connectors.Manager, error) {
+	result := &connector{}
+	result.commonConfig = conf
 
-func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, cfg yaml.Node) error {
-	c.commonConfig = conf
-
-	err := cfg.Decode(&c.config)
+	err := conf.Cfg.Decode(&result.config)
 	if err != nil {
-		return fmt.Errorf("parse config: %w", err)
+		return nil, fmt.Errorf("parse config: %w", err)
 	}
-	c.config.FillDefaults()
-	if err := c.config.Validate(); err != nil {
-		return fmt.Errorf("validate config: %w", err)
+	result.config.FillDefaults()
+	if err := result.config.Validate(); err != nil {
+		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
-	c.snip = newNvmeSnippets(conf.Tr, c.config.NvmeCmd, conf.DevFolder, c.config.ParseKernelLog)
+	result.snip = newNvmeSnippets(conf.Tr, result.config.NvmeCmd, conf.DevFolder, result.config.ParseKernelLog)
 
-	return nil
+	return result, nil
 }
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
