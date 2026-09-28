@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
@@ -63,14 +62,10 @@ func main() {
 			panic("connector config is not valid")
 		}
 
-		serverByteConfig, err := yaml.Marshal(conf.Config.ServerConfig)
-		if err != nil {
-			panic(fmt.Errorf("marshal server config: %w", err))
-		}
-
 		var cfg ServerConfig
-		if err := yaml.Unmarshal(serverByteConfig, &cfg); err != nil {
-			panic(fmt.Errorf("parse %s config: %w", conf.Config.ServerType, err))
+		err = conf.Config.ServerConfig.Decode(&cfg)
+		if err != nil {
+			panic(fmt.Errorf("parse server config: %w", err))
 		}
 
 		serverInstance := NewServer(ctx, cfg, conf.Srv)

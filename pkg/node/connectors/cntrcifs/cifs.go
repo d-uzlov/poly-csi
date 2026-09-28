@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
@@ -15,7 +16,7 @@ func New() connectors.Connector {
 	return &connector{}
 }
 
-func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, cfg yaml.Node) error {
 	c.conf = conf
 	return nil
 }

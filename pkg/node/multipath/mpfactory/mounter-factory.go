@@ -15,11 +15,12 @@ const (
 	MultipathTypeNone  = "none"
 )
 
-func GetByType(mtype string, byteConfig []byte, devFolder string) (func(tr transport.Transport) multipath.Multipath, error) {
+func GetByType(mtype string, byteConfig yaml.Node, devFolder string) (func(tr transport.Transport) multipath.Multipath, error) {
 	switch mtype {
 	case MultipathTypeLocal:
 		var cfg mplocal.Config
-		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
+		err := byteConfig.Decode(&cfg)
+		if err != nil {
 			return nil, fmt.Errorf("parse %s config: %w", mtype, err)
 		}
 		if err := cfg.Validate(); err != nil {

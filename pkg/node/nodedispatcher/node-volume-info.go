@@ -105,7 +105,7 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 	err = connector.Configure(ctx, connectors.CommonConfig{
 		Tr:        tr,
 		DevFolder: devFolder,
-	}, conTemplate.Conf.ByteConfig)
+	}, conTemplate.Conf.Config)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}

@@ -17,8 +17,8 @@ import (
 const ConnectorHttpPath = "/connector"
 
 type client struct {
-	config    ClientConfig
-	hc        http.Client
+	config ClientConfig
+	hc     http.Client
 }
 
 type ClientConfig struct {
@@ -36,12 +36,12 @@ func (c *ClientConfig) Validate() error {
 }
 
 func NewHttpClient() Sender {
-	return &client{
-	}
+	return &client{}
 }
 
-func (m *client) SetConfig(opaqueConfig []byte) error {
-	if err := yaml.Unmarshal(opaqueConfig, &m.config); err != nil {
+func (m *client) SetConfig(cfg yaml.Node) error {
+	err := cfg.Decode(&m.config)
+	if err != nil {
 		return fmt.Errorf("parse opaqueConfig: %w", err)
 	}
 	m.hc = http.Client{

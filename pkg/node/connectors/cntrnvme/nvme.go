@@ -29,11 +29,12 @@ func New() connectors.Connector {
 	return &connector{}
 }
 
-func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, cfg yaml.Node) error {
 	c.commonConfig = conf
 
-	if err := yaml.Unmarshal(opaqueConfig, &c.config); err != nil {
-		return fmt.Errorf("parse opaqueConfig: %w", err)
+	err := cfg.Decode(&c.config)
+	if err != nil{
+		return fmt.Errorf("parse config: %w", err)
 	}
 	c.config.FillDefaults()
 	if err := c.config.Validate(); err != nil {
@@ -98,7 +99,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	return &state{
 		tr:          c.commonConfig.Tr,
 		snip:        &c.snip,
-		DevFolder:   c.commonConfig.DevFolder,
+		devFolder:   c.commonConfig.DevFolder,
 		Params:      cp,
 		Auth:        auth,
 		ConExtra:    extra,
@@ -113,6 +114,7 @@ func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Conn
 	}
 
 	res.tr = c.commonConfig.Tr
+	res.devFolder = c.snip.devFolder
 	res.snip = &c.snip
 
 	return res, nil

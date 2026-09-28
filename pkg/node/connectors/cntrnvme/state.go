@@ -13,10 +13,10 @@ import (
 )
 
 type state struct {
-	tr   transport.Transport
-	snip *NvmeSnippets
+	tr        transport.Transport `json:"-"`
+	snip      *NvmeSnippets       `json:"-"`
+	devFolder string              `json:"-"`
 
-	DevFolder   string               `json:"devFolder"`
 	Params      ConnectParams        `json:"params"`
 	Auth        *ConnectAuth         `json:"auth"`
 	ConExtra    ConnectExtra         `json:"conExtra"`
@@ -108,7 +108,7 @@ func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("device not found")
 	}
-	namespaceDevicePath := s.DevFolder + "/" + dev
+	namespaceDevicePath := s.devFolder + "/" + dev
 	return []string{namespaceDevicePath}, nil
 }
 
@@ -203,7 +203,7 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 
 	var failedNamespaces []string
 	for _, ns := range subsys.Namespaces {
-		_, err := s.snip.IdNs(ctx, fmt.Sprintf("%s/%s", s.DevFolder, ns.NameSpace))
+		_, err := s.snip.IdNs(ctx, fmt.Sprintf("%s/%s", s.devFolder, ns.NameSpace))
 		if err != nil {
 			failedNamespaces = append(failedNamespaces, fmt.Sprintf("namespace %s: failed to run id-ns", ns.NameSpace))
 		}
@@ -234,7 +234,7 @@ func (s *state) Validate() error {
 	if s.snip == nil {
 		return fmt.Errorf("snippets is not set")
 	}
-	if s.DevFolder == "" {
+	if s.devFolder == "" {
 		return fmt.Errorf("DevFolder is not set")
 	}
 	if s.Connections == nil {

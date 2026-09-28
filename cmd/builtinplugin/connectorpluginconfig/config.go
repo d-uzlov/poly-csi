@@ -15,7 +15,7 @@ import (
 
 type Config struct {
 	ServerType   string                          `yaml:"serverType"`
-	ServerConfig map[string]any                  `yaml:"serverConfig"`
+	ServerConfig yaml.Node                       `yaml:"serverConfig"`
 	Connector    *connectorfactory.ConnectorSpec `yaml:"connector"`
 	DevFolder    string                          `yaml:"devFolder"`
 	Logs         logs.Config                     `yaml:"logs"`
@@ -52,12 +52,7 @@ func ParseConfig(ctx context.Context, tr transport.Transport, raw []byte) (*pars
 		logger.Error(fmt.Sprintf("parsing connector '%s' failed", pm.Conf.Id))
 	}
 
-	connectorByteConfig, err := yaml.Marshal(config.Connector.Config)
-	if err != nil {
-		return nil, fmt.Errorf("marshal server config: %w", err)
-	}
-
-	dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, pm.Inflate, connectorByteConfig)
+	dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, pm.Inflate, config.Connector.Config)
 
 	srv := cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
 

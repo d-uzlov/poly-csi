@@ -16,11 +16,12 @@ const (
 
 type Inflate func(tr transport.Transport) (voldb.VolumeDatabase, error)
 
-func VolumeDatabaseFromType(transportType string, byteConfig []byte) (Inflate, config.ValidatableConfig, error) {
+func VolumeDatabaseFromType(transportType string, byteConfig yaml.Node) (Inflate, config.ValidatableConfig, error) {
 	switch transportType {
 	case TypeJsonFile:
 		var cfg jsonfiledb.JsonFileInfoManagerConfig
-		if err := yaml.Unmarshal(byteConfig, &cfg); err != nil {
+		err := byteConfig.Decode(&cfg)
+		if err != nil {
 			return nil, nil, fmt.Errorf("parse %s config: %w", transportType, err)
 		}
 		return func(tr transport.Transport) (voldb.VolumeDatabase, error) {

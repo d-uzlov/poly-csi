@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
@@ -21,10 +22,9 @@ func NewDispatcherClient(sender Sender) *DispatcherClient {
 	}
 }
 
-func (c *DispatcherClient) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+func (c *DispatcherClient) Configure(ctx context.Context, conf connectors.CommonConfig, cfg yaml.Node) error {
 	c.conf = conf
-	c.remote.SetConfig(opaqueConfig)
-	return nil
+	return c.remote.SetConfig(cfg)
 }
 
 func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabilities, error) {

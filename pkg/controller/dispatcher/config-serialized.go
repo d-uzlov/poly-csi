@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/logs"
 )
 
@@ -45,9 +46,9 @@ type ServerConfig struct {
 	Name         string              `yaml:"name"`
 	StableId     string              `yaml:"stableId"`
 	ExecType     string              `yaml:"execType"`
-	ExecConfig   map[string]any      `yaml:"execConfig"`
+	ExecConfig   yaml.Node           `yaml:"execConfig"`
 	DbType       string              `yaml:"metadataType"`
-	DbConfig     map[string]any      `yaml:"metadataConfig"`
+	DbConfig     yaml.Node           `yaml:"metadataConfig"`
 	GlobalParams map[string]string   `yaml:"globalParams"`
 	Commands     map[string][]string `yaml:"commands"`
 	AddressList  []AddressOption     `yaml:"addressList"`

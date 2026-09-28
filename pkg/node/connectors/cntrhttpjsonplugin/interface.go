@@ -3,11 +3,12 @@ package cntrhttpjsonplugin
 import (
 	"context"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/logs"
 )
 
 type Sender interface {
-	SetConfig(opaqueConfig []byte) error
+	SetConfig(cfg yaml.Node) error
 	Send(ctx context.Context, req PluginRequest) (result string, err error)
 }
 

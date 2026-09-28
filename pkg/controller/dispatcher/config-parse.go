@@ -134,12 +134,7 @@ func (c *parsedServer) InitTransport(ctx context.Context, logPrefix string) erro
 		return fmt.Errorf("type is empty")
 	}
 
-	byteConfig, err := yaml.Marshal(c.Conf.ExecConfig)
-	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
-	}
-
-	inflater, cfg, err := transportfactory.TransportFromType(c.Conf.ExecType, byteConfig)
+	inflater, cfg, err := transportfactory.TransportFromType(c.Conf.ExecType, c.Conf.ExecConfig)
 	if err != nil {
 		return fmt.Errorf("TransportFromType: %w", err)
 	}
@@ -179,12 +174,7 @@ func (c *parsedServer) InitDatabase(ctx context.Context, logPrefix string) error
 		return nil
 	}
 
-	byteConfig, err := yaml.Marshal(c.Conf.DbConfig)
-	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
-	}
-
-	inflater, cfg, err := voldbfactory.VolumeDatabaseFromType(c.Conf.DbType, byteConfig)
+	inflater, cfg, err := voldbfactory.VolumeDatabaseFromType(c.Conf.DbType, c.Conf.DbConfig)
 	if err != nil {
 		return fmt.Errorf("VolumeDatabaseFromType: %w", err)
 	}

@@ -8,8 +8,7 @@ devFolder: /host/dev
 
 connector:
   id: iscsi
-  type: builtin
-  subtype: iscsiadm
+  type: iscsiadm
   config:
     iscsiadmCmd: [ "chroot", "/host", "iscsiadm" ]
     initiatorNamePath: /host/etc/iscsi/initiatorname.iscsi

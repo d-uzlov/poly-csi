@@ -9,11 +9,9 @@ import (
 )
 
 type ConnectorSpec struct {
-	Id      string         `yaml:"id"`
-	Type    string         `yaml:"type"`
-	Config  map[string]any `yaml:"config"`
-
-	ByteConfig []byte `yaml:"-"`
+	Id     string         `yaml:"id"`
+	Type   string         `yaml:"type"`
+	Config yaml.Node `yaml:"config"`
 }
 
 type ParsedConnector struct {
@@ -26,26 +24,16 @@ func ParseConnector(ctx context.Context, c *ConnectorSpec) *ParsedConnector {
 	logger := slogctx.FromCtx(ctx)
 
 	if c.Type == "" {
-		logger.Error("mount_config: missing type", "id", c.Id)
+		logger.Error("missing type", "id", c.Id)
 		return &ParsedConnector{
 			Valid: false,
 			Conf:  c,
 		}
 	}
-
-	byteConfig, err := yaml.Marshal(c.Config)
-	if err != nil {
-		logger.Error("mount_config: marshal config", "id", c.Id, "error", err.Error())
-		return &ParsedConnector{
-			Valid: false,
-			Conf:  c,
-		}
-	}
-	c.ByteConfig = byteConfig
 
 	inflater, err := GetByType(c.Type)
 	if err != nil {
-		logger.Error("mount_config: could not create", "id", c.Id, "error", err.Error())
+		logger.Error("could not create", "id", c.Id, "error", err.Error())
 		return &ParsedConnector{
 			Valid: false,
 			Conf:  c,

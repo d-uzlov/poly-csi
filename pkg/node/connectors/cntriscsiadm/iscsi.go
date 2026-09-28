@@ -17,10 +17,11 @@ func New() connectors.Connector {
 	return &connector{}
 }
 
-func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, opaqueConfig []byte) error {
+func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig, cfg yaml.Node) error {
 	c.commonConfig = conf
-	if err := yaml.Unmarshal(opaqueConfig, &c.config); err != nil {
-		return fmt.Errorf("parse opaqueConfig: %w", err)
+	err := cfg.Decode(&c.config)
+	if err != nil {
+		return fmt.Errorf("parse config: %w", err)
 	}
 	c.config.FillDefaults()
 	if err := c.config.Validate(); err != nil {

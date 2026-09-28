@@ -10,8 +10,8 @@ import (
 )
 
 type MultipathConfig struct {
-	Type    string         `yaml:"type"`
-	Config  map[string]any `yaml:"config"`
+	Type   string    `yaml:"type"`
+	Config yaml.Node `yaml:"config"`
 }
 
 type ParsedMultipath struct {
@@ -31,16 +31,7 @@ func ParseMultipath(ctx context.Context, c *MultipathConfig, devFolder string) *
 		}
 	}
 
-	byteConfig, err := yaml.Marshal(c.Config)
-	if err != nil {
-		logger.Error("multipath: marshal config", "error", err.Error())
-		return &ParsedMultipath{
-			Valid: false,
-			Conf:  c,
-		}
-	}
-
-	inflater, err := GetByType(c.Type, byteConfig, devFolder)
+	inflater, err := GetByType(c.Type, c.Config, devFolder)
 	if err != nil {
 		logger.Error("multipath: GetByType failed", "error", err.Error())
 		return &ParsedMultipath{

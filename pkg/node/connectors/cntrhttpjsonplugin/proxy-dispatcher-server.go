@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -15,10 +16,10 @@ type DispatcherServer struct {
 	tr           transport.Transport
 	devFolder    string
 	inflate      connectors.InflateFunc
-	opaqueConfig []byte
+	opaqueConfig yaml.Node
 }
 
-func NewDispatcherServer(tr transport.Transport, devFolder string, inflate connectors.InflateFunc, opaqueConfig []byte) *DispatcherServer {
+func NewDispatcherServer(tr transport.Transport, devFolder string, inflate connectors.InflateFunc, opaqueConfig yaml.Node) *DispatcherServer {
 	return &DispatcherServer{
 		tr:           tr,
 		devFolder:    devFolder,

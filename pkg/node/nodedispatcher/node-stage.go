@@ -70,10 +70,11 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("createConnector 'id=%s': inflate returned nil", vc.ConnectorId)
 	}
 
+	// TODO why is it even in stage? this should be in config parsing
 	err = connector.Configure(ctx, connectors.CommonConfig{
 		Tr:        tr,
 		DevFolder: n.conf.DevFolder,
-	}, conTemplate.Conf.ByteConfig)
+	}, conTemplate.Conf.Config)
 	if err != nil {
 		return nil, fmt.Errorf("connector.Configure: %w", err)
 	}

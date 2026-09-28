@@ -3,6 +3,7 @@ package connectors
 import (
 	"context"
 
+	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -13,7 +14,7 @@ type Connector interface {
 	// Configure sets universal parameters. It MUST be the first method called on the connector.
 	// It can be considered a part of the constructor, which is moved to a method for unified initialization.
 	// opaqueConfig is a YAML-encoded config with unspecified structure
-	Configure(ctx context.Context, conf CommonConfig, opaqueConfig []byte) error
+	Configure(ctx context.Context, conf CommonConfig, cfg yaml.Node) error
 	// Capabilities returns an object describing capabilities of this type of connector
 	Capabilities(ctx context.Context) (Capabilities, error)
 	// GetInfo returns opaque string containing connector-specific info about the node.

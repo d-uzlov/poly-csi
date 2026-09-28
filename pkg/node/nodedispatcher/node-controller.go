@@ -7,7 +7,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
-	"go.yaml.in/yaml/v3"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
@@ -50,15 +49,10 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 		if m == nil {
 			continue
 		}
-		opaqueConfig, err := yaml.Marshal(v.Conf.Config)
-		if err != nil {
-			slogctx.FromCtx(ctx).Error("failed to initialize connector[id=%s] during reload: marshal config: %w", v.Conf.Id, err)
-			continue
-		}
-		err = m.Configure(ctx, connectors.CommonConfig{
+		err := m.Configure(ctx, connectors.CommonConfig{
 			Tr:        tr,
 			DevFolder: newConf.DevFolder,
-		}, opaqueConfig)
+		}, v.Conf.Config)
 		if err != nil {
 			slogctx.FromCtx(ctx).Error("failed to initialize connector[id=%s] during reload: %w", v.Conf.Id, err)
 			continue
