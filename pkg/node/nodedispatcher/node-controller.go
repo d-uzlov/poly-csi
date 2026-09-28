@@ -40,7 +40,7 @@ type Node struct {
 func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfig) error {
 	tr := localexec.New(newConf.ExecConfig)
 
-	mounts := map[string]connectors.Connector{}
+	mounts := map[string]connectors.Manager{}
 	for _, v := range newConf.Connectors {
 		if !v.Valid {
 			continue

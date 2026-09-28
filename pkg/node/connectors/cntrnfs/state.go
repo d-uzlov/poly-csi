@@ -14,10 +14,10 @@ import (
 type state struct {
 	tr transport.Transport `json:"-"`
 
-	NfsPath    string   `json:"nfsPath"`
+	NfsPath string `json:"nfsPath"`
 }
 
-var _ connectors.ConnectionHandle = &state{}
+var _ connectors.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state

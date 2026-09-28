@@ -15,7 +15,7 @@ type state struct {
 	RemoteState string `json:"remoteState"`
 }
 
-var _ connectors.ConnectionHandle = &state{}
+var _ connectors.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -52,7 +52,7 @@ func (s *state) ConnectFolder(ctx context.Context, cReq connectors.ConnectFolder
 	}
 	_, err = s.con.remote.Send(ctx, req)
 	if err != nil {
-		return  err
+		return err
 	}
 
 	return nil

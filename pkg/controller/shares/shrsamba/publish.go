@@ -5,16 +5,14 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrcifs"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Public: cntrcifs.PublicContext{
-			ShareName: sh.ShareName,
-			UserName:  sh.UserName,
-		},
-		Secret: cntrcifs.SecretContext{
+		Context: protocols.Cifs{
+			ShareName:    sh.ShareName,
+			UserName:     sh.UserName,
 			UserPassword: sh.UserPass,
 		},
 		LocalData: nil,

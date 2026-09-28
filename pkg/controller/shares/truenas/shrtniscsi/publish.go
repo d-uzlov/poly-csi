@@ -8,6 +8,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 type publishData struct {
@@ -47,7 +48,7 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context,  mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	iscsiInfo, err := cntriscsiadm.ParseIscsiInfo(mi)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
@@ -65,11 +66,11 @@ func (sh *share) Publish(ctx context.Context,  mi connectors.ConnectorNodeInfo) 
 	}
 
 	return &shares.PublishContext{
-		Public: cntriscsiadm.PublicContext{
+		Context: protocols.Iscsi{
 			Iqn:       sh.Iqn,
 			Port:      "3260",
 			Transport: "tcp",
-			AuthType:  cntriscsiadm.AuthNone,
+			AuthType:  protocols.IscsiAuthNone,
 		},
 		LocalData: pd,
 	}, nil

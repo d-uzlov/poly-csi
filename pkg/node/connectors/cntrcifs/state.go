@@ -18,7 +18,7 @@ type state struct {
 	Password  string `json:"password"`
 }
 
-var _ connectors.ConnectionHandle = &state{}
+var _ connectors.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state

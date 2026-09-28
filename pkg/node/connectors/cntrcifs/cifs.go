@@ -6,13 +6,14 @@ import (
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 type connector struct {
 	conf connectors.CommonConfig
 }
 
-func New() connectors.Connector {
+func New() connectors.Manager {
 	return &connector{}
 }
 
@@ -32,17 +33,13 @@ func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 	return &connectors.ConnectorNodeInfo{}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
+func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("smb connector does not support more than one address")
 	}
-	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
+	pc, err := protocols.Parse[protocols.Cifs](req.PublishContext, req.PublishSecret)
 	if err != nil {
-		return nil, fmt.Errorf("ParsePublishContext: %w", err)
-	}
-	err = validateContext(pc, sc)
-	if err != nil {
-		return nil, fmt.Errorf("validateContext: %w", err)
+		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}
 
 	smbPath := fmt.Sprintf("//%s/%s", req.AddressOptions[0].Address, pc.ShareName)
@@ -51,11 +48,11 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		tr:        c.conf.Tr,
 		SharePath: smbPath,
 		Username:  pc.UserName,
-		Password:  sc.UserPassword,
+		Password:  pc.UserPassword,
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

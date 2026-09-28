@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 type ShareManager interface {
@@ -59,15 +60,12 @@ type CreateShareRequest struct {
 }
 
 type PublishContext struct {
-	// Public data is passed to node deployment as cleartext.
+	// Context data is passed to node deployment as cleartext.
 	// Users (both human and automated controllers) can inspect it.
 	//
 	// It is serialized using serialmaps package.
 	// It must be a struct with fields annotated with `map:"map_key"` tags
-	Public any `json:"public"`
-	// Secret data is passed to node deployment as serialized and encrypted string.
-	// It is serialized into JSON, annotate it accordingly.
-	Secret any `json:"secret"`
+	Context protocols.Config `json:"public"`
 	// LocalData is an arbitrary storage for internal information for ShareManager.Publish and ShareManager.Unpublish.
 	// Can be empty/nil if ShareManager.Unpublish is a no-op.
 	// It is serialized into JSON, annotate it accordingly.

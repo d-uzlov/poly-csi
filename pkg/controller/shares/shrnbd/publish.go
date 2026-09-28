@@ -5,12 +5,12 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublknbd"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Public: cntrublknbd.PublicContext{
+		Context: protocols.Nbd{
 			ExportName: sh.ExportName,
 			Port:       sh.ConnectPort,
 		},

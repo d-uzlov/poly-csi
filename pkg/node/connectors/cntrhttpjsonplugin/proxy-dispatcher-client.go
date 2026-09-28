@@ -14,7 +14,7 @@ type DispatcherClient struct {
 	conf   connectors.CommonConfig
 }
 
-var _ connectors.Connector = &DispatcherClient{}
+var _ connectors.Manager = &DispatcherClient{}
 
 func NewDispatcherClient(sender Sender) *DispatcherClient {
 	return &DispatcherClient{
@@ -67,7 +67,7 @@ func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNo
 	return &res, nil
 }
 
-func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
+func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.ConnectRequest) (connectors.Handle, error) {
 	serializedArg, err := json.Marshal(cReq)
 	if err != nil {
 		return nil, fmt.Errorf("serialize connect request: %w", err)
@@ -88,7 +88,7 @@ func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.Connec
 	}, nil
 }
 
-func (c *DispatcherClient) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
+func (c *DispatcherClient) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

@@ -8,9 +8,9 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-type InflateFunc = func() Connector
+type InflateFunc = func() Manager
 
-type Connector interface {
+type Manager interface {
 	// Configure sets universal parameters. It MUST be the first method called on the connector.
 	// It can be considered a part of the constructor, which is moved to a method for unified initialization.
 	// opaqueConfig is a YAML-encoded config with unspecified structure
@@ -22,12 +22,12 @@ type Connector interface {
 	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
 	// GetHandle creates a handle to manage a connection.
 	// Connector must parse params and create a handle, without making any changes in OS.
-	GetHandle(ctx context.Context, req ConnectRequest) (ConnectionHandle, error)
+	GetHandle(ctx context.Context, req ConnectRequest) (Handle, error)
 	// ParseHandle recreates state object from State.Serialize result
-	ParseHandle(serializedData string) (ConnectionHandle, error)
+	ParseHandle(serializedData string) (Handle, error)
 }
 
-type ConnectionHandle interface {
+type Handle interface {
 	ConnectBlock(ctx context.Context) error
 	// GetDevices returns list of block devices associated connection.
 	// It's irrelevant for connectors that don't create block devices.
@@ -45,7 +45,7 @@ type ConnectionHandle interface {
 
 	CheckHealth(ctx context.Context) ([]HealthMessage, error)
 
-	// Serialize creates an opaque string that can be used in Connector.ParseState
+	// Serialize creates an opaque string that can be used in [Manager].ParseState
 	Serialize() (string, error)
 	Validate() error
 }

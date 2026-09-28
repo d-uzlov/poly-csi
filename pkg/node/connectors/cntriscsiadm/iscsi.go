@@ -6,6 +6,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 type connector struct {
@@ -13,7 +14,7 @@ type connector struct {
 	config       Config
 }
 
-func New() connectors.Connector {
+func New() connectors.Manager {
 	return &connector{}
 }
 
@@ -36,14 +37,10 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
-	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
+func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
+	pc, err := protocols.Parse[protocols.Iscsi](req.PublishContext, req.PublishSecret)
 	if err != nil {
-		return nil, fmt.Errorf("ParsePublishContext: %w", err)
-	}
-	err = validateContext(pc, sc)
-	if err != nil {
-		return nil, fmt.Errorf("validateContext: %w", err)
+		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}
 
 	snip := newIscsiSnippets(c.commonConfig.Tr, c.config.IscsiadmCmd)
@@ -51,14 +48,14 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	attributes := map[string]string{}
 
 	switch pc.AuthType {
-	case AuthNone:
+	case protocols.IscsiAuthNone:
 		attributes["node.session.auth.authmethod"] = "None"
-	case AuthChapFromPublishSecret:
+	case protocols.IscsiAuthChap:
 		attributes["node.session.auth.authmethod"] = "CHAP"
-		attributes["node.session.auth.username"] = sc.ClientUser
-		attributes["node.session.auth.password"] = sc.ClientPass
-		attributes["node.session.auth.username_in"] = sc.TargetUser
-		attributes["node.session.auth.password_in"] = sc.TargetPass
+		attributes["node.session.auth.username"] = pc.ClientUser
+		attributes["node.session.auth.password"] = pc.ClientPass
+		attributes["node.session.auth.username_in"] = pc.TargetUser
+		attributes["node.session.auth.password_in"] = pc.TargetPass
 	default:
 		return nil, fmt.Errorf("unknown chap type: '%s'", pc.AuthType)
 	}
@@ -83,7 +80,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

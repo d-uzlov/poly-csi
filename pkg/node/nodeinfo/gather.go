@@ -12,7 +12,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Connector, networks []nodeconfig.ParsedNetworks, presets []string) (regnodeinfo.RegNodeInfo, error) {
+func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Manager, networks []nodeconfig.ParsedNetworks, presets []string) (regnodeinfo.RegNodeInfo, error) {
 	nodePublicKey := pk.GetPublicKey()
 	info := NodeInfo{
 		Id:         nodeId,

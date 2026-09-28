@@ -7,6 +7,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
@@ -25,7 +26,7 @@ type PresetData struct {
 	ReconnectDelay        string `map:"reconnectDelaySec"`
 }
 
-func New() connectors.Connector {
+func New() connectors.Manager {
 	return &connector{}
 }
 
@@ -33,7 +34,7 @@ func (c *connector) Configure(ctx context.Context, conf connectors.CommonConfig,
 	c.commonConfig = conf
 
 	err := cfg.Decode(&c.config)
-	if err != nil{
+	if err != nil {
 		return fmt.Errorf("parse config: %w", err)
 	}
 	c.config.FillDefaults()
@@ -52,14 +53,10 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.ConnectionHandle, error) {
-	pc, sc, err := ParsePublishContext(req.PublishContext, req.PublishSecret)
+func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
+	pc, err := protocols.Parse[protocols.Nvme](req.PublishContext, req.PublishSecret)
 	if err != nil {
-		return nil, fmt.Errorf("ParsePublishContext: %w", err)
-	}
-	err = validateContext(pc, sc)
-	if err != nil {
-		return nil, fmt.Errorf("validateContext: %w", err)
+		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}
 
 	var parsedPreset PresetData
@@ -76,10 +73,10 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		NvmeTransport: pc.TransportType,
 	}
 	var auth *ConnectAuth
-	if sc.HostKey != "" && sc.ControllerKey != "" {
+	if pc.HostKey != "" && pc.ControllerKey != "" {
 		auth = &ConnectAuth{
-			HostKey:       sc.HostKey,
-			ControllerKey: sc.ControllerKey,
+			HostKey:       pc.HostKey,
+			ControllerKey: pc.ControllerKey,
 		}
 	}
 	extra := ConnectExtra{
@@ -107,7 +104,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (connectors.ConnectionHandle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

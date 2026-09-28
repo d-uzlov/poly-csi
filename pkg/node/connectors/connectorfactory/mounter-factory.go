@@ -22,12 +22,12 @@ const (
 	ConnectorTypePlugin   = "plugin_json"
 )
 
-var builtinTypes = map[string]func() connectors.Connector{
+var builtinTypes = map[string]func() connectors.Manager{
 	ConnectorTypeNfs:      cntrnfs.New,
 	ConnectorTypeCifs:     cntrcifs.New,
 	ConnectorTypeNvme:     cntrnvme.New,
 	ConnectorTypeIscsiadm: cntriscsiadm.New,
-	ConnectorTypePlugin: func() connectors.Connector {
+	ConnectorTypePlugin: func() connectors.Manager {
 		httpClient := cntrhttpjsonplugin.NewHttpClient()
 		return cntrhttpjsonplugin.NewDispatcherClient(httpClient)
 	},

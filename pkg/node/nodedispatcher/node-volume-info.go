@@ -41,8 +41,8 @@ type NodeVolumeInfo struct {
 	Preset               map[string]string `json:"preset"`
 
 	tr           transport.Transport         `json:"-"`
-	connector    connectors.Connector        `json:"-"`
-	conState     connectors.ConnectionHandle `json:"-"`
+	connector    connectors.Manager          `json:"-"`
+	conState     connectors.Handle           `json:"-"`
 	mp           multipath.Multipath         `json:"-"`
 	parentFolder string                      `json:"-"`
 	fs           volumeinit.FilesystemHelper `json:"-"`
@@ -53,7 +53,7 @@ type SavedParams struct {
 
 const metadataFile = "/mount-info.json"
 
-func newVolumeHandle(parentFolder string, tr transport.Transport, connector connectors.Connector, mp multipath.Multipath, connectorId string, preset map[string]string) NodeVolumeInfo {
+func newVolumeHandle(parentFolder string, tr transport.Transport, connector connectors.Manager, mp multipath.Multipath, connectorId string, preset map[string]string) NodeVolumeInfo {
 	return NodeVolumeInfo{
 		parentFolder: parentFolder,
 		Preset:       preset,

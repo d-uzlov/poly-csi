@@ -10,6 +10,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
@@ -106,19 +107,21 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("inject address options: %w", err)
 	}
 
-	if pc.Public != nil {
-		_, err = serialmaps.SerializeInto(pc.Public, publishContext, "")
-		if err != nil {
-			return nil, fmt.Errorf("inject public data: %w", err)
-		}
+	if pc.Context == nil {
+		return nil, fmt.Errorf("share did not set publish context")
 	}
 
-	if pc.Secret != nil {
-		logger.Info("creating encrypted publish secret")
-		err = encrypt.InjectSecretIntoMap(publishContext, ni.PublicKey, pc.Secret)
-		if err != nil {
-			return nil, fmt.Errorf("inject secret: %w", err)
-		}
+	public, secret, err := protocols.SplitSecret(pc.Context)
+
+	_, err = serialmaps.SerializeInto(public, publishContext, "")
+	if err != nil {
+		return nil, fmt.Errorf("inject public data: %w", err)
+	}
+
+	logger.Info("creating encrypted publish secret")
+	err = encrypt.InjectSecretIntoMap(publishContext, ni.PublicKey, secret)
+	if err != nil {
+		return nil, fmt.Errorf("inject secret: %w", err)
 	}
 
 	if pc.LocalData != nil {

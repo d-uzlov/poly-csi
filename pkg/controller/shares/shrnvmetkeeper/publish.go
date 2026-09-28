@@ -10,6 +10,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -62,14 +63,19 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 	hostId := uuid.NewString()
 	hostNqn := nvmeInfo.HostNqn + ":" + hostId
 
-	var secret cntrnvme.SecretContext
-	authType := ""
+	pc := protocols.Nvme{
+		TargetNqn:     sh.Nqn,
+		HostNqn:       hostNqn,
+		HostId:        hostId,
+		ConnectPort:   sh.TcpPort,
+		TransportType: sh.Transport,
+	}
 
 	switch sh.AuthType {
 	case authTypeNone:
-		// no need to configure hosts
+		pc.AuthType = ""
 	case authTypeNqn:
-		authType = cntrnvme.AuthTypeNqn
+		pc.AuthType = protocols.NvmeAuthNqn
 
 		cmd := append(nvmetKeeperCmd, "host", "create", nvmet.Host{
 			Nqn:      hostNqn,
@@ -80,17 +86,14 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 			return nil, fmt.Errorf("host create: %w", err)
 		}
 	case authTypeChapProvision:
-		authType = cntrnvme.AuthTypeDhChap
+		pc.AuthType = protocols.NvmeAuthDhChap
 
 		host, err := sh.createSecureHost(ctx, hostNqn)
 		if err != nil {
 			return nil, fmt.Errorf("createSecureHost: %w", err)
 		}
-		secret = cntrnvme.SecretContext{
-			HostKey:       host.HostKey,
-			ControllerKey: host.ControllerKey,
-		}
-
+		pc.HostKey = host.HostKey
+		pc.ControllerKey = host.ControllerKey
 	}
 
 	cmd := append(nvmetKeeperCmd, "subsys", "allow", sh.Nqn, hostNqn)
@@ -100,15 +103,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 	}
 
 	return &shares.PublishContext{
-		Public: cntrnvme.PublicContext{
-			TargetNqn:     sh.Nqn,
-			HostNqn:       hostNqn,
-			HostId:        hostId,
-			AuthType:      authType,
-			ConnectPort:   sh.TcpPort,
-			TransportType: sh.Transport,
-		},
-		Secret: secret,
+		Context: pc,
 		LocalData: &publishData{
 			HostNqn: hostNqn,
 		},

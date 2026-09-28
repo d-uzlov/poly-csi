@@ -8,6 +8,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
 
@@ -75,15 +76,17 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		return nil, fmt.Errorf("nvmet_save: %w", err)
 	}
 
+	pc := protocols.Nvme{
+		TargetNqn:     sh.Nqn,
+		HostNqn:       nvmeInfo.HostNqn,
+		HostId:        nvmeInfo.HostId,
+		AuthType:      protocols.NvmeAuthNqn,
+		ConnectPort:   sh.Port,
+		TransportType: sh.Transport,
+	}
+
 	return &shares.PublishContext{
-		Public: cntrnvme.PublicContext{
-			TargetNqn:     sh.Nqn,
-			HostNqn:       nvmeInfo.HostNqn,
-			HostId:        nvmeInfo.HostId,
-			AuthType:      cntrnvme.AuthTypeNqn,
-			ConnectPort:   sh.Port,
-			TransportType: sh.Transport,
-		},
+		Context: pc,
 		LocalData: &publishData{
 			HostNqn: nvmeInfo.HostNqn,
 		},

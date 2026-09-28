@@ -7,7 +7,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -81,7 +81,7 @@ func (sh *share) DeleteShare(ctx context.Context) error {
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Public: cntrnfs.PublicContext{
+		Context: protocols.Nfs{
 			Path: sh.FsPath,
 		},
 	}, nil

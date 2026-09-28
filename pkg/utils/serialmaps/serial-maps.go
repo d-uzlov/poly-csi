@@ -3,7 +3,9 @@ package serialmaps
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 )
 
 const tag = "map"
@@ -92,14 +94,19 @@ func SerializeInto[T any](in T, out map[string]string, prefix string) (map[strin
 			continue
 		}
 
-		key := sf.Tag.Get(tag)
-		if key == "" {
-			return nil, fmt.Errorf("field %s: missing '%s' tag", sf.Name, tag)
-		}
-		if key == "-" {
+		tagValue := sf.Tag.Get(tag)
+		if tagValue == "-" {
 			continue
 		}
-
+		if tagValue == "" {
+			return nil, fmt.Errorf("field %s: missing '%s' tag", sf.Name, tag)
+		}
+		tagFields := strings.Split(tagValue, ",")
+		if slices.Contains(tagFields, "omitempty") && v.Field(i).IsZero() {
+			continue
+		}
+		
+		key := tagFields[0]
 		mapKey := prefix + key
 		_, ok := out[mapKey]
 		if ok {

@@ -10,6 +10,7 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
 type publishData struct {
@@ -59,11 +60,11 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
 	}
 
-	chap := cntriscsiadm.AuthNone
+	chap := protocols.IscsiAuthNone
 	if sh.AuthType == authTypeChapProvision {
-		chap = cntriscsiadm.AuthChapFromPublishSecret
+		chap = protocols.IscsiAuthChap
 	}
-	pc := cntriscsiadm.PublicContext{
+	pc := protocols.Iscsi{
 		Iqn:       sh.Iqn,
 		Port:      sh.Port,
 		Transport: sh.Transport,
@@ -75,7 +76,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 
 	if sh.AuthType == authTypeNone {
 		return &shares.PublishContext{
-			Public:    pc,
+			Context:   pc,
 			LocalData: pd,
 		}, nil
 	}
@@ -94,7 +95,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		}
 
 		return &shares.PublishContext{
-			Public:    pc,
+			Context:   pc,
 			LocalData: pd,
 		}, nil
 	}
@@ -118,12 +119,10 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		}
 	}
 
-	secret := cntriscsiadm.SecretContext{
-		ClientUser: acl.userId,
-		ClientPass: acl.password,
-		TargetUser: acl.mutualUserId,
-		TargetPass: acl.mutualPassword,
-	}
+	pc.ClientUser = acl.userId
+	pc.ClientPass = acl.password
+	pc.TargetUser = acl.mutualUserId
+	pc.TargetPass = acl.mutualPassword
 
 	err = snip.save(ctx)
 	if err != nil {
@@ -131,8 +130,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 	}
 
 	return &shares.PublishContext{
-		Public:    pc,
-		Secret:    secret,
+		Context:   pc,
 		LocalData: pd,
 	}, nil
 }

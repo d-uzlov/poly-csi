@@ -14,11 +14,10 @@ import (
 )
 
 type Config struct {
-	ServerType   string                          `yaml:"serverType"`
-	ServerConfig yaml.Node                       `yaml:"serverConfig"`
-	Connector    *connectorfactory.ConnectorSpec `yaml:"connector"`
-	DevFolder    string                          `yaml:"devFolder"`
-	Logs         logs.Config                     `yaml:"logs"`
+	Socket    string                          `yaml:"socket"`
+	Connector *connectorfactory.ConnectorSpec `yaml:"connector"`
+	DevFolder string                          `yaml:"devFolder"`
+	Logs      logs.Config                     `yaml:"logs"`
 }
 
 type parsedConfig struct {

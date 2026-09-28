@@ -1,8 +1,6 @@
 
-serverType: http-json
-serverConfig:
-  socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
-  # socket: ./iscsi.sock
+socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
+# socket: ./iscsi.sock
 
 devFolder: /host/dev
 

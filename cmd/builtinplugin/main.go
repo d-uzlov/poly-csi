@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -62,13 +61,7 @@ func main() {
 			panic("connector config is not valid")
 		}
 
-		var cfg ServerConfig
-		err = conf.Config.ServerConfig.Decode(&cfg)
-		if err != nil {
-			panic(fmt.Errorf("parse server config: %w", err))
-		}
-
-		serverInstance := NewServer(ctx, cfg, conf.Srv)
+		serverInstance := NewServer(ctx, conf.Config.Socket, conf.Srv)
 
 		serverInstance.StartServe(ctx, time.Second, func(err error) {
 			if err != nil {
@@ -92,19 +85,15 @@ func main() {
 }
 
 type Server struct {
-	config  ServerConfig
+	socket  string
 	callCtx context.Context
 	hs      *cntrhttpjsonplugin.HttpServer
 }
 
-type ServerConfig struct {
-	Socket string `yaml:"socket"`
-}
-
-func NewServer(callCtx context.Context, config ServerConfig, hs *cntrhttpjsonplugin.HttpServer) *Server {
+func NewServer(callCtx context.Context, socket string, hs *cntrhttpjsonplugin.HttpServer) *Server {
 	return &Server{
 		callCtx: callCtx,
-		config:  config,
+		socket:  socket,
 		hs:      hs,
 	}
 }
@@ -122,7 +111,7 @@ func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, 
 
 	go func() {
 		defer close(serveDoneCh)
-		unixListener, err := net.Listen("unix", s.config.Socket)
+		unixListener, err := net.Listen("unix", s.socket)
 		if err != nil {
 			doneCallback(err)
 			return
