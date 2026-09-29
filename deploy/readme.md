@@ -11,6 +11,7 @@ kl apply -f ./deploy/controller/csi-driver.yaml
 kl -n pv-poly create configmap --dry-run=client -o yaml controller-config             --from-file config.yaml=./config-controller.yaml | kl apply -f -
 kl -n pv-poly create configmap --dry-run=client -o yaml node-config                   --from-file config.yaml=./deploy/node/config-node.yaml | kl apply -f -
 kl -n pv-poly create configmap --dry-run=client -o yaml node-plugin-iscsi-config      --from-file config.yaml=./deploy/node/config-iscsi.yaml | kl apply -f -
+kl -n pv-poly create configmap --dry-run=client -o yaml node-plugin-ublk-config       --from-file config.yaml=./deploy/node/config-ublk.yaml | kl apply -f -
 
 ssh_key=~/.ssh/id_ed25519
 kl -n pv-poly create secret --dry-run=client -o yaml generic ssh-keys               --from-file ssh_key_1=$ssh_key | kl apply -f -

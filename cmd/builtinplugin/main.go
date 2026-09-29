@@ -14,7 +14,10 @@ import (
 	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/ublkfactory"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
@@ -58,35 +61,65 @@ func main() {
 	}
 
 	tr := localexec.New(localexec.Config{})
+	// TODO use this more
+	logsConfig := logs.Config{
+		LogLevel: "info",
+	}
+	logsLogger := logsConfig.MakeInstance()
+	ctx = logs.NewCtx(ctx, logsLogger)
 
 	serverDoneCh := make(chan struct{})
 	var watcherDoneCh <-chan struct{}
+
+	var handler http.Handler
+
 	switch argConfig.PluginType {
 	case "connector":
-		// TODO use this more
-		logsConfig := logs.Config{
-			LogLevel: "info",
+		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, connectorfactory.GetByType)
+		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
+		handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
+
+	case "ublk":
+		watcher := cntrublk.NewWatcher(tr)
+		logger.Info("running watcher.InitialRestore")
+		err := watcher.InitialRestore(ctx)
+		if err != nil {
+			panic(err)
 		}
-		logsLogger := logsConfig.MakeInstance()
-		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors)
+		logger.Info("finished watcher.InitialRestore")
+		watcherDoneCh = startWatcher(ctx, watcher)
+
+		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, func(mtype string) (connectors.InflateFunc, error) {
+			inflate, err := ublkfactory.GetByType(mtype)
+			if err != nil {
+				return nil, err
+			}
+			return func(conf connectors.CommonConfig) (connectors.Manager, error) {
+				return inflate(watcher, conf), nil
+			}, nil
+		})
 
 		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
-
-		srv := cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
-
-		serverInstance := NewServer(ctx, config.Socket, srv)
-
-		serverInstance.StartServe(ctx, time.Second, func(err error) {
-			if err != nil {
-				logger.Error("server finished with error", "error", err.Error())
-			} else {
-				logger.Info("server finished without error")
-			}
-			close(serverDoneCh)
-		})
+		handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
 	default:
 		panic("unknown plugin type: " + argConfig.PluginType)
 	}
+
+	// if previous run of the plugin failed without cleanup (sigkill, OOM, etc),
+	// dead socket file will prevent us from binding
+	if err := os.RemoveAll(config.Socket); err != nil {
+		panic(err)
+	}
+	serverInstance := NewServer(ctx, config.Socket, handler)
+
+	serverInstance.StartServe(ctx, time.Second, func(err error) {
+		if err != nil {
+			logger.Error("server finished with error", "error", err.Error())
+		} else {
+			logger.Info("server finished without error")
+		}
+		close(serverDoneCh)
+	})
 
 	select {
 	case <-serverDoneCh:
@@ -105,10 +138,10 @@ func main() {
 type Server struct {
 	socket  string
 	callCtx context.Context
-	hs      *cntrhttpjsonplugin.HttpServer
+	hs      http.Handler
 }
 
-func NewServer(callCtx context.Context, socket string, hs *cntrhttpjsonplugin.HttpServer) *Server {
+func NewServer(callCtx context.Context, socket string, hs http.Handler) *Server {
 	return &Server{
 		callCtx: callCtx,
 		socket:  socket,
@@ -147,4 +180,23 @@ func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, 
 		case <-serveDoneCh:
 		}
 	}()
+}
+
+func startWatcher(ctx context.Context, watcher *cntrublk.Watcher) <-chan struct{} {
+	doneCh := make(chan struct{})
+	go func() {
+		defer close(doneCh)
+		for ctx.Err() == nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.Tick(time.Second * 10):
+				err := watcher.Reconcile(ctx)
+				if err != nil {
+					logs.FromCtx(ctx).Error("reconcile failed", "error", err)
+				}
+			}
+		}
+	}()
+	return doneCh
 }

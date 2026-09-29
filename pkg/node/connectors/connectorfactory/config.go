@@ -15,9 +15,9 @@ type ConnectorSpec struct {
 	Config yaml.Node `yaml:"config"`
 }
 
-func ParseList(logger *logs.Instance, tr transport.Transport, devFolder string, connectorList []*ConnectorSpec) map[string]connectors.Manager {
+func ParseList(logger *logs.Instance, tr transport.Transport, devFolder string, connectorList []*ConnectorSpec, lookup func(mtype string) (connectors.InflateFunc, error)) map[string]connectors.Manager {
 	cons := map[string]connectors.Manager{}
-	logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
+	logger.Info(fmt.Sprintf("connectors in config: %d", len(connectorList)))
 	for i, v := range connectorList {
 		if v.Id == "" {
 			logger.Error(fmt.Sprintf("connector[i=%d]: missing id", i))
@@ -32,9 +32,14 @@ func ParseList(logger *logs.Instance, tr transport.Transport, devFolder string, 
 			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: missing type", i, v.Id))
 			continue
 		}
-		inflate, err := GetByType(v.Type)
+		inflate, err := lookup(v.Type)
 		if err != nil {
 			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: GetByType failed", i, v.Id), "error", err)
+			continue
+		}
+		if inflate == nil {
+			logger.Error(fmt.Sprintf("connector[i=%d/id=%s]: GetByType returned nil", i, v.Id))
+			continue
 		}
 		con, err := inflate(connectors.CommonConfig{
 			Tr:        tr,

@@ -56,7 +56,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*nodeconfig.ParsedConfig, err
 	tr := localexec.New(config.ExecConfig)
 
 	logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
-	cons := connectorfactory.ParseList(logger, tr, config.DevFolder, config.Connectors)
+	cons := connectorfactory.ParseList(logger, tr, config.DevFolder, config.Connectors, connectorfactory.GetByType)
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 

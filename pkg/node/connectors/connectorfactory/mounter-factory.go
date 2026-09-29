@@ -15,19 +15,19 @@ import (
 )
 
 const (
-	ConnectorTypeNfs      = "nfs"
-	ConnectorTypeCifs     = "cifs"
-	ConnectorTypeNvme     = "nvme"
-	ConnectorTypeIscsiadm = "iscsiadm"
-	ConnectorTypePlugin   = "plugin_json"
+	TypeNfs      = "nfs"
+	TypeCifs     = "cifs"
+	TypeNvme     = "nvme"
+	TypeIscsiadm = "iscsiadm"
+	TypePlugin   = "plugin_json"
 )
 
 var builtinTypes = map[string]connectors.InflateFunc{
-	ConnectorTypeNfs:      cntrnfs.New,
-	ConnectorTypeCifs:     cntrcifs.New,
-	ConnectorTypeNvme:     cntrnvme.New,
-	ConnectorTypeIscsiadm: cntriscsiadm.New,
-	ConnectorTypePlugin: func(conf connectors.CommonConfig) (connectors.Manager, error) {
+	TypeNfs:      cntrnfs.New,
+	TypeCifs:     cntrcifs.New,
+	TypeNvme:     cntrnvme.New,
+	TypeIscsiadm: cntriscsiadm.New,
+	TypePlugin: func(conf connectors.CommonConfig) (connectors.Manager, error) {
 		httpClient := cntrhttpjsonplugin.NewHttpClient()
 		return cntrhttpjsonplugin.NewDispatcherClient(httpClient, conf)
 	},

@@ -1,0 +1,65 @@
+FROM debian:forky-20260918-slim AS builder_ublk
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
+	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    make \
+    g++ \
+    pkg-config \
+    libtool \
+    liburing-dev \
+    libiscsi-dev
+
+WORKDIR /src
+
+ADD --link https://github.com/ublk-org/ublksrv.git /src
+
+RUN autoreconf -i \
+	&& ./configure \
+	&& make -j"$(nproc)" \
+	&& make ublk.iscsi
+RUN make install DESTDIR=/ublk-install
+
+# ========================
+
+FROM golang:1.27.1-alpine3.23 AS builder_plugin
+
+WORKDIR /app
+
+COPY go.mod go.sum /app/
+
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY ./cmd/builtinplugin/ /app/cmd/builtinplugin/
+COPY ./pkg/ /app/pkg/
+
+ARG APP_VERSION
+
+# prevent building with empty version
+RUN test -n "${APP_VERSION}"
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+  CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/builtinplugin/config.externalVersion=${APP_VERSION}" ./cmd/builtinplugin/
+
+# ========================
+
+FROM debian:forky-20260918-slim AS runtime
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
+	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
+	apt-get update \
+	&& apt-get install -y --no-install-recommends \
+  liburing2 \
+  libiscsi7 \
+  libstdc++6 \
+  tini
+
+COPY --from=builder_ublk /ublk-install/usr/local/ /usr/local/
+COPY --from=builder_plugin /app/builtinplugin /builtinplugin
+
+RUN ldconfig
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/builtinplugin"]

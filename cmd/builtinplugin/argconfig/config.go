@@ -9,10 +9,11 @@ import (
 )
 
 type ArgConfig struct {
-	LogLevel   slog.Level
-	Hostname   string
-	ConfigPath string
-	PluginType string
+	LogLevel    slog.Level
+	Hostname    string
+	ConfigPath  string
+	PluginType  string
+	UblkWatcher bool
 }
 
 const (
@@ -29,7 +30,7 @@ func Parse() ArgConfig {
 	flag.BoolVar(&versionFlag, "version", false, "Print version info")
 
 	flag.StringVar(&result.ConfigPath, "node-config", "./config-iscsi.yaml", "Path to application config")
-	flag.StringVar(&result.PluginType, "plugin-type", "connector", "allowed values: connector, multipath")
+	flag.StringVar(&result.PluginType, "plugin-type", "connector", "allowed values: connector, ublk")
 
 	flag.StringVar(&result.Hostname, "hostname", "", "Hostname to use in logs, if it needs to be different from OS-provided value")
 	var logLevel string

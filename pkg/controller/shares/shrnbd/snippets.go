@@ -13,7 +13,7 @@ var nbdReloadCmd = []string{"nbd_reload"}
 
 var exportTemplate = template.Must(template.New("").Parse(`
 [{{ .ExportName }}]
-exportname = "{{ .DevicePath }}"
+exportname = {{ .DevicePath }}
 # authfile = /export/nbd/export1-authfile
 readonly = false
 multifile = false

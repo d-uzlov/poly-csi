@@ -23,10 +23,25 @@ spec:
       priorityClassName: system-node-critical
       # hostNetwork is required to correctly report node IPs and communicate with multipathd and iscsiadm
       hostNetwork: true
+      # hostPID can be required on older kernels due to ublk bug
+      #     https://lkml.rescloud.iu.edu/hypermail/linux/kernel/2601.1/06849.html
+      hostPID: true
+      # hostUsers: false
       dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+      - name: modprobe
+        image: docker.io/alpine:3.24.2
+        command:
+        - modprobe
+        - ublk_drv
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /lib/modules
+          name: kernel-modules
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.4.37
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.4.44
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///var/lib/kubelet/plugins/io.meoe.poly-csi/csi.sock
@@ -101,8 +116,8 @@ spec:
         - mountPath: /registration
           name: registration-dir
 
-      - name: iscsi-connector
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.4.37
+      - name: iscsi
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.4.44
         args:
         - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -129,8 +144,48 @@ spec:
           name: config-iscsi
         - mountPath: /run/io.meoe.poly-csi/plugins/iscsi-container
           name: poly-csi-plugins
+          # TODO can external plugins even utilize extra filesystems without FUSE?
           mountPropagation: Bidirectional
           subPath: iscsi-container
+
+      - name: ublk
+        image: harbor.k8s.lan/local-test/poly-csi-ublk:v0.4.56
+        args:
+        - --plugin-type=ublk
+        - --node-config=/poly-csi/ublk-config/config.yaml
+        resources:
+          limits:
+            memory: 1500Mi
+          requests:
+            cpu: 10m
+            memory: 15Mi
+        securityContext:
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
+          # allowPrivilegeEscalation: true
+          # procMount: Unmasked
+          # seccompProfile:
+          #   type: Unconfined
+          # appArmorProfile:
+          #   type: Unconfined
+        terminationMessagePath: /tmp/termination
+        volumeMounts:
+        - mountPath: /poly-csi/ublk-config
+          name: config-ublk
+        - mountPath: /run/io.meoe.poly-csi/plugins/ublk-container
+          name: poly-csi-plugins
+          subPath: ublk-container
+        - mountPath: /var/run/ublksrvd
+          name: poly-csi-plugins
+          subPath: ublk-container/var-run-ublksrvd
+        - mountPath: /dev
+          name: host-dev
+          readOnly: true
+        - mountPath: /proc
+          name: host-proc
+          readOnly: true
 
       volumes:
       - name: var-lib-kubelet-plugins-self
@@ -157,6 +212,14 @@ spec:
         hostPath:
           path: /dev
           type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
       - name: poly-csi-plugins
         hostPath:
           path: /run/io.meoe.poly-csi/plugins
@@ -168,9 +231,17 @@ spec:
         hostPath:
           path: /
           type: Directory
+      - name: kernel-modules
+        hostPath:
+          path: /lib/modules
+          type: Directory
       - name: config-iscsi
         configMap:
           name: node-plugin-iscsi-config
+      - name: config-ublk
+        configMap:
+          name: node-plugin-ublk-config
+
       tolerations:
       - effect: NoSchedule
         operator: Exists
