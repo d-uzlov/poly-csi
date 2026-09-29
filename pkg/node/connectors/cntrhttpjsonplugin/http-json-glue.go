@@ -54,30 +54,30 @@ func (m *client) SetConfig(cfg yaml.Node) error {
 	return nil
 }
 
-func (m *client) Send(ctx context.Context, req PluginRequest) (result string, err error) {
+func (m *client) Send(ctx context.Context, req PluginRequest) (result string, state string, err error) {
 	b, err := json.Marshal(req)
 	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
+		return "", "", fmt.Errorf("marshal request: %w", err)
 	}
 
 	resp, err := m.hc.Post("http://unix/connector", "application/json", bytes.NewReader(b))
 	if err != nil {
-		return "", fmt.Errorf("post %s: %w", req.Method, err)
+		return "", "", fmt.Errorf("post %s: %w", req.Method, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("read body: %w", err)
+		return "", "", fmt.Errorf("read body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("status code %d: %s", resp.StatusCode, body)
+		return "", "", fmt.Errorf("status code %d: %s", resp.StatusCode, body)
 	}
 
 	var pr PluginResponse
 	err = json.Unmarshal(body, &pr)
 	if err != nil {
-		return "", fmt.Errorf("unmarshal response: %w", err)
+		return "", "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
 	if len(pr.Logs) != 0 {
@@ -87,11 +87,11 @@ func (m *client) Send(ctx context.Context, req PluginRequest) (result string, er
 
 	switch pr.Status {
 	case ResponseStatusOk:
-		return pr.Result, nil
+		return pr.Result, pr.State, nil
 	case ResponseStatusError:
-		return "", fmt.Errorf("remote error: %s", pr.Err)
+		return "", "", fmt.Errorf("remote error: %s", pr.Err)
 	default:
-		return "", fmt.Errorf("unknown response type: %s", pr.Status)
+		return "", "", fmt.Errorf("unknown response type: %s", pr.Status)
 	}
 }
 
@@ -119,7 +119,7 @@ func (s *HttpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		logger.Commit(requestSuccess)
 	}()
 
-	resp, err, errCode := s.handle(ctx, logger, req)
+	resp, state, err, errCode := s.handle(ctx, logger, req)
 	var pluginResp PluginResponse
 	if err != nil {
 		logger.EphemeralError("handler finished with error", "error", err)
@@ -134,6 +134,7 @@ func (s *HttpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		pluginResp = PluginResponse{
 			Status: ResponseStatusOk,
 			Err:    "",
+			State:  state,
 			Result: resp,
 			Logs:   logger.GetCopy(),
 		}
@@ -158,23 +159,23 @@ func (s *HttpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestSuccess = err == nil
 }
 
-func (s *HttpServer) handle(ctx context.Context, logger *logs.Instance, req *http.Request) (resp string, err error, errCode int) {
+func (s *HttpServer) handle(ctx context.Context, logger *logs.Instance, req *http.Request) (resp string, state string, err error, errCode int) {
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		return "", fmt.Errorf("read request body: %w", err), http.StatusInternalServerError
+		return "", "", fmt.Errorf("read request body: %w", err), http.StatusInternalServerError
 	}
 
 	var parsedRequest PluginRequest
 	err = json.Unmarshal(bodyBytes, &parsedRequest)
 	if err != nil {
-		return "", fmt.Errorf("parse request: %w", err), http.StatusBadRequest
+		return "", "", fmt.Errorf("parse request: %w", err), http.StatusBadRequest
 	}
 
 	logger.EphemeralInfo("new request", "request", parsedRequest)
 
-	callRes, err := s.dispatcher.Process(ctx, parsedRequest)
+	callRes, state, err := s.dispatcher.Process(ctx, parsedRequest)
 	if err != nil {
-		return "", err, http.StatusInternalServerError
+		return "", "", err, http.StatusInternalServerError
 	}
 	logger.EphemeralInfo("handler call success", "data", callRes)
 
@@ -184,10 +185,10 @@ func (s *HttpServer) handle(ctx context.Context, logger *logs.Instance, req *htt
 	} else {
 		serializedBytes, err := json.Marshal(callRes)
 		if err != nil {
-			return "", fmt.Errorf("json marshal call result: %w", err), http.StatusInternalServerError
+			return "", "", fmt.Errorf("json marshal call result: %w", err), http.StatusInternalServerError
 		}
 		serialized = string(serializedBytes)
 	}
 
-	return serialized, nil, http.StatusOK
+	return serialized, state, nil, http.StatusOK
 }

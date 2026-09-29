@@ -9,7 +9,7 @@ import (
 
 type Sender interface {
 	SetConfig(cfg yaml.Node) error
-	Send(ctx context.Context, req PluginRequest) (result string, err error)
+	Send(ctx context.Context, req PluginRequest) (result string, state string, err error)
 }
 
 type PluginRequest struct {
@@ -22,6 +22,7 @@ type PluginRequest struct {
 type PluginResponse struct {
 	Status string            `json:"status"`
 	Err    string            `json:"error"`
+	State  string            `json:"state"`
 	Result string            `json:"result"`
 	Logs   []logs.LogRequest `json:"logs"`
 }

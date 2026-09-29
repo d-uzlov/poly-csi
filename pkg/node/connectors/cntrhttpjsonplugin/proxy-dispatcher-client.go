@@ -47,7 +47,7 @@ func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabil
 		State:         "",
 		SerializedArg: "",
 	}
-	resp, err := c.remote.Send(ctx, req)
+	resp, _, err := c.remote.Send(ctx, req)
 	if err != nil {
 		return connectors.Capabilities{}, err
 	}
@@ -68,7 +68,7 @@ func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNo
 		State:         "",
 		SerializedArg: "",
 	}
-	resp, err := c.remote.Send(ctx, req)
+	resp, _, err := c.remote.Send(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -93,14 +93,14 @@ func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.Connec
 		State:         "",
 		SerializedArg: string(serializedArg),
 	}
-	resp, err := c.remote.Send(ctx, req)
+	_, remoteState, err := c.remote.Send(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	return &state{
 		con:         c,
-		RemoteState: resp,
+		RemoteState: remoteState,
 	}, nil
 }
 

@@ -33,10 +33,11 @@ func (s *state) ConnectBlock(ctx context.Context) error {
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
-	_, err := s.con.remote.Send(ctx, req)
+	_, remoteState, err := s.con.remote.Send(ctx, req)
 	if err != nil {
 		return err
 	}
+	s.RemoteState = remoteState
 
 	return nil
 }
@@ -52,10 +53,11 @@ func (s *state) ConnectFolder(ctx context.Context, cReq connectors.ConnectFolder
 		State:         s.RemoteState,
 		SerializedArg: string(serializedArg),
 	}
-	_, err = s.con.remote.Send(ctx, req)
+	_, remoteState, err := s.con.remote.Send(ctx, req)
 	if err != nil {
 		return err
 	}
+	s.RemoteState = remoteState
 
 	return nil
 }
@@ -67,10 +69,11 @@ func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 		State:         s.RemoteState,
 		SerializedArg: strconv.Itoa(index),
 	}
-	resp, err := s.con.remote.Send(ctx, req)
+	resp, remoteState, err := s.con.remote.Send(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+	s.RemoteState = remoteState
 
 	var res []string
 	err = json.Unmarshal([]byte(resp), &res)
@@ -96,10 +99,11 @@ func (s *state) Disconnect(ctx context.Context) error {
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
-	_, err := s.con.remote.Send(ctx, req)
+	_, remoteState, err := s.con.remote.Send(ctx, req)
 	if err != nil {
 		return err
 	}
+	s.RemoteState = remoteState
 
 	return nil
 }
@@ -111,10 +115,11 @@ func (s *state) Expand(ctx context.Context) error {
 		State:         s.RemoteState,
 		SerializedArg: "",
 	}
-	_, err := s.con.remote.Send(ctx, req)
+	_, remoteState, err := s.con.remote.Send(ctx, req)
 	if err != nil {
 		return err
 	}
+	s.RemoteState = remoteState
 
 	return nil
 }
