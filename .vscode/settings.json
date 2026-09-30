@@ -92,6 +92,7 @@
     "mtype",
     "multipath",
     "multipathd",
+    "nbdublk",
     "ncat",
     "noatime",
     "node.session.auth.authmethod",

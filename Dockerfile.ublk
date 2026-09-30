@@ -56,6 +56,28 @@ RUN make install DESTDIR=/install && cp /ublksrv/.libs/ublk.iscsi /install/usr/l
 
 # ========================
 
+FROM c_builder AS builder_nbdublk
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
+	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
+  apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    libgnutls28-dev \
+    libxml2-dev \
+    ocaml
+
+COPY --from=builder_ublksrv /install/usr/local/ /usr/local/
+
+ADD --link https://gitlab.com/nbdkit/libnbd.git#467f548f4f78da48ae3e44ea83aeb679adb7a698 /nbdublk
+
+WORKDIR /nbdublk
+
+RUN autoreconf -i \
+	&& ./configure \
+	&& make -j"$(nproc)"
+RUN make install DESTDIR=/install
+
+# ========================
+
 FROM golang:1.27.1-alpine3.23 AS builder_plugin
 
 WORKDIR /app
