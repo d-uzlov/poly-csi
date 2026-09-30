@@ -10,13 +10,14 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
     g++ \
     pkg-config \
     libtool \
+    liburing-dev \
     git
 
 # ========================
 
 FROM c_builder AS builder_libiscsi
 
-ADD --link https://github.com/sahlberg/libiscsi.git /libiscsi
+ADD --link https://github.com/sahlberg/libiscsi.git#2f568c66202cdfb8af7c8817708db8e19a9164f8 /libiscsi
 
 WORKDIR /libiscsi
 
@@ -24,6 +25,7 @@ COPY ./libiscsi-str-len.patch /tmp/libiscsi-str-len.patch
 
 # by default libiscsi silently truncates url to 255 bytes,
 # which breaks shares with long domain name, long iqn, or long user/pass
+# https://github.com/sahlberg/libiscsi/blob/2f568c66202cdfb8af7c8817708db8e19a9164f8/lib/init.c#L592
 RUN git apply /tmp/libiscsi-str-len.patch
 
 RUN autoreconf -i \
@@ -33,16 +35,11 @@ RUN make install DESTDIR=/install
 
 # ========================
 
-FROM c_builder AS builder_ublk
+FROM c_builder AS builder_ublksrv
 
 COPY --from=builder_libiscsi /install/usr/local/ /usr/local/
 
-RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
-	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
-    liburing-dev
-
-ADD --link https://github.com/ublk-org/ublksrv.git /ublksrv
+ADD --link https://github.com/ublk-org/ublksrv.git#e36fae3f0995c4940b9007eb10d020beaba6a7e2 /ublksrv
 
 WORKDIR /ublksrv
 
@@ -92,7 +89,8 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
   rsyslog
 
 COPY --from=builder_libiscsi /install/usr/local/ /usr/local/
-COPY --from=builder_ublk /install/usr/local/ /usr/local/
+COPY --from=builder_ublksrv /install/usr/local/ /usr/local/
+COPY --from=builder_nbdublk /install/usr/local/ /usr/local/
 COPY --from=builder_plugin /app/builtinplugin /builtinplugin
 
 RUN ldconfig
