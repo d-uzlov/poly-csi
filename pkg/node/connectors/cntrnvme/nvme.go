@@ -50,7 +50,7 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
-	pc, err := protocols.Parse[protocols.Nvme](req.PublishContext, req.PublishSecret)
+	pc, err := protocols.Parse[protocols.NvmeShare](req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}

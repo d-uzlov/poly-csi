@@ -18,8 +18,8 @@ type state struct {
 	devFolder string                `json:"-"`
 	callback  cntrublk.UblkCallback `json:"-"`
 
-	Address string        `json:"address"`
-	Pc      protocols.Nbd `json:"nbd"`
+	Address string             `json:"address"`
+	Pc      protocols.NbdShare `json:"nbd"`
 
 	DevId string `json:"devId"`
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type Nbd struct {
+type NbdShare struct {
 	// public
 	Port       string `map:"nbd.port,omitempty"        json:"port,omitempty"`
 	ExportName string `map:"nbd.exportName,omitempty" json:"exportName,omitempty"`
@@ -12,7 +12,7 @@ type Nbd struct {
 	// secret
 }
 
-func (v Nbd) Validate() error {
+func (v NbdShare) Validate() error {
 	if v.Port == "" {
 		return fmt.Errorf("missing port")
 	}

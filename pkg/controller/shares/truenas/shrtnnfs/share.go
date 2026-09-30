@@ -69,7 +69,7 @@ func (sh *share) AttachVolume(ctx context.Context, volume any, index int) error 
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Context: protocols.Nfs{
+		Context: protocols.NfsShare{
 			Path: sh.FsPath,
 		},
 	}, nil

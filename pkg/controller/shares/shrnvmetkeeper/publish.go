@@ -63,7 +63,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 	hostId := uuid.NewString()
 	hostNqn := nvmeInfo.HostNqn + ":" + hostId
 
-	pc := protocols.Nvme{
+	pc := protocols.NvmeShare{
 		TargetNqn:     sh.Nqn,
 		HostNqn:       hostNqn,
 		HostId:        hostId,

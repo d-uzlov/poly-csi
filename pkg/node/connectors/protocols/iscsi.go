@@ -9,11 +9,12 @@ const (
 	IscsiAuthChap = "chap-mutual"
 )
 
-type Iscsi struct {
+type IscsiShare struct {
 	// public
-	Iqn       string `map:"iscsi.nqn,omitempty"       json:"iqn,omitempty"`
-	Port      string `map:"iscsi.port,omitempty"      json:"port,omitempty"`
-	Transport string `map:"iscsi.transport,omitempty" json:"transport,omitempty"`
+	Initiator string `map:"iscsi.initiator,omitempty"     json:"initiator,omitempty"`
+	Iqn       string `map:"iscsi.nqn,omitempty"           json:"iqn,omitempty"`
+	Port      string `map:"iscsi.port,omitempty"          json:"port,omitempty"`
+	Transport string `map:"iscsi.transport,omitempty"     json:"transport,omitempty"`
 	AuthType  string `map:"iscsi.authType,omitempty"      json:"authType,omitempty"`
 
 	// secret
@@ -23,7 +24,10 @@ type Iscsi struct {
 	TargetPass string `secret:"+" map:"iscsi.targetPass" json:"targetPass,omitempty"`
 }
 
-func (v Iscsi) Validate() error {
+func (v IscsiShare) Validate() error {
+	if v.Initiator == "" {
+		return fmt.Errorf("missing Initiator")
+	}
 	if v.Iqn == "" {
 		return fmt.Errorf("missing iqn")
 	}
@@ -55,4 +59,8 @@ func (v Iscsi) Validate() error {
 		return fmt.Errorf("auth type: unknown value: '%s'", v.AuthType)
 	}
 	return nil
+}
+
+type IscsiNodeInfo struct {
+	InitiatorIqn string `map:"initiatorIqn"`
 }

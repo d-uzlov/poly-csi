@@ -88,7 +88,7 @@ func (sh *share) DeleteShare(ctx context.Context) error {
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Context: protocols.Nfs{
+		Context: protocols.NfsShare{
 			Path: sh.Folder,
 		},
 	}, nil

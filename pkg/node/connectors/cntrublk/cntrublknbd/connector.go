@@ -37,7 +37,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		return nil, fmt.Errorf("nbd connector does not support more than one address")
 	}
 
-	pc, err := protocols.Parse[protocols.Nbd](req.PublishContext, req.PublishSecret)
+	pc, err := protocols.Parse[protocols.NbdShare](req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}

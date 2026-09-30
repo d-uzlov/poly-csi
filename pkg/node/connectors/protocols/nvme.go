@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type Nvme struct {
+type NvmeShare struct {
 	// public
 	TargetNqn     string `map:"nvme.targetNqn,omitempty"     json:"targetNqn,omitempty"`
 	HostNqn       string `map:"nvme.hostNqn,omitempty"       json:"hostNqn,omitempty"`
@@ -23,7 +23,7 @@ const (
 	NvmeAuthDhChap = "dhchap-mutual"
 )
 
-func (v Nvme) Validate() error {
+func (v NvmeShare) Validate() error {
 	if v.TargetNqn == "" {
 		return fmt.Errorf("target nqn is empty")
 	}

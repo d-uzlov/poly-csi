@@ -4,14 +4,14 @@ import (
 	"fmt"
 )
 
-type Nfs struct {
+type NfsShare struct {
 	// public
 	Path string `map:"nfs.sharePath,omitempty" json:"path,omitempty"`
 
 	// secret
 }
 
-func (v Nfs) Validate() error {
+func (v NfsShare) Validate() error {
 	if v.Path == "" {
 		return fmt.Errorf("missing share path")
 	}

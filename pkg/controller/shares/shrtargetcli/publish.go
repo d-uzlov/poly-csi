@@ -64,7 +64,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 	if sh.AuthType == authTypeChapProvision {
 		chap = protocols.IscsiAuthChap
 	}
-	pc := protocols.Iscsi{
+	pc := protocols.IscsiShare{
 		Iqn:       sh.Iqn,
 		Port:      sh.Port,
 		Transport: sh.Transport,

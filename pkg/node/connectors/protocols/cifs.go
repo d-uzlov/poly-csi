@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type Cifs struct {
+type CifsShare struct {
 	// public
 	ShareName string `map:"cifs.shareName,omitempty" json:"shareName,omitempty"`
 	UserName  string `map:"cifs.userName,omitempty" json:"userName,omitempty"`
@@ -13,7 +13,7 @@ type Cifs struct {
 	UserPassword string `secret:"+" map:"userPassword" json:"userPassword,omitempty"`
 }
 
-func (v Cifs) Validate() error {
+func (v CifsShare) Validate() error {
 	if v.ShareName == "" {
 		return fmt.Errorf("missing ShareName")
 	}

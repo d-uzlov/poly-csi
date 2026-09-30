@@ -34,7 +34,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		return nil, fmt.Errorf("nfs connector does not support more than one address")
 	}
 
-	pc, err := protocols.Parse[protocols.Nfs](req.PublishContext, req.PublishSecret)
+	pc, err := protocols.Parse[protocols.NfsShare](req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}

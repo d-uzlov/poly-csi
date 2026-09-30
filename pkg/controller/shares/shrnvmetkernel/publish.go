@@ -76,7 +76,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		return nil, fmt.Errorf("nvmet_save: %w", err)
 	}
 
-	pc := protocols.Nvme{
+	pc := protocols.NvmeShare{
 		TargetNqn:     sh.Nqn,
 		HostNqn:       nvmeInfo.HostNqn,
 		HostId:        nvmeInfo.HostId,

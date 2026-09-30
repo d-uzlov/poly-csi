@@ -66,7 +66,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 	}
 
 	return &shares.PublishContext{
-		Context: protocols.Iscsi{
+		Context: protocols.IscsiShare{
 			Iqn:       sh.Iqn,
 			Port:      "3260",
 			Transport: "tcp",

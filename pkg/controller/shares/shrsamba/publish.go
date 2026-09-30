@@ -10,7 +10,7 @@ import (
 
 func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Context: protocols.Cifs{
+		Context: protocols.CifsShare{
 			ShareName:    sh.ShareName,
 			UserName:     sh.UserName,
 			UserPassword: sh.UserPass,

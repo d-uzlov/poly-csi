@@ -33,7 +33,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("smb connector does not support more than one address")
 	}
-	pc, err := protocols.Parse[protocols.Cifs](req.PublishContext, req.PublishSecret)
+	pc, err := protocols.Parse[protocols.CifsShare](req.PublishContext, req.PublishSecret)
 	if err != nil {
 		return nil, fmt.Errorf("protocols.Parse: %w", err)
 	}
