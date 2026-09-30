@@ -48,27 +48,32 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 		if v.Target == "" {
 			continue
 		}
-		target, err := v.ParseNbd()
+		if v.TargetType != "nbd" {
+			continue
+		}
+		target, err := v.ParseTarget[ublk.NbdTarget]()
 		if err != nil {
 			logs.FromCtx(ctx).Warn("failed to parse ublk target from json", "devId", v.DevId, "target", v.Target, "error", err)
 			continue
 		}
 		if s.checkSameTarget(target) {
-			logs.FromCtx(ctx).Warn("found existing matching target", "devId", v.DevId)
+			logs.FromCtx(ctx).Info("found existing matching target", "devId", v.DevId)
 			s.DevId = v.DevId
 			return nil
 		}
 	}
 
-	info, err := snip.CreateNbd(ctx, ublk.CreateNbd{
+	info, err := snip.Create(ctx, ublk.CreateParams{
+		Type:     "nbd",
+		Zerocopy: true,
+	}, ublk.CreateNbd{
 		Host:         s.Address,
 		Port:         s.Pc.Port,
 		ExportName:   s.Pc.ExportName,
-		Zerocopy:     true,
 		SendZeroCopy: true,
 	})
 	if err != nil {
-		return fmt.Errorf("CreateNbd: %w", err)
+		return fmt.Errorf("snip.Create: %w", err)
 	}
 
 	s.DevId = info.DevId
@@ -113,6 +118,9 @@ func (s *state) Disconnect(ctx context.Context) error {
 	if info.DevId != s.DevId {
 		return fmt.Errorf("snip.List(devId=%s) returned info for devId=%s", s.DevId, info.DevId)
 	}
+	if info.TargetType != "nbd" {
+		return nil
+	}
 	if info.Target == "" {
 		// maybe someone else has created device with same devId
 		// it's not safe to delete without detailed target info
@@ -120,7 +128,7 @@ func (s *state) Disconnect(ctx context.Context) error {
 		return nil
 	}
 
-	target, err := info.ParseNbd()
+	target, err := info.ParseTarget[ublk.NbdTarget]()
 	if err != nil {
 		return err
 	}

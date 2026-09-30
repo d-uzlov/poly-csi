@@ -53,7 +53,10 @@ type CommonConfig struct {
 }
 
 type Capabilities struct {
-	// ConnectType specifies the how Connector.Connect should be used.
+	// HasNodeInfo indicates if GetInfo of this connector provides essential info needed to create shares
+	HasNodeInfo bool `json:"has_node_info"`
+
+	// ConnectType specifies the how connection should be created.
 	// See constants below for more info
 	ConnectType string `json:"connect_type"`
 

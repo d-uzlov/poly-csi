@@ -2,6 +2,7 @@ package ublk
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -72,7 +73,9 @@ type UblkDeviceInfo struct {
 	OwnerUidGid string
 
 	Queues []UblkQueueInfo
-	Target string
+
+	Target     string
+	TargetType string
 }
 
 func ParseUblkOutput(humanString string) (UblkDeviceInfo, error) {
@@ -147,6 +150,12 @@ func ParseUblkList(humanString string) ([]UblkDeviceInfo, error) {
 			})
 		case strings.HasPrefix(l, "target"):
 			current.Target = strings.TrimSpace(strings.TrimPrefix(l, "target"))
+			var raw map[string]any
+			err := json.Unmarshal([]byte(current.Target), &raw)
+			if err != nil {
+				return nil, fmt.Errorf("parse target: %w", err)
+			}
+			current.TargetType, _ = raw["name"].(string)
 		default:
 			return nil, fmt.Errorf("could not parse line: '%s'", l)
 		}

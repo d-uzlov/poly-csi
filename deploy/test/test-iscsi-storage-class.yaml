@@ -14,8 +14,9 @@ parameters:
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.shareType: targetcli
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.connectorId: iscsi
-  dispatch.addressNames: storage,k8s
+  dispatch.connectorId: ublk_iscsi
+  # dispatch.addressNames: storage,k8s
+  dispatch.addressNames: storage
   dispatch.fsFormatSide: controller
 
   zfs.parentDataset: tulip/test-guid

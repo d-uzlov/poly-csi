@@ -21,16 +21,6 @@ func New(tr transport.Transport) Snippets {
 	}
 }
 
-type CreateNbd struct {
-	Host       string
-	Port       string
-	ExportName string
-	// enable zero-copy in io_uring
-	Zerocopy bool
-	// enable zero-copy for NBD connection
-	SendZeroCopy bool
-}
-
 func (s *Snippets) Delete(ctx context.Context, devId string) error {
 	cmd := append(ublkCmd, "del", "-n", devId)
 	return transport.CheckedRun(ctx, s.tr, cmd)

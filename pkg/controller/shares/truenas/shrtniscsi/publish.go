@@ -48,9 +48,11 @@ func parsePublishData(serialized string) (publishData, error) {
 
 func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	var iscsiInfo protocols.IscsiNodeInfo
-	err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
-	if err != nil {
-		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
+	if req.ConInfo.Public != "" {
+		err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
+		if err != nil {
+			return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
+		}
 	}
 
 	if iscsiInfo.InitiatorIqn == "" {
@@ -59,7 +61,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 
 	snip := newSnippets(sh.tr)
 
-	err = snip.attachGroup(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
+	err := snip.attachGroup(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
 	if err != nil {
 		return nil, fmt.Errorf("attach iscsi group: %w", err)
 	}
@@ -70,6 +72,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 
 	return &shares.PublishContext{
 		Context: protocols.IscsiShare{
+			Initiator: iscsiInfo.InitiatorIqn,
 			Iqn:       sh.Iqn,
 			Port:      "3260",
 			Transport: "tcp",

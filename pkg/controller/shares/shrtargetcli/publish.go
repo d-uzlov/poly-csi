@@ -54,9 +54,11 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 	}
 
 	var iscsiInfo protocols.IscsiNodeInfo
-	err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
-	if err != nil {
-		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
+	if req.ConInfo.Public != "" {
+		err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
+		if err != nil {
+			return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
+		}
 	}
 
 	if iscsiInfo.InitiatorIqn == "" {
@@ -68,6 +70,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 		chap = protocols.IscsiAuthChap
 	}
 	pc := protocols.IscsiShare{
+		Initiator: iscsiInfo.InitiatorIqn,
 		Iqn:       sh.Iqn,
 		Port:      sh.Port,
 		Transport: sh.Transport,
@@ -86,7 +89,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 
 	snip := newTargetcliSnippets(sh.tr)
 
-	err = snip.createClient(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
+	err := snip.createClient(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
 	if err != nil {
 		return nil, fmt.Errorf("create client: %w", err)
 	}

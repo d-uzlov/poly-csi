@@ -2,14 +2,15 @@
 socket: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
 # socket: ./iscsi.sock
 
-devFolder: /host/dev
+devFolder: /dev
 
 connector:
 - id: ublk_nbd
   type: ublk_nbd
-  config:
-    iscsiadmCmd: [ "chroot", "/host", "iscsiadm" ]
-    initiatorNamePath: /host/etc/iscsi/initiatorname.iscsi
+  config: {}
+- id: ublk_iscsi
+  type: ublk_iscsi
+  config: {}
 
 logs:
   logLevel: debug
