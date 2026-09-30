@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -79,7 +78,7 @@ func (sh *share) DeleteShare(ctx context.Context) error {
 	return snip.removeNfsShare(ctx, sh.Name)
 }
 
-func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
 		Context: protocols.NfsShare{
 			Path: sh.FsPath,

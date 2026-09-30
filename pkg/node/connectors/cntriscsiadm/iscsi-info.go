@@ -7,12 +7,9 @@ import (
 	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
-
-type IscsiPublicInfo struct {
-	HostIqn string `json:"host_iqn"`
-}
 
 func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
 	iqn, err := c.parseIqn(c.commonConfig.Tr, ctx)
@@ -20,8 +17,8 @@ func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 		return nil, err
 	}
 
-	public, err := json.Marshal(IscsiPublicInfo{
-		HostIqn: iqn,
+	public, err := json.Marshal(protocols.IscsiNodeInfo{
+		InitiatorIqn: iqn,
 	})
 	if err != nil {
 		return nil, err
@@ -30,15 +27,6 @@ func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo,
 	return &connectors.ConnectorNodeInfo{
 		Public: string(public),
 	}, nil
-}
-
-func ParseIscsiInfo(src connectors.ConnectorNodeInfo) (IscsiPublicInfo, error) {
-	var result IscsiPublicInfo
-	err := json.Unmarshal([]byte(src.Public), &result)
-	if err != nil {
-		return IscsiPublicInfo{}, fmt.Errorf("parsing '%v': %w", src.Public, err)
-	}
-	return result, nil
 }
 
 func (c *connector) parseIqn(tr transport.Transport, ctx context.Context) (string, error) {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
@@ -49,14 +48,14 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	if !testReady(ctx, sh.tr) {
 		return nil, fmt.Errorf("nvmet is not ready")
 	}
 
 	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
-	nvmeInfo, err := cntrnvme.ParseNvmeInfo(mi)
+	nvmeInfo, err := cntrnvme.ParseNvmeInfo(req.ConInfo)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
 	}

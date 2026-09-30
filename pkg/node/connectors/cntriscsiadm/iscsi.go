@@ -33,6 +33,7 @@ func (c *connector) Configure() error {
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	return connectors.Capabilities{
+		HasNodeInfo: true,
 		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
 }

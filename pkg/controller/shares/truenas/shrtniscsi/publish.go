@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
@@ -48,21 +46,26 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	iscsiInfo, err := cntriscsiadm.ParseIscsiInfo(mi)
+func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
+	var iscsiInfo protocols.IscsiNodeInfo
+	err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
 	}
 
+	if iscsiInfo.InitiatorIqn == "" {
+		iscsiInfo.InitiatorIqn = fmt.Sprintf("%s:host:%s", sh.gp.iqnBase, req.NodeName)
+	}
+
 	snip := newSnippets(sh.tr)
 
-	err = snip.attachGroup(ctx, sh.Iqn, iscsiInfo.HostIqn)
+	err = snip.attachGroup(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
 	if err != nil {
 		return nil, fmt.Errorf("attach iscsi group: %w", err)
 	}
 
 	pd := publishData{
-		HostIqn: iscsiInfo.HostIqn,
+		HostIqn: iscsiInfo.InitiatorIqn,
 	}
 
 	return &shares.PublishContext{

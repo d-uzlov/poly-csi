@@ -8,8 +8,6 @@ import (
 	"github.com/thanhpk/randstr"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
@@ -50,14 +48,19 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	if !testReady(ctx, sh.tr) {
 		return nil, fmt.Errorf("targetcli is not ready")
 	}
 
-	iscsiInfo, err := cntriscsiadm.ParseIscsiInfo(mi)
+	var iscsiInfo protocols.IscsiNodeInfo
+	err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
+	}
+
+	if iscsiInfo.InitiatorIqn == "" {
+		iscsiInfo.InitiatorIqn = fmt.Sprintf("%s:host:%s", sh.gp.iqnBase, req.NodeName)
 	}
 
 	chap := protocols.IscsiAuthNone
@@ -71,7 +74,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		AuthType:  chap,
 	}
 	pd := publishData{
-		HostIqn: iscsiInfo.HostIqn,
+		HostIqn: iscsiInfo.InitiatorIqn,
 	}
 
 	if sh.AuthType == authTypeNone {
@@ -83,7 +86,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 
 	snip := newTargetcliSnippets(sh.tr)
 
-	err = snip.createClient(ctx, sh.Iqn, iscsiInfo.HostIqn)
+	err = snip.createClient(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
 	if err != nil {
 		return nil, fmt.Errorf("create client: %w", err)
 	}
@@ -100,12 +103,12 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 		}, nil
 	}
 
-	acl, err := snip.readClientAcl(ctx, sh.Iqn, iscsiInfo.HostIqn)
+	acl, err := snip.readClientAcl(ctx, sh.Iqn, iscsiInfo.InitiatorIqn)
 	if err != nil {
 		return nil, fmt.Errorf("read client auth: %w", err)
 	}
 	if acl == nil {
-		logs.FromCtx(ctx).MicroOp("acl is not found, generating a new one", "share-iqn", sh.Iqn, "host-iqn", iscsiInfo.HostIqn)
+		logs.FromCtx(ctx).MicroOp("acl is not found, generating a new one", "share-iqn", sh.Iqn, "host-iqn", iscsiInfo.InitiatorIqn)
 		acl = &chapAcl{
 			userId:         randstr.Base62(16),
 			password:       randstr.Base62(32),
@@ -113,7 +116,7 @@ func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (
 			mutualPassword: randstr.Base62(32),
 		}
 
-		err = snip.setupClientAcl(ctx, sh.Iqn, iscsiInfo.HostIqn, *acl)
+		err = snip.setupClientAcl(ctx, sh.Iqn, iscsiInfo.InitiatorIqn, *acl)
 		if err != nil {
 			return nil, fmt.Errorf("setup client acl: %w", err)
 		}

@@ -4,11 +4,10 @@ import (
 	"context"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 )
 
-func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
+func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
 		Context: protocols.CifsShare{
 			ShareName:    sh.ShareName,

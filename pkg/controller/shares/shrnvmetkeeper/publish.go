@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
 	"meoe.io/poly-csi/pkg/transport"
@@ -52,8 +51,8 @@ func parsePublishData(serialized string) (publishData, error) {
 	return result, nil
 }
 
-func (sh *share) Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*shares.PublishContext, error) {
-	nvmeInfo, err := cntrnvme.ParseNvmeInfo(mi)
+func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
+	nvmeInfo, err := cntrnvme.ParseNvmeInfo(req.ConInfo)
 	if err != nil {
 		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
 	}

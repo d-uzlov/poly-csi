@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors/protocols"
@@ -75,7 +76,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		}
 	}
 
-	mountInfo, ok := ni.Connectors[mh.vi.ConnectorId]
+	conInfo, ok := ni.Connectors[mh.vi.ConnectorId]
 	if !ok {
 		return nil, fmt.Errorf("node info does not list connector %s", mh.vi.ConnectorId)
 	}
@@ -92,7 +93,10 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("validate share: %w", err)
 	}
 
-	pc, err := shareHandle.Publish(ctx, mountInfo)
+	pc, err := shareHandle.Publish(ctx, shares.PublishRequest{
+		NodeName: req.NodeId,
+		ConInfo: conInfo,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("shareHandle.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
 	}

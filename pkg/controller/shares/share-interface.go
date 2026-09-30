@@ -25,7 +25,7 @@ type Share interface {
 	// AttachVolume configures sharing of a volume, when some storage-specific info is required.
 	// Implementation can cast the volume object to expected type to extract info from it.
 	AttachVolume(ctx context.Context, volume any, index int) error
-	Publish(ctx context.Context, mi connectors.ConnectorNodeInfo) (*PublishContext, error)
+	Publish(ctx context.Context, req PublishRequest) (*PublishContext, error)
 	Unpublish(ctx context.Context, serializedLocalData string) error
 	UnpublishAll(ctx context.Context) error
 	DeleteShare(ctx context.Context) error
@@ -57,6 +57,11 @@ type CreateShareRequest struct {
 	// MutableParams override StaticParams.
 	// Implementation must fail if MutableParams contains something that can not be dynamically changed.
 	MutableParams map[string]string
+}
+
+type PublishRequest struct {
+	NodeName string
+	ConInfo  connectors.ConnectorNodeInfo
 }
 
 type PublishContext struct {
