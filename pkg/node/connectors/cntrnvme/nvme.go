@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/protocols"
+	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 

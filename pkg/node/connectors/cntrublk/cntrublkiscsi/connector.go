@@ -6,7 +6,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
-	"meoe.io/poly-csi/pkg/node/connectors/protocols"
+	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type connector struct {

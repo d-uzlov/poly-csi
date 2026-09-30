@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors/protocols"
+	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type publishData struct {

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors/protocols"
+	"meoe.io/poly-csi/pkg/protocols"
 )
 
 func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {

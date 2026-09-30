@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/protocols"
+	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type ShareManager interface {
