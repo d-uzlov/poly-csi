@@ -6,7 +6,7 @@
 /LICENSE
 *.md
 /development.md
-*.patch
+# *.patch
 *.log
 
 Dockerfile

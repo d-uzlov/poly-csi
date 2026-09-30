@@ -1,27 +1,55 @@
-FROM debian:forky-20260918-slim AS builder_ublk
+
+FROM debian:forky-20260918-slim AS c_builder
 
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
-  apt-get update \
-  && apt-get install -y --no-install-recommends \
+  apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     autoconf \
     automake \
     make \
     g++ \
     pkg-config \
-    libtool \
+    libtool
+
+# ========================
+
+FROM c_builder AS builder_libiscsi
+
+ADD --link https://github.com/sahlberg/libiscsi.git /libiscsi
+
+WORKDIR /libiscsi
+
+RUN autoreconf -i \
+	&& ./configure \
+	&& make -j"$(nproc)"
+RUN make install DESTDIR=/install
+
+# ========================
+
+FROM c_builder AS builder_ublk
+
+COPY --from=builder_libiscsi /install/usr/local/ /usr/local/
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
+	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
+  apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     liburing-dev \
-    libiscsi-dev
+    git
 
-WORKDIR /src
+ADD --link https://github.com/ublk-org/ublksrv.git /ublksrv
 
-ADD --link https://github.com/ublk-org/ublksrv.git /src
+WORKDIR /ublksrv
+
+COPY ./ublk-iscsi.patch /tmp/ublk-iscsi.patch
+
+# https://github.com/ublk-org/ublksrv/issues/211
+RUN git apply /tmp/ublk-iscsi.patch
 
 RUN autoreconf -i \
 	&& ./configure \
 	&& make -j"$(nproc)" \
 	&& make ublk.iscsi
-RUN make install DESTDIR=/ublk-install
+RUN make install DESTDIR=/install && cp /ublksrv/.libs/ublk.iscsi /install/usr/local/sbin/ublk.iscsi
 
 # ========================
 
@@ -51,13 +79,14 @@ FROM debian:forky-20260918-slim AS runtime
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
 	apt-get update \
-	&& apt-get install -y --no-install-recommends \
+	&& apt-get install -y --no-install-recommends --no-install-suggests \
   liburing2 \
-  libiscsi7 \
   libstdc++6 \
-  tini
+  tini \
+  rsyslog
 
-COPY --from=builder_ublk /ublk-install/usr/local/ /usr/local/
+COPY --from=builder_libiscsi /install/usr/local/ /usr/local/
+COPY --from=builder_ublk /install/usr/local/ /usr/local/
 COPY --from=builder_plugin /app/builtinplugin /builtinplugin
 
 RUN ldconfig
