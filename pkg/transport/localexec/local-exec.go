@@ -1,6 +1,7 @@
 package localexec
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -31,8 +32,8 @@ func New(config Config) transport.Transport {
 	uid := os.Getuid()
 	isRoot := uid == 0
 	result := &localExecWrapper{
-		isRoot: isRoot,
-		config: config,
+		isRoot:   isRoot,
+		config:   config,
 		commands: transport.NewExecReplacement(map[string][]string{}),
 	}
 
@@ -66,12 +67,13 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 		return transport.RunResult{}, fmt.Errorf("cmd is empty")
 	}
 
-	options := transport.ExecParams{}
+	options := transport.ExecParams{
+		Timeout:     new(defaultTimeout),
+		ExitTimeout: time.Second,
+		Sudo:        false,
+	}
 	for _, v := range opts {
 		v(&options)
-	}
-	if options.Timeout == 0 {
-		options.Timeout = defaultTimeout
 	}
 
 	if s.isRoot {
@@ -80,22 +82,39 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 
 	cmd = append(s.commands.Lookup(cmd[0], options.Sudo), cmd[1:]...)
 
-	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
-	defer cancel()
-
 	cmdString := shellescape.QuoteCommand(cmd)
 	logs.FromCtx(ctx).Command("local exec: running command", "cmd", cmdString)
 
 	ec := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 	for k, v := range options.Env {
-		ec.Env = append(ec.Env, k + "=" + v)
+		ec.Env = append(ec.Env, k+"="+v)
 	}
+
+	ec.Cancel = func() error {
+		return ec.Process.Signal(syscall.SIGTERM)
+	}
+	ec.WaitDelay = options.ExitTimeout
 
 	stderrBuf := bytes.Buffer{}
 	ec.Stderr = &stderrBuf
 
+	var stdoutDoneCh chan struct{}
 	stdoutBuf := bytes.Buffer{}
-	if options.DisableStdout {
+	if options.StreamingStdoutLines != nil {
+		reader, err := ec.StdoutPipe()
+		if err != nil {
+			return transport.RunResult{}, fmt.Errorf("StdoutPipe: %w", err)
+		}
+		stdoutDoneCh = make(chan struct{})
+		go func() {
+			defer close(stdoutDoneCh)
+			s := bufio.NewScanner(reader)
+			for s.Scan() {
+				options.StreamingStdoutLines(s.Text())
+			}
+			_ = s.Err()
+		}()
+	} else if options.DisableStdout {
 		ec.Stdout = nil
 	} else if options.StdoutFile != "" {
 		file, err := os.Open(options.StdoutFile)
@@ -119,40 +138,64 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 		ec.Stdin = file
 	}
 
+	start := time.Now()
+	if options.Timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *options.Timeout)
+		defer cancel()
+	}
+
 	err := ec.Start()
 	if err != nil {
 		return transport.RunResult{}, fmt.Errorf("exec start: %w", err)
 	}
 
-	// adding a buffer of size 1 to be able to send without blocking even if main thread stopped reading
-	commandDoneCh := make(chan error, 1)
+	commandDoneCh := make(chan struct{})
+	var waitErr error
 	go func() {
 		defer close(commandDoneCh)
-		commandDoneCh <- ec.Wait()
+		if stdoutDoneCh != nil {
+			<-stdoutDoneCh
+		}
+		waitErr = ec.Wait()
 	}()
 
+	cancelled := false
+
 	select {
+	case <-commandDoneCh:
 	case <-ctx.Done():
-		_ = ec.Process.Signal(syscall.SIGTERM)
-		return transport.RunResult{}, ctx.Err()
-	case err = <-commandDoneCh:
-		if err == nil {
-			return transport.RunResult{
-				Stdout:   stdoutBuf.Bytes(),
-				Stderr:   stderrBuf.Bytes(),
-				ExitCode: 0,
-			}, nil
-		}
-
-		var exitErr *exec.ExitError
-		if ok := errors.As(err, &exitErr); ok {
-			return transport.RunResult{
-				Stdout:   stdoutBuf.Bytes(),
-				Stderr:   stderrBuf.Bytes(),
-				ExitCode: exitErr.ExitCode(),
-			}, nil
-		}
-
-		return transport.RunResult{}, fmt.Errorf("run: %w", err)
+		cancelled = true
+		// no need to do anything, exec.Cmd will send signals on its own
 	}
+
+	// give the program some time to terminate
+	select {
+	case <-commandDoneCh:
+		// using double timeout: after ExitTimeout exec.Cmd will send sigkill,
+		// and then we want to wait a bit to get command result
+	case <-time.Tick(2 * options.ExitTimeout):
+		return transport.RunResult{}, fmt.Errorf("timed out waiting for command to finish")
+	}
+
+	result := transport.RunResult{
+		Stdout:    stdoutBuf.Bytes(),
+		Stderr:    stderrBuf.Bytes(),
+		ExitCode:  0,
+		Cancelled: cancelled,
+	}
+	if options.Timeout != nil {
+		result.Timeout = time.Since(start) > *options.Timeout
+	}
+
+	if waitErr != nil {
+		var exitErr *exec.ExitError
+		if ok := errors.As(waitErr, &exitErr); !ok {
+			return transport.RunResult{}, err
+		}
+
+		result.ExitCode = exitErr.ExitCode()
+	}
+
+	return result, nil
 }

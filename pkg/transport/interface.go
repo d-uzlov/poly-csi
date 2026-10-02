@@ -22,9 +22,15 @@ type Transport interface {
 }
 
 type RunResult struct {
+	// Stdout contains raw command stdout.
+	// Can be empty if stdout was disabled.
 	Stdout   []byte
 	Stderr   []byte
 	ExitCode int
+	// Cancelled is set if command was cancelled for any reason.
+	Cancelled  bool
+	// Timeout is set if command exceeded timeout.
+	Timeout bool
 }
 
 type Commands interface {

@@ -50,16 +50,24 @@ func RelaxedRun(ctx context.Context, tr Transport, cmd []string, allowStderr str
 
 // FormatRunError creates a human-readable error from CommandResult
 func FormatRunError(r RunResult) error {
+	result := fmt.Sprintf("exit code %d", r.ExitCode)
+	if r.Cancelled {
+		if r.Timeout {
+			result = "timed out: " + result
+		} else {
+			result = "cancelled by user: " + result
+		}
+	}
 	if len(r.Stderr) != 0 {
 		stderr := strings.TrimSpace(string(r.Stderr))
-		return fmt.Errorf("exit code %d: stderr: %s", r.ExitCode, stderr)
+		return fmt.Errorf("%s: stderr: %s", result, stderr)
 	}
 	// use stdout as fallback if stderr is missing
 	if len(r.Stdout) != 0 {
 		stdout := strings.TrimSpace(string(r.Stdout))
-		return fmt.Errorf("exit code %d: stdout: %s", r.ExitCode, stdout)
+		return fmt.Errorf("%s: stdout: %s", result, stdout)
 	}
-	return fmt.Errorf("exit code %d: no output", r.ExitCode)
+	return fmt.Errorf("%s: no output", result)
 }
 
 // Retry runs specified command in a loop.

@@ -1,10 +1,12 @@
 package ssh_wrapper
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"meoe.io/poly-csi/pkg/logs"
@@ -30,18 +32,16 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 		return transport.RunResult{}, fmt.Errorf("cmd is empty")
 	}
 
-	options := transport.ExecParams{}
+	options := transport.ExecParams{
+		Timeout:     new(defaultTimeout),
+		ExitTimeout: time.Second,
+		Sudo:        false,
+	}
 	for _, v := range opts {
 		v(&options)
 	}
-	if options.Timeout == 0 {
-		options.Timeout = defaultTimeout
-	}
 
 	cmd = append(s.commands.Lookup(cmd[0], options.Sudo), cmd[1:]...)
-
-	ctx, cancel := context.WithTimeout(ctx, options.Timeout)
-	defer cancel()
 
 	cmdString := shellescape.QuoteCommand(cmd)
 	logs.FromCtx(ctx).Command("ssh: running command", "cmd", cmdString, "ssh-target", s.sshLogId)
@@ -69,7 +69,19 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 	session.Stderr = &stderrBuf
 
 	stdoutBuf := bytes.Buffer{}
-	if options.DisableStdout {
+	if options.StreamingStdoutLines != nil {
+		reader, err := session.StdoutPipe()
+		if err != nil {
+			return transport.RunResult{}, fmt.Errorf("StdoutPipe: %w", err)
+		}
+		go func() {
+			s := bufio.NewScanner(reader)
+			for s.Scan() {
+				options.StreamingStdoutLines(s.Text())
+			}
+			_ = s.Err()
+		}()
+	} else if options.DisableStdout {
 		session.Stdout = nil
 		cmdString = fmt.Sprintf("%s > /dev/null", cmdString)
 	} else if options.StdoutFile != "" {
@@ -84,45 +96,74 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 		cmdString = fmt.Sprintf("%s < %s", cmdString, shellescape.Quote(options.StdinFile))
 	}
 
+	start := time.Now()
+	if options.Timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *options.Timeout)
+		defer cancel()
+	}
+
 	err = session.Start(cmdString)
 	if err != nil {
 		return transport.RunResult{}, fmt.Errorf("start process: %w", err)
 	}
 
-	// adding a buffer of size 1 to be able to send without blocking even if main thread stopped reading
-	commandDoneCh := make(chan error, 1)
+	commandDoneCh := make(chan struct{})
+	var waitErr error
 	go func() {
 		defer close(commandDoneCh)
-		commandDoneCh <- session.Wait()
+		waitErr = session.Wait()
 	}()
 
 	select {
+	case <-commandDoneCh:
 	case <-ctx.Done():
-		_ = session.Signal(ssh.SIGTERM)
-		// TODO do we need to wait until command actually finishes?
-		return transport.RunResult{}, ctx.Err()
-	case err := <-commandDoneCh:
-		if err == nil {
-			return transport.RunResult{
-				Stdout:   stdoutBuf.Bytes(),
-				Stderr:   stderrBuf.Bytes(),
-				ExitCode: 0,
-			}, nil
+		err = session.Signal(ssh.SIGTERM)
+		if err != nil {
+			return transport.RunResult{}, fmt.Errorf("send SIGTERM on ctx.Done(): %w", err)
 		}
-
-		var exitErr *ssh.ExitError
-		if ok := errors.As(err, &exitErr); ok {
-			return transport.RunResult{
-				Stdout:   stdoutBuf.Bytes(),
-				Stderr:   stderrBuf.Bytes(),
-				ExitCode: exitErr.ExitStatus(),
-			}, nil
-		}
-
-		if checkIoError(err) {
-			go client.Close()
-		}
-
-		return transport.RunResult{}, fmt.Errorf("run: %w", err)
 	}
+
+	cancelled := false
+
+	select {
+	case <-commandDoneCh:
+	case <-time.Tick(options.ExitTimeout):
+		err = session.Signal(ssh.SIGKILL)
+		if err != nil {
+			return transport.RunResult{}, fmt.Errorf("send SIGKILL on ctx.Done(): %w", err)
+		}
+		return transport.RunResult{}, fmt.Errorf("timed out waiting for command to finish")
+	}
+
+	select {
+	case <-commandDoneCh:
+	case <-time.Tick(options.ExitTimeout):
+		return transport.RunResult{}, fmt.Errorf("timed out waiting for command to finish")
+	}
+
+	result := transport.RunResult{
+		Stdout:    stdoutBuf.Bytes(),
+		Stderr:    stderrBuf.Bytes(),
+		ExitCode:  0,
+		Cancelled: cancelled,
+	}
+	if options.Timeout != nil {
+		result.Timeout = time.Since(start) > *options.Timeout
+	}
+
+	if waitErr != nil {
+		var exitErr *ssh.ExitError
+		if ok := errors.As(waitErr, &exitErr); !ok {
+			if checkIoError(err) {
+				go client.Close()
+			}
+
+			return transport.RunResult{}, err
+		}
+
+		result.ExitCode = exitErr.ExitStatus()
+	}
+
+	return result, nil
 }
