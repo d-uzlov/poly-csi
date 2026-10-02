@@ -88,6 +88,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	}
 
 	ch, err := con.GetHandle(ctx, connectors.ConnectRequest{
+		Uuid:                    vc.Uuid,
 		AddressOptions:          addressOptions,
 		VolumeContext:           req.VolumeContext,
 		PublishContext:          connectorContext,

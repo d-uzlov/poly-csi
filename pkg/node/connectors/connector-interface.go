@@ -80,20 +80,21 @@ const (
 )
 
 type ConnectRequest struct {
-	AddressOptions []addropt.AddressOption `json:"address_options"`
-	VolumeContext  map[string]string       `json:"volume_context"`
-	PublishContext map[string]string       `json:"publish_context"`
+	Uuid           string                  `json:"uuid"`
+	AddressOptions []addropt.AddressOption `json:"addressOptions"`
+	VolumeContext  map[string]string       `json:"volumeContext"`
+	PublishContext map[string]string       `json:"publishContext"`
 	// PublishSecret is a decrypted secret from publish context
-	PublishSecret           []byte            `json:"publish_context_secret"`
+	PublishSecret           []byte            `json:"publishSecret"`
 	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
 	Preset                  map[string]string `json:"preset"`
 }
 
 type ConnectFolderRequest struct {
-	FsMountPath string   `json:"fs_mount_path"`
-	FsType      string   `json:"fs_type"`
-	MountFlags  []string `json:"mount_flags"`
-	MountGroup  string   `json:"mount_group"`
+	FsMountPath string   `json:"fsMountPath"`
+	FsType      string   `json:"fsType"`
+	MountFlags  []string `json:"mountFlags"`
+	MountGroup  string   `json:"mountGroup"`
 }
 
 const (
