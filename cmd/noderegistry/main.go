@@ -22,7 +22,7 @@ func main() {
 	// but in the main stop is not useful
 	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 
-	appConfig := argconfig.Parse()
+	argConfig := argconfig.Parse()
 
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelInfo)
@@ -31,13 +31,13 @@ func main() {
 	})
 	logger := slog.New(logHandler)
 
-	logger = logger.With("host", appConfig.Hostname)
+	logger = logger.With("host", argConfig.Hostname)
 	ctx = slogctx.NewCtx(ctx, logger)
 
-	logger.Info("using config", "config", appConfig)
+	logger.Info("using arg config", "config", argConfig)
 
 	// set log level after the 'using config' log entry, so that it is always present
-	logLevel.Set(appConfig.LogLevel)
+	logLevel.Set(argConfig.LogLevel)
 
 	doneCh := make(chan struct{})
 

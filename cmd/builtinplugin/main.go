@@ -44,7 +44,7 @@ func main() {
 	logger = logger.With("host", argConfig.Hostname)
 	ctx = slogctx.NewCtx(ctx, logger)
 
-	logger.Info("using config", "config", argConfig)
+	logger.Info("using arg config", "config", argConfig)
 
 	// set log level after the 'using config' log entry, so that it is always present
 	logLevel.Set(argConfig.LogLevel)
@@ -62,10 +62,8 @@ func main() {
 
 	tr := localexec.New(localexec.Config{})
 	// TODO use this more
-	logsConfig := logs.Config{
-		LogLevel: "info",
-	}
-	logsLogger := logsConfig.MakeInstance()
+	logsLogger := config.Logs.MakeInstance()
+	logsLogger.Info("parsed config", "config", config)
 	ctx = logs.NewCtx(ctx, logsLogger)
 
 	serverDoneCh := make(chan struct{})
