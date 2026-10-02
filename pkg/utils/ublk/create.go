@@ -10,36 +10,49 @@ import (
 )
 
 type CreateParams struct {
-	Type string
+	DevNum string
+	Type   string
 	// enable zero-copy in io_uring
 	Zerocopy bool
 }
 
-type Params interface {
+func (p CreateParams) GetForegroundBinary() string {
+	return "ublk." + p.Type
+}
+
+func (c CreateParams) MakeParams() []string {
+	result := []string{
+		"--user_recovery", "1",
+	}
+	if c.Zerocopy {
+		result = append(result, "--zerocopy")
+	}
+	if c.DevNum != "" {
+		result = append(result, "-n", c.DevNum)
+	}
+	return result
+}
+
+type ExtraParams interface {
 	MakeParams() []string
 }
 
-func (s *Snippets) Create(ctx context.Context, cr CreateParams, extra Params) (UblkDeviceInfo, error) {
-	cmd := append(ublkCmd, "add",
-		"--type", cr.Type,
-		"--user_recovery", "1",
-	)
-	if cr.Zerocopy {
-		cmd = append(cmd, "--zerocopy")
-	}
+func (s *Snippets) Create(ctx context.Context, cr CreateParams, extra ExtraParams) (DeviceInfo, error) {
+	cmd := append(ublkCmd, "add", "--type", cr.Type)
+	cmd = append(cmd, cr.MakeParams()...)
 	cmd = append(cmd, extra.MakeParams()...)
 
 	rr, err := s.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return UblkDeviceInfo{}, fmt.Errorf("ublk add: %w", err)
+		return DeviceInfo{}, fmt.Errorf("ublk add: %w", err)
 	}
 	if rr.ExitCode != 0 {
-		return UblkDeviceInfo{}, fmt.Errorf("ublk add: %w", transport.FormatRunError(rr))
+		return DeviceInfo{}, fmt.Errorf("ublk add: %w", transport.FormatRunError(rr))
 	}
 
 	info, err := ParseUblkOutput(string(rr.Stdout))
 	if err != nil {
-		return UblkDeviceInfo{}, fmt.Errorf("parse ublk add output: %w", err)
+		return DeviceInfo{}, fmt.Errorf("parse ublk add output: %w", err)
 	}
 
 	return info, nil
@@ -76,7 +89,7 @@ type NbdTarget struct {
 	Port       string `json:"port"`
 }
 
-func (di UblkDeviceInfo) ParseTarget[T any]() (T, error) {
+func (di DeviceInfo) ParseTarget[T any]() (T, error) {
 	var result T
 	if di.Target == "" {
 		return result, fmt.Errorf("target info is empty")

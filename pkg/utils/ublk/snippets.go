@@ -23,22 +23,23 @@ func New(tr transport.Transport) Snippets {
 
 func (s *Snippets) Delete(ctx context.Context, devId string) error {
 	cmd := append(ublkCmd, "del", "-n", devId)
-	return transport.CheckedRun(ctx, s.tr, cmd)
+	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "can't get dev info")
+	return err
 }
 
-func (s *Snippets) Recover(ctx context.Context, devId string) (UblkDeviceInfo, error) {
+func (s *Snippets) Recover(ctx context.Context, devId string) (DeviceInfo, error) {
 	cmd := append(ublkCmd, "recover", "-n", devId)
 	rr, err := s.tr.RunCommand(ctx, cmd)
 	if err != nil {
-		return UblkDeviceInfo{}, fmt.Errorf("ublk recover: %w", err)
+		return DeviceInfo{}, fmt.Errorf("ublk recover: %w", err)
 	}
 	if rr.ExitCode != 0 {
-		return UblkDeviceInfo{}, fmt.Errorf("ublk recover: %w", transport.FormatRunError(rr))
+		return DeviceInfo{}, fmt.Errorf("ublk recover: %w", transport.FormatRunError(rr))
 	}
 
 	info, err := ParseUblkOutput(string(rr.Stdout))
 	if err != nil {
-		return UblkDeviceInfo{}, fmt.Errorf("parse ublk recover output: %w", err)
+		return DeviceInfo{}, fmt.Errorf("parse ublk recover output: %w", err)
 	}
 
 	return info, nil

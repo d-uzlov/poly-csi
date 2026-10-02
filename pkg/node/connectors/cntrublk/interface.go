@@ -1,12 +1,16 @@
 package cntrublk
 
 import (
+	"context"
+
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/utils/ublk"
 )
 
-type UblkCallback interface {
-	Add(devId string, pid string)
-	Remove(devId string)
+type Supervisor interface {
+	StartupRestore() error
+	Launch(ctx context.Context, uuid string, cp ublk.CreateParams, ep ublk.ExtraParams) (result ublk.DeviceInfo, err error)
+	Remove(uuid string) error
 }
 
-type InflateFunc func(callback UblkCallback, conf connectors.CommonConfig) connectors.Manager
+type InflateFunc func(sv Supervisor, conf connectors.CommonConfig) connectors.Manager

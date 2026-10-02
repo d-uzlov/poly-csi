@@ -10,14 +10,14 @@ import (
 )
 
 type connector struct {
-	conf     connectors.CommonConfig
-	callback cntrublk.UblkCallback
+	conf connectors.CommonConfig
+	sv   cntrublk.Supervisor
 }
 
-func New(callback cntrublk.UblkCallback, conf connectors.CommonConfig) connectors.Manager {
+func New(sv cntrublk.Supervisor, conf connectors.CommonConfig) connectors.Manager {
 	return &connector{
-		callback: callback,
-		conf:     conf,
+		sv:   sv,
+		conf: conf,
 	}
 }
 
@@ -48,7 +48,9 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 
 	return &state{
 		tr:        c.conf.Tr,
+		sv:        c.sv,
 		devFolder: c.conf.DevFolder,
+		Uuid:      req.Uuid,
 		Address:   req.AddressOptions[0].Address,
 		Pc:        pc,
 	}, nil
@@ -61,6 +63,7 @@ func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Hand
 	}
 
 	res.tr = c.conf.Tr
+	res.sv = c.sv
 	res.devFolder = c.conf.DevFolder
 
 	return res, nil

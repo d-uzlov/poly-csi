@@ -10,4 +10,11 @@ type Config struct {
 	Connectors []*connectorfactory.ConnectorSpec `yaml:"connector"`
 	DevFolder  string                            `yaml:"devFolder"`
 	Logs       logs.Config                       `yaml:"logs"`
+	Supervisor SupervisorConfig                  `yaml:"supervisor"`
+}
+
+type SupervisorConfig struct {
+	ConfigDir string `yaml:"configDir"`
+	MinId     int    `yaml:"minId"`
+	MaxId     int    `yaml:"maxId"`
 }

@@ -117,4 +117,4 @@ COPY --from=builder_plugin /app/builtinplugin /builtinplugin
 
 RUN ldconfig
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/builtinplugin"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "/builtinplugin"]

@@ -16,7 +16,7 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
+	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/supervisor"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/ublkfactory"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
@@ -67,7 +67,6 @@ func main() {
 	ctx = logs.NewCtx(ctx, logsLogger)
 
 	serverDoneCh := make(chan struct{})
-	var watcherDoneCh <-chan struct{}
 
 	var handler http.Handler
 
@@ -78,14 +77,17 @@ func main() {
 		handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
 
 	case "ublk":
-		watcher := cntrublk.NewWatcher(tr)
-		logger.Info("running watcher.InitialRestore")
-		err := watcher.InitialRestore(ctx)
+		err = os.MkdirAll(config.Supervisor.ConfigDir, 0777)
 		if err != nil {
 			panic(err)
 		}
-		logger.Info("finished watcher.InitialRestore")
-		watcherDoneCh = startWatcher(ctx, watcher)
+		supervisor := supervisor.New(ctx, tr, config.Supervisor.ConfigDir, config.Supervisor.MinId, config.Supervisor.MaxId)
+		logsLogger.Info("running supervisor.StartupRestore")
+		err := supervisor.StartupRestore()
+		if err != nil {
+			panic(err)
+		}
+		logsLogger.Info("finished supervisor.StartupRestore")
 
 		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, func(mtype string) (connectors.InflateFunc, error) {
 			inflate, err := ublkfactory.GetByType(mtype)
@@ -93,7 +95,7 @@ func main() {
 				return nil, err
 			}
 			return func(conf connectors.CommonConfig) (connectors.Manager, error) {
-				return inflate(watcher, conf), nil
+				return inflate(supervisor, conf), nil
 			}, nil
 		})
 
@@ -112,9 +114,9 @@ func main() {
 
 	serverInstance.StartServe(ctx, time.Second, func(err error) {
 		if err != nil {
-			logger.Error("server finished with error", "error", err.Error())
+			logsLogger.Error("server finished with error", "error", err.Error())
 		} else {
-			logger.Info("server finished without error")
+			logsLogger.Info("server finished without error")
 		}
 		close(serverDoneCh)
 	})
@@ -122,15 +124,12 @@ func main() {
 	select {
 	case <-serverDoneCh:
 		cancel()
-		logger.Info("server exited")
+		logsLogger.Info("server exited")
 	case <-ctx.Done():
-		logger.Info("context cancelled")
+		logsLogger.Info("context cancelled")
 	}
 	<-serverDoneCh
-	if watcherDoneCh != nil {
-		<-watcherDoneCh
-	}
-	logger.Info("shutdown finished")
+	logsLogger.Info("shutdown finished")
 }
 
 type Server struct {
@@ -178,23 +177,4 @@ func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, 
 		case <-serveDoneCh:
 		}
 	}()
-}
-
-func startWatcher(ctx context.Context, watcher *cntrublk.Watcher) <-chan struct{} {
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		for ctx.Err() == nil {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.Tick(time.Second * 10):
-				err := watcher.Reconcile(ctx)
-				if err != nil {
-					logs.FromCtx(ctx).Error("reconcile failed", "error", err)
-				}
-			}
-		}
-	}()
-	return doneCh
 }

@@ -17,7 +17,6 @@ type ConnectorSpec struct {
 
 func ParseList(logger *logs.Instance, tr transport.Transport, devFolder string, connectorList []*ConnectorSpec, lookup func(mtype string) (connectors.InflateFunc, error)) map[string]connectors.Manager {
 	cons := map[string]connectors.Manager{}
-	logger.Info(fmt.Sprintf("connectors in config: %d", len(connectorList)))
 	for i, v := range connectorList {
 		if v.Id == "" {
 			logger.Error(fmt.Sprintf("connector[i=%d]: missing id", i))

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
 	"meoe.io/poly-csi/pkg/protocols"
@@ -14,10 +13,11 @@ import (
 )
 
 type state struct {
-	tr        transport.Transport   `json:"-"`
-	devFolder string                `json:"-"`
-	callback  cntrublk.UblkCallback `json:"-"`
+	tr        transport.Transport `json:"-"`
+	devFolder string              `json:"-"`
+	sv        cntrublk.Supervisor `json:"-"`
 
+	Uuid string `json:"uuid"`
 	Address string               `json:"address"`
 	Pc      protocols.IscsiShare `json:"iscsi"`
 
@@ -37,7 +37,12 @@ func parseState(serialized string) (*state, error) {
 }
 
 func (s *state) ConnectBlock(ctx context.Context) (err error) {
-	snip := ublk.New(s.tr)
+	defer func() {
+		if err != nil {
+			s.sv.Remove(s.Uuid)
+			s.DevId = ""
+		}
+	}()
 
 	url := ublk.IscsiUrlParams{
 		TargetIqn: s.Pc.Iqn,
@@ -60,32 +65,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 	}
 	s.IscsiUrl = url.String()
 
-	// ublk will happily create several devices connecting to the same target
-	// so we need to check if any of existing devices is the one we need
-	list, err := snip.List(ctx, "")
-	if err != nil {
-		return fmt.Errorf("listDevices: %w", err)
-	}
-	for _, v := range list {
-		if v.Target == "" {
-			continue
-		}
-		if v.TargetType != "iscsi" {
-			continue
-		}
-		target, err := v.ParseTarget[ublk.IscsiTarget]()
-		if err != nil {
-			logs.FromCtx(ctx).Warn("failed to parse ublk target from json", "devId", v.DevId, "target", v.Target, "error", err)
-			continue
-		}
-		if target.Url == s.IscsiUrl {
-			logs.FromCtx(ctx).Info("found existing matching target", "devId", v.DevId)
-			s.DevId = v.DevId
-			return nil
-		}
-	}
-
-	info, err := snip.Create(ctx, ublk.CreateParams{
+	info, err := s.sv.Launch(ctx, s.Uuid, ublk.CreateParams{
 		Type:     "iscsi",
 		Zerocopy: false,
 	}, &ublk.CreateIscsi{
@@ -93,17 +73,13 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 		Url:           s.IscsiUrl,
 	})
 	if err != nil {
-		return fmt.Errorf("snip.Create: %w", err)
+		return fmt.Errorf("supervisor.Launch: %w", err)
 	}
 
 	s.DevId = info.DevId
 
 	if !info.Flags.F_user_recovery {
 		return fmt.Errorf("created device devId=%s is missing recovery flag", info.DevId)
-	}
-
-	if s.callback != nil {
-		s.callback.Add(info.DevId, info.DaemonPid)
 	}
 
 	return nil
@@ -121,44 +97,7 @@ func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
 }
 
 func (s *state) Disconnect(ctx context.Context) error {
-	// TODO is it safe to call callback before we are sure devId is correct?
-	if s.callback != nil {
-		s.callback.Remove(s.DevId)
-	}
-	snip := ublk.New(s.tr)
-	list, err := snip.List(ctx, s.DevId)
-	if err != nil {
-		return fmt.Errorf("list existing devices before deletion: %w", err)
-	}
-	if len(list) == 0 {
-		// device with devId is already deleted
-		return nil
-	}
-	if len(list) > 1 {
-		return fmt.Errorf("snip.List(devId=%s) returned several results", s.DevId)
-	}
-	info := list[0]
-	if info.DevId != s.DevId {
-		return fmt.Errorf("snip.List(devId=%s) returned info for devId=%s", s.DevId, info.DevId)
-	}
-	if info.TargetType != "iscsi" {
-		return nil
-	}
-	if info.Target == "" {
-		// maybe someone else has created device with same devId
-		// it's not safe to delete without detailed target info
-		logs.FromCtx(ctx).Warn("tried to delete ublk device without target info, skipping", "devId", s.DevId)
-		return nil
-	}
-
-	target, err := info.ParseTarget[ublk.IscsiTarget]()
-	if err != nil {
-		return err
-	}
-	if s.IscsiUrl != target.Url {
-		return nil
-	}
-	return snip.Delete(ctx, s.DevId)
+	return s.sv.Remove(s.Uuid)
 }
 
 func (s *state) Expand(ctx context.Context) error {
@@ -181,6 +120,12 @@ func (s *state) Serialize() (string, error) {
 func (s *state) Validate() error {
 	if s.tr == nil {
 		return fmt.Errorf("missing transport")
+	}
+	if s.sv == nil {
+		return fmt.Errorf("missing supervisor")
+	}
+	if s.devFolder == "" {
+		return fmt.Errorf("missing devFolder")
 	}
 	if s.Address == "" {
 		return fmt.Errorf("missing Address")

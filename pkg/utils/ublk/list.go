@@ -10,7 +10,7 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-func (s *Snippets) List(ctx context.Context, devId string) ([]UblkDeviceInfo, error) {
+func (s *Snippets) List(ctx context.Context, devId string) ([]DeviceInfo, error) {
 	cmd := append(ublkCmd, "list")
 	if devId != "" {
 		cmd = append(cmd, "-n", devId)
@@ -43,15 +43,21 @@ var (
 	line3r = regexp.MustCompile(`^flags (0x[0-9a-fA-F]+) \[(.*)\]$`)
 	line4r = regexp.MustCompile(`^ublkc: (\d+:\d+) ublkb: (\d+:\d+) owner: (\d+:\d+)$`)
 	line5r = regexp.MustCompile(`^queue (\d+): tid (\d+) affinity\((.*)\)$`)
+
+	line1p = "dev id"
+	line2p = "max rq"
+	line3p = "flags"
+	line4p = "ublkc"
+	line5p = "queue"
 )
 
-type UblkQueueInfo struct {
+type QueueInfo struct {
 	QueueIndex string
 	Tid        string
 	Affinity   string
 }
 
-type UblkDeviceInfo struct {
+type DeviceInfo struct {
 	// line 1
 	DevId       string
 	HwQueues    string
@@ -72,96 +78,133 @@ type UblkDeviceInfo struct {
 	BlockMajMin string
 	OwnerUidGid string
 
-	Queues []UblkQueueInfo
+	Queues []QueueInfo
 
 	Target     string
 	TargetType string
 }
 
-func ParseUblkOutput(humanString string) (UblkDeviceInfo, error) {
+func ParseUblkOutput(humanString string) (DeviceInfo, error) {
 	list, err := ParseUblkList(humanString)
 	if err != nil {
-		return UblkDeviceInfo{}, err
+		return DeviceInfo{}, err
 	}
 	if len(list) == 0 {
-		return UblkDeviceInfo{}, fmt.Errorf("empty input")
+		return DeviceInfo{}, fmt.Errorf("empty input")
 	}
 	if len(list) > 1 {
-		return UblkDeviceInfo{}, fmt.Errorf("input has more than 1 ublk dev info")
+		return DeviceInfo{}, fmt.Errorf("input has more than 1 ublk dev info")
 	}
 	return list[0], nil
 }
 
-func ParseUblkList(humanString string) ([]UblkDeviceInfo, error) {
-	var result []UblkDeviceInfo
-	var current *UblkDeviceInfo
+type ListParser struct {
+	state *DeviceInfo
+}
+
+func (p *ListParser) GetState() *DeviceInfo {
+	return p.state
+}
+
+func (p *ListParser) IsDeviceInfoStart(line string) bool {
+	return strings.HasPrefix(line, line1p)
+}
+
+// PushLine tries to parse a new line from `ublk list` output.
+// If line contains target data, it returns device info and resets internal state.
+// If the device does not have target line, device info will be returned on next line, when a new device description is detected.
+// The last value can be obtained via [ListParser.GetState].
+func (p *ListParser) PushLine(line string) (*DeviceInfo, error) {
+	line = strings.TrimSpace(line)
+	var result *DeviceInfo
+	current := p.state
+	switch {
+	case strings.HasPrefix(line, line1p):
+		result = current
+		p.state = &DeviceInfo{}
+		current := p.state
+		match := line1r.FindStringSubmatch(line)
+		if len(match) != 6 {
+			return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", line, line1r.String())
+		}
+		current.DevId = match[1]
+		current.HwQueues = match[2]
+		current.QueueDepth = match[3]
+		current.BlockSize = match[4]
+		current.DevCapacity = match[5]
+
+	case strings.HasPrefix(line, line2p):
+		match := line2r.FindStringSubmatch(line)
+		if len(match) != 4 {
+			return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", line, line2r.String())
+		}
+		current.MaxRqSize = match[1]
+		current.DaemonPid = match[2]
+		current.State = match[3]
+
+	case strings.HasPrefix(line, line3p):
+		match := line3r.FindStringSubmatch(line)
+		if len(match) != 3 {
+			return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", line, line3r.String())
+		}
+		flags, err := ParseFlagsString(match[1])
+		if err != nil {
+			return nil, err
+		}
+		current.Flags = flags
+
+	case strings.HasPrefix(line, line4p):
+		match := line4r.FindStringSubmatch(line)
+		if len(match) != 4 {
+			return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", line, line4r.String())
+		}
+		current.CharMajMin = match[1]
+		current.BlockMajMin = match[2]
+		current.OwnerUidGid = match[3]
+
+	case strings.HasPrefix(line, line5p):
+		match := line5r.FindStringSubmatch(line)
+		if len(match) != 4 {
+			return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", line, line5r.String())
+		}
+		current.Queues = append(current.Queues, QueueInfo{
+			QueueIndex: match[1],
+			Tid:        match[2],
+			Affinity:   match[3],
+		})
+
+	case strings.HasPrefix(line, "target"):
+		current.Target = strings.TrimSpace(strings.TrimPrefix(line, "target"))
+		var raw map[string]any
+		err := json.Unmarshal([]byte(current.Target), &raw)
+		if err != nil {
+			return nil, fmt.Errorf("parse target: %w", err)
+		}
+		current.TargetType, _ = raw["name"].(string)
+		result = current
+		p.state = nil
+
+	default:
+		return nil, fmt.Errorf("line '%s': unknown line prefix", line)
+	}
+
+	return result, nil
+}
+
+func ParseUblkList(humanString string) ([]DeviceInfo, error) {
+	parser := ListParser{}
+	var result []DeviceInfo
 	for l := range strings.Lines(humanString) {
-		l = strings.TrimSpace(l)
-		switch {
-		case strings.HasPrefix(l, "dev id"):
-			if current != nil {
-				result = append(result, *current)
-			}
-			current = &UblkDeviceInfo{}
-			match := line1r.FindStringSubmatch(l)
-			if len(match) != 6 {
-				return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", l, line1r.String())
-			}
-			current.DevId = match[1]
-			current.HwQueues = match[2]
-			current.QueueDepth = match[3]
-			current.BlockSize = match[4]
-			current.DevCapacity = match[5]
-		case strings.HasPrefix(l, "max rq size"):
-			match := line2r.FindStringSubmatch(l)
-			if len(match) != 4 {
-				return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", l, line2r.String())
-			}
-			current.MaxRqSize = match[1]
-			current.DaemonPid = match[2]
-			current.State = match[3]
-		case strings.HasPrefix(l, "flags"):
-			match := line3r.FindStringSubmatch(l)
-			if len(match) != 3 {
-				return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", l, line3r.String())
-			}
-			flags, err := ParseFlagsString(match[1])
-			if err != nil {
-				return nil, err
-			}
-			current.Flags = flags
-		case strings.HasPrefix(l, "ublkc"):
-			match := line4r.FindStringSubmatch(l)
-			if len(match) != 4 {
-				return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", l, line4r.String())
-			}
-			current.CharMajMin = match[1]
-			current.BlockMajMin = match[2]
-			current.OwnerUidGid = match[3]
-		case strings.HasPrefix(l, "queue"):
-			match := line5r.FindStringSubmatch(l)
-			if len(match) != 4 {
-				return nil, fmt.Errorf("format mismatch: '%s' is not '%s'", l, line5r.String())
-			}
-			current.Queues = append(current.Queues, UblkQueueInfo{
-				QueueIndex: match[1],
-				Tid:        match[2],
-				Affinity:   match[3],
-			})
-		case strings.HasPrefix(l, "target"):
-			current.Target = strings.TrimSpace(strings.TrimPrefix(l, "target"))
-			var raw map[string]any
-			err := json.Unmarshal([]byte(current.Target), &raw)
-			if err != nil {
-				return nil, fmt.Errorf("parse target: %w", err)
-			}
-			current.TargetType, _ = raw["name"].(string)
-		default:
-			return nil, fmt.Errorf("could not parse line: '%s'", l)
+		next, err := parser.PushLine(l)
+		if err != nil {
+			return nil, err
+		}
+		if next != nil {
+			result = append(result, *next)
 		}
 	}
-	if current != nil {
-		result = append(result, *current)
+	if parser.GetState() != nil {
+		result = append(result, *parser.GetState())
 	}
 	return result, nil
 }

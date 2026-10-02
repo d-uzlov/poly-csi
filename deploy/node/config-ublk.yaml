@@ -17,3 +17,8 @@ logs:
   echoCommands: true
   confirmMicroOps: true
   skipOnSuccess: false
+
+supervisor:
+  configDir: /run/io.meoe.poly-csi/plugins/ublk-container/connections
+  minId: 10000
+  maxId: 20000
