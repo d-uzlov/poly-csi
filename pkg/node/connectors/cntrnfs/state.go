@@ -28,8 +28,8 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) ConnectBlock(ctx context.Context) (err error) {
-	return fmt.Errorf("nvme: ConnectBlock is not implemented")
+func (s *state) ConnectBlock(ctx context.Context) error {
+	return fmt.Errorf("nfs: ConnectBlock is not implemented")
 }
 
 func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
