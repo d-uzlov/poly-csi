@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/connectors/cntraoe"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrcifs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
 	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
@@ -19,6 +20,7 @@ const (
 	TypeCifs     = "cifs"
 	TypeNvme     = "nvme"
 	TypeIscsiadm = "iscsiadm"
+	TypeAoe      = "aoe"
 	TypePlugin   = "plugin_json"
 )
 
@@ -27,6 +29,7 @@ var builtinTypes = map[string]connectors.InflateFunc{
 	TypeCifs:     cntrcifs.New,
 	TypeNvme:     cntrnvme.New,
 	TypeIscsiadm: cntriscsiadm.New,
+	TypeAoe:      cntraoe.New,
 	TypePlugin: func(conf connectors.CommonConfig) (connectors.Manager, error) {
 		httpClient := cntrhttpjsonplugin.NewHttpClient()
 		return cntrhttpjsonplugin.NewDispatcherClient(httpClient, conf)

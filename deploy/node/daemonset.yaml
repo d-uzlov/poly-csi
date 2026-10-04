@@ -32,8 +32,9 @@ spec:
       - name: modprobe
         image: docker.io/alpine:3.24.2
         command:
-        - modprobe
-        - ublk_drv
+        - /bin/sh
+        - -c
+        - modprobe ublk_drv && modprobe aoe
         securityContext:
           privileged: true
         volumeMounts:
@@ -41,7 +42,7 @@ spec:
           name: kernel-modules
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.4.73
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.4.93
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///var/lib/kubelet/plugins/io.meoe.poly-csi/csi.sock

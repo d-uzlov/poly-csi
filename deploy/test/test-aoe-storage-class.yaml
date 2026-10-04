@@ -1,0 +1,36 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: poly-csi-aoe
+provisioner: io.meoe.poly-csi
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+parameters:
+  dispatch.serverName: rose
+  dispatch.storageType: zfs-zvol
+  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  dispatch.shareType: vblade
+  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  dispatch.connectorId: aoe
+  dispatch.nodePreset: ''
+  dispatch.addressNames: storage
+  dispatch.fsFormatSide: node
+
+  # none, sameShare, sameServer, separate
+  dispatch.journalVolume: none
+
+  zfs.parentDataset: rose/test
+  zfs.reservedPercent: 0%
+  zfs.volblocksize: 16k
+
+  aoe.connectPort: '10809'
+
+  fsType: ext4
+
+mountOptions:
+- noatime
+- nodiratime
+- discard

@@ -42,6 +42,8 @@ connectors:
   config:
     socket: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
     remoteId: ublk_iscsi
+- id: aoe
+  type: aoe
 
 presets:
 - name: nvmeCon

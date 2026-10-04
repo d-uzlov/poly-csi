@@ -26,19 +26,6 @@ parameters:
   zfs.reservedPercent: 0%
   zfs.volblocksize: 16k
 
-  # journal.serverName: rose
-  journal.storageType: zfs-zvol
-  journal.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}-journal'
-  # journal.shareType: nvmet-keeper
-  # journal.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  # journal.connectorId: nvme
-  # journal.nodePreset: nvmeCon,nvmeIoq4
-  # journal.addressNames: storage,k8s
-
-  journal.zfs.parentDataset: rose/test
-  journal.zfs.reservedPercent: 105%
-  journal.zfs.volblocksize: 4k
-
   nbd.connectPort: '10809'
 
   fsType: ext4

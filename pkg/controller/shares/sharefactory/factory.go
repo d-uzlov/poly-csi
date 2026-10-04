@@ -2,6 +2,9 @@ package sharefactory
 
 import (
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/shrnbd"
@@ -10,6 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares/shrnvmetkernel"
 	"meoe.io/poly-csi/pkg/controller/shares/shrsamba"
 	"meoe.io/poly-csi/pkg/controller/shares/shrtargetcli"
+	"meoe.io/poly-csi/pkg/controller/shares/shrvblade"
 	"meoe.io/poly-csi/pkg/controller/shares/shrzfssharenfs"
 	"meoe.io/poly-csi/pkg/controller/shares/truenas/shrtniscsi"
 	"meoe.io/poly-csi/pkg/controller/shares/truenas/shrtnnfs"
@@ -26,28 +30,28 @@ const (
 	shareTnIscsi     = "truenas-iscsi"
 	shareSamba       = "samba"
 	shareNbd         = "nbd"
+	shareVblade      = "vblade"
 )
 
+type InflateFunc func(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error)
+
+var shareTypes = map[string]InflateFunc{
+	shareNvmetKernel: shrnvmetkernel.New,
+	shareNvmetKeeper: shrnvmetkeeper.New,
+	shareZfsSharenfs: shrzfssharenfs.New,
+	shareNfs:         shrnfs.New,
+	shareTargetcli:   shrtargetcli.New,
+	shareTnNfs:       shrtnnfs.New,
+	shareTnIscsi:     shrtniscsi.New,
+	shareSamba:       shrsamba.New,
+	shareNbd:         shrnbd.New,
+	shareVblade:      shrvblade.New,
+}
+
 func ShareFromType(tr transport.Transport, vmType string, globalParams map[string]string) (shares.ShareManager, error) {
-	switch vmType {
-	case shareZfsSharenfs:
-		return shrzfssharenfs.New(tr, globalParams)
-	case shareNfs:
-		return shrnfs.New(tr, globalParams)
-	case shareNvmetKernel:
-		return shrnvmetkernel.New(tr, globalParams)
-	case shareNvmetKeeper:
-		return shrnvmetkeeper.New(tr, globalParams)
-	case shareTargetcli:
-		return shrtargetcli.New(tr, globalParams)
-	case shareTnNfs:
-		return shrtnnfs.New(tr, globalParams)
-	case shareTnIscsi:
-		return shrtniscsi.New(tr, globalParams)
-	case shareSamba:
-		return shrsamba.New(tr, globalParams)
-	case shareNbd:
-		return shrnbd.New(tr, globalParams)
+	v, ok := shareTypes[vmType]
+	if !ok {
+		return nil, fmt.Errorf("unknown share type: '%s', must be one of: %v", vmType, strings.Join(slices.Collect(maps.Keys(shareTypes)), ", "))
 	}
-	return nil, fmt.Errorf("unknown share type: %s", vmType)
+	return v(tr, globalParams)
 }

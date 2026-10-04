@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-sc-poly-csi-aoe
+  labels:
+    test: pvc
+spec:
+  storageClassName: poly-csi-aoe
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
