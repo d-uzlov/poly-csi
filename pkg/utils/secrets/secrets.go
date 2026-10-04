@@ -37,7 +37,7 @@ func ClearFields[T any](obj T, securityValue string) (T, error) {
 			return obj, fmt.Errorf("input obj has unexported field: %v", field.Name)
 		}
 
-		if field.Tag.Get(securityTag) != securityValue {
+		if field.Tag.Get(securityTag) == securityValue {
 			result.Field(i).Set(v.Field(i))
 		} else {
 			result.Field(i).SetZero()
