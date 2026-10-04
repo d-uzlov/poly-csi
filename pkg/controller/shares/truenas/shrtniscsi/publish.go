@@ -74,7 +74,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 		Context: protocols.IscsiShare{
 			Initiator: iscsiInfo.InitiatorIqn,
 			Iqn:       sh.Iqn,
-			Port:      "3260",
+			Port:      3260,
 			Transport: "tcp",
 			AuthType:  protocols.IscsiAuthNone,
 		},

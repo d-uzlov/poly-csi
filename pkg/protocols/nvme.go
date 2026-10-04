@@ -6,16 +6,16 @@ import (
 
 type NvmeShare struct {
 	// public
-	TargetNqn     string `map:"nvme.targetNqn,omitempty"     json:"targetNqn,omitempty"`
-	HostNqn       string `map:"nvme.hostNqn,omitempty"       json:"hostNqn,omitempty"`
-	HostId        string `map:"nvme.hostId,omitempty"        json:"hostId,omitempty"`
-	AuthType      string `map:"nvme.authType,omitempty"      json:"authType,omitempty"`
-	ConnectPort   string `map:"nvme.connectPort,omitempty"   json:"connectPort,omitempty"`
-	TransportType string `map:"nvme.transportType,omitempty" json:"transportType,omitempty"`
+	TargetNqn     string `map:"nvme.targetNqn,omitempty"     json:"targetNqn,omitempty"     validate:"required"`
+	HostNqn       string `map:"nvme.hostNqn,omitempty"       json:"hostNqn,omitempty"       validate:"required"`
+	HostId        string `map:"nvme.hostId,omitempty"        json:"hostId,omitempty"        validate:"required"`
+	AuthType      string `map:"nvme.authType,omitempty"      json:"authType,omitempty"      validate:"required,oneof=nqn dhchap-mutual"`
+	ConnectPort   int    `map:"nvme.connectPort,omitempty"   json:"connectPort,omitempty"   validate:"required,port"`
+	TransportType string `map:"nvme.transportType,omitempty" json:"transportType,omitempty" validate:"required"`
 
 	// secret
-	HostKey       string `secret:"+" map:"nvme.hostKey"       json:"hostKey,omitempty"`
-	ControllerKey string `secret:"+" map:"nvme.controllerKey" json:"controllerKey,omitempty"`
+	HostKey       string `secret:"+" map:"nvme.hostKey"       json:"hostKey,omitempty"       validate:"required_if=AuthType dhchap-mutual"`
+	ControllerKey string `secret:"+" map:"nvme.controllerKey" json:"controllerKey,omitempty" validate:"required_if=AuthType dhchap-mutual"`
 }
 
 const (
@@ -24,23 +24,11 @@ const (
 )
 
 func (v NvmeShare) Validate() error {
-	if v.TargetNqn == "" {
-		return fmt.Errorf("target nqn is empty")
-	}
-	if v.HostNqn == "" {
-		return fmt.Errorf("host nqn is empty")
-	}
-	if v.HostId == "" {
-		return fmt.Errorf("host id is empty")
-	}
 	switch v.AuthType {
 	case NvmeAuthNqn, NvmeAuthDhChap:
 		// ok
 	default:
 		return fmt.Errorf("unknown auth type: %s", v.AuthType)
-	}
-	if v.ConnectPort == "" {
-		return fmt.Errorf("connect port is empty")
 	}
 	if v.TransportType == "" {
 		return fmt.Errorf("transport type is empty")

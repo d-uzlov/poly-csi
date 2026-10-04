@@ -73,11 +73,12 @@ func initKernelMessageParser(prefix string) (getMessages func() []string, err er
 	}, nil
 }
 
+// TODO replace with protocols.Nvme?
 type ConnectParams struct {
 	TargetNqn     string `json:"targetNqn"`
 	HostNqn       string `json:"hostNqn"`
 	HostId        string `json:"hostId"`
-	Port          string `json:"port"`
+	Port          int    `json:"port"`
 	NvmeTransport string `json:"nvmeTransport"`
 }
 
@@ -90,9 +91,6 @@ func (p ConnectParams) Validate() error {
 	}
 	if p.HostId == "" {
 		return fmt.Errorf("missing HostId")
-	}
-	if p.Port == "" {
-		return fmt.Errorf("missing Port")
 	}
 	if p.NvmeTransport == "" {
 		return fmt.Errorf("missing NvmeTransport")
@@ -138,7 +136,7 @@ func (snip *NvmeSnippets) Connect(ctx context.Context, address string, params Co
 		"--hostnqn="+params.HostNqn,
 		"--hostid="+params.HostId,
 		"--transport="+params.NvmeTransport,
-		"--trsvcid="+params.Port,
+		fmt.Sprintf("--trsvcid=%d", params.Port),
 		"--nqn="+params.TargetNqn,
 	)
 

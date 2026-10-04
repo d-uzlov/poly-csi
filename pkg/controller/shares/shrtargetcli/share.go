@@ -15,7 +15,7 @@ type share struct {
 	gp globalParams
 
 	Iqn           string `json:"iqn"`
-	Port          string `json:"port"`
+	Port          int    `json:"port"`
 	Transport     string `json:"transport"`
 	BackstoreName string `json:"backstore_name"`
 	AuthType      string `json:"auth_type"`
@@ -53,9 +53,6 @@ func (sh *share) Validate() error {
 	// if sh.BackstoreName == "" {
 	// 	return fmt.Errorf("missing backstoreName")
 	// }
-	if sh.Port == "" {
-		return fmt.Errorf("missing port")
-	}
 	if sh.Transport == "" {
 		return fmt.Errorf("missing transport")
 	}

@@ -16,7 +16,7 @@ type globalParams struct {
 type params struct {
 	TransportType string `map:"transportType"`
 	NvmetPortName string `map:"nvmetPortName"`
-	ConnectPort   string `map:"connectPort"`
+	ConnectPort   int    `map:"connectPort"`
 	AuthType      string `map:"authType"`
 
 	// TODO add fallback to reading ListenPort from current nvmet state
@@ -78,9 +78,6 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 	if resMutable.NvmetPortName != "" {
 		return nil, fmt.Errorf("port name is not mutable")
 	}
-	if resMutable.ConnectPort != "" {
-		return nil, fmt.Errorf("connect port is not mutable")
-	}
 	if resMutable.AuthType != "" {
 		return nil, fmt.Errorf("auth type is not mutable")
 	}
@@ -103,9 +100,6 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 func (p params) validate() error {
 	if p.TransportType == "" {
 		return fmt.Errorf("missing key transport type")
-	}
-	if p.ConnectPort == "" {
-		return fmt.Errorf("missing connect port")
 	}
 	if p.AuthType == "" {
 		return fmt.Errorf("missing auth type")

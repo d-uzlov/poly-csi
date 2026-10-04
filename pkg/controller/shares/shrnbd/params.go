@@ -16,7 +16,7 @@ type globalParams struct {
 }
 
 type params struct {
-	ConnectPort string `map:"connectPort"`
+	ConnectPort int `map:"connectPort"`
 }
 
 const paramsPrefix = "nbd."

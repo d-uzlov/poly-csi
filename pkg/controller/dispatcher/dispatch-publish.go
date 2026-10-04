@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/go-playground/validator/v10"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/logs"
@@ -101,8 +102,17 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("shareHandle.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
 	}
 	logger.Info("share.Publish: success")
+	if pc.Context == nil {
+		return nil, fmt.Errorf("share did not set publish context")
+	}
+
 	if pc == nil {
-		return &csi.ControllerPublishVolumeResponse{}, nil
+		return nil, fmt.Errorf("share did not set publish context data")
+	}
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	err = validate.Struct(pc.Context)
+	if err != nil {
+		return nil, fmt.Errorf("validate share protocol data: %w", err)
 	}
 
 	publishContext := map[string]string{}
@@ -111,11 +121,10 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("inject address options: %w", err)
 	}
 
-	if pc.Context == nil {
-		return nil, fmt.Errorf("share did not set publish context")
-	}
-
 	public, secret, err := protocols.SplitSecret(pc.Context)
+	if err != nil {
+		return nil, fmt.Errorf("split protocol info: %w", err)
+	}
 
 	_, err = serialmaps.SerializeInto(public, publishContext, "")
 	if err != nil {

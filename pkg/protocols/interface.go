@@ -3,6 +3,8 @@ package protocols
 import (
 	"encoding/json"
 	"fmt"
+	
+	"github.com/go-playground/validator/v10"
 
 	"meoe.io/poly-csi/pkg/utils/secrets"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -24,6 +26,13 @@ func Parse[T Config](public map[string]string, secret []byte) (T, error) {
 		if err != nil {
 			return result, fmt.Errorf("secret: %w", err)
 		}
+	}
+
+	// TODO cache validator instance
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	err = validate.Struct(result)
+	if err != nil {
+		return result, err
 	}
 
 	err = result.Validate()

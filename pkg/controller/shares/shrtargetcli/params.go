@@ -23,12 +23,12 @@ func testReady(ctx context.Context, tr transport.Transport) bool {
 }
 
 type globalParams struct {
-	iqnBase      string
+	iqnBase string
 }
 
 type params struct {
 	Transport  string `map:"transport"`
-	ListenPort string `map:"listenPort"`
+	ListenPort int    `map:"listenPort"`
 	AuthType   string `map:"authType"`
 }
 
@@ -85,9 +85,6 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 	if resMutable.Transport != "" {
 		return nil, fmt.Errorf("transport is not mutable")
 	}
-	if resMutable.ListenPort != "" {
-		return nil, fmt.Errorf("listen port is not mutable")
-	}
 	if resMutable.AuthType != "" {
 		return nil, fmt.Errorf("auth type is not mutable")
 	}
@@ -110,9 +107,6 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 func (p params) validate() error {
 	if p.Transport == "" {
 		return fmt.Errorf("transport is empty")
-	}
-	if p.ListenPort == "" {
-		return fmt.Errorf("listenPort is empty")
 	}
 	if p.AuthType == "" {
 		return fmt.Errorf("authType is empty")

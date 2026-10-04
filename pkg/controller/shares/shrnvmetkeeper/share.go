@@ -14,7 +14,7 @@ type share struct {
 	tr transport.Transport
 
 	Nqn          string `json:"nqn"`
-	TcpPort      string `json:"tcp_port"`
+	TcpPort      int    `json:"tcp_port"`
 	NvmePortName string `json:"nvme_port_name"`
 	Transport    string `json:"transport"`
 	AuthType     string `json:"auth_type"`
@@ -45,9 +45,6 @@ func (sh *share) Validate() error {
 	}
 	if sh.Nqn == "" {
 		return fmt.Errorf("missing nqn")
-	}
-	if sh.TcpPort == "" {
-		return fmt.Errorf("missing port")
 	}
 	if sh.Transport == "" {
 		return fmt.Errorf("missing transport")
@@ -102,7 +99,7 @@ func (sh *share) AttachVolume(ctx context.Context, volume any, index int) error 
 }
 
 func (sh *share) DeleteShare(ctx context.Context) error {
-	cmd := append(nvmetKeeperCmd, "subsys", "detach", sh.Nqn, sh.TcpPort)
+	cmd := append(nvmetKeeperCmd, "subsys", "detach", sh.Nqn, sh.NvmePortName)
 	err := transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys detach: %w", err)

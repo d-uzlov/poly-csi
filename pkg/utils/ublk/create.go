@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"meoe.io/poly-csi/pkg/transport"
@@ -62,7 +63,7 @@ func (s *Snippets) Create(ctx context.Context, cr CreateParams, extra ExtraParam
 
 type CreateNbd struct {
 	Host       string
-	Port       string
+	Port       int
 	ExportName string
 	// enable zero-copy for NBD connection
 	SendZeroCopy bool
@@ -73,8 +74,8 @@ func (c CreateNbd) MakeParams() []string {
 		"--host", c.Host,
 		"--export_name", c.ExportName,
 	}
-	if c.Port != "" {
-		result = append(result, "--port", c.Port)
+	if c.Port != 0 {
+		result = append(result, "--port", strconv.Itoa(c.Port))
 	}
 	if c.SendZeroCopy {
 		result = append(result, "--send_zc", "1")
@@ -86,7 +87,7 @@ type NbdTarget struct {
 	DevSize    int64  `json:"dev_size"`
 	ExportName string `json:"export_name"`
 	Host       string `json:"host"`
-	Port       string `json:"port"`
+	Port       int    `json:"port"`
 }
 
 func (di DeviceInfo) ParseTarget[T any]() (T, error) {
@@ -124,7 +125,7 @@ type IscsiTarget struct {
 
 type IscsiUrlParams struct {
 	Host      string
-	Port      string
+	Port      int
 	TargetIqn string
 	Lun       string
 
@@ -137,9 +138,6 @@ type IscsiUrlParams struct {
 func (u IscsiUrlParams) Validate() error {
 	if u.Host == "" {
 		return fmt.Errorf("missing Host")
-	}
-	if u.Port == "" {
-		return fmt.Errorf("missing Port")
 	}
 	if u.TargetIqn == "" {
 		return fmt.Errorf("missing TargetIqn")
@@ -170,8 +168,8 @@ func (u IscsiUrlParams) String() string {
 		result += u.Username + "%" + u.Password + "@"
 	}
 	result += u.Host
-	if u.Port != "" {
-		result += ":" + u.Port
+	if u.Port != 0 {
+		result += ":" + strconv.Itoa(u.Port)
 	}
 	result += "/" + u.TargetIqn + "/" + u.Lun
 	var params []string

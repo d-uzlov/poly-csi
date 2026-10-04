@@ -10,8 +10,8 @@ import (
 func (s *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
 		Context: protocols.AoeShare{
-			Shelf: s.Shelf,
-			Slot:  s.Slot,
+			Shelf: new(int(s.Shelf)),
+			Slot:  new(int(s.Slot)),
 		},
 	}, nil
 }

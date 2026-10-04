@@ -11,32 +11,20 @@ const (
 
 type IscsiShare struct {
 	// public
-	Initiator string `map:"iscsi.initiator,omitempty"     json:"initiator,omitempty"`
-	Iqn       string `map:"iscsi.nqn,omitempty"           json:"iqn,omitempty"`
-	Port      string `map:"iscsi.port,omitempty"          json:"port,omitempty"`
-	Transport string `map:"iscsi.transport,omitempty"     json:"transport,omitempty"`
-	AuthType  string `map:"iscsi.authType,omitempty"      json:"authType,omitempty"`
+	Initiator string `map:"iscsi.initiator,omitempty"    json:"initiator,omitempty" validate:"required"`
+	Iqn       string `map:"iscsi.nqn,omitempty"          json:"iqn,omitempty"       validate:"required"`
+	Port      int    `map:"iscsi.port,omitempty"         json:"port,omitempty"      validate:"required,port"`
+	Transport string `map:"iscsi.transport,omitempty"    json:"transport,omitempty" validate:"required"`
+	AuthType  string `map:"iscsi.authType,omitempty"     json:"authType,omitempty"  validate:"required,oneof=none chap-mutual"`
 
 	// secret
-	ClientUser string `secret:"+" map:"iscsi.clientUser" json:"clientUser,omitempty"`
-	ClientPass string `secret:"+" map:"iscsi.clientPass" json:"clientPass,omitempty"`
-	TargetUser string `secret:"+" map:"iscsi.targetUser" json:"targetUser,omitempty"`
-	TargetPass string `secret:"+" map:"iscsi.targetPass" json:"targetPass,omitempty"`
+	ClientUser string `secret:"+" map:"iscsi.clientUser" json:"clientUser,omitempty" validate:"required_if=AuthType chap-mutual"`
+	ClientPass string `secret:"+" map:"iscsi.clientPass" json:"clientPass,omitempty" validate:"required_if=AuthType chap-mutual"`
+	TargetUser string `secret:"+" map:"iscsi.targetUser" json:"targetUser,omitempty" validate:"required_if=AuthType chap-mutual"`
+	TargetPass string `secret:"+" map:"iscsi.targetPass" json:"targetPass,omitempty" validate:"required_if=AuthType chap-mutual"`
 }
 
 func (v IscsiShare) Validate() error {
-	if v.Initiator == "" {
-		return fmt.Errorf("missing Initiator")
-	}
-	if v.Iqn == "" {
-		return fmt.Errorf("missing iqn")
-	}
-	if v.Port == "" {
-		return fmt.Errorf("missing port")
-	}
-	if v.Transport == "" {
-		return fmt.Errorf("missing transport")
-	}
 	switch v.AuthType {
 	case "":
 		return fmt.Errorf("missing auth type")

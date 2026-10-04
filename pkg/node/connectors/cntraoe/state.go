@@ -29,7 +29,7 @@ func parseState(serialized string) (*state, error) {
 }
 
 func (s *state) getDevName() string {
-	return fmt.Sprintf("e%d.%d", s.Pc.Shelf, s.Pc.Slot)
+	return fmt.Sprintf("e%d.%d", *s.Pc.Shelf, *s.Pc.Slot)
 }
 
 func (s *state) ConnectBlock(ctx context.Context) error {

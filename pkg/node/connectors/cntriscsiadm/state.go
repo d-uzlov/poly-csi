@@ -19,7 +19,7 @@ type state struct {
 	DevFolder               string            `json:"devFolder"`
 	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
 	Iqn                     string            `json:"iqn"`
-	Port                    string            `json:"port"`
+	Port                    int               `json:"port"`
 	Attributes              map[string]string `json:"attributes"`
 	Connections             []Connection      `json:"connections"`
 }
@@ -56,7 +56,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 		}
 		logs.FromCtx(ctx).MicroOp("detected failure, running cleanup")
 		for _, v := range s.Connections {
-			addr := fmt.Sprintf("%s:%s", v.Addr.Address, s.Port)
+			addr := fmt.Sprintf("%s:%d", v.Addr.Address, s.Port)
 			cleanupErr := s.snip.disconnect(ctx, s.Iqn, addr)
 			if cleanupErr != nil {
 				logs.FromCtx(ctx).Error("failed to run cleanup", "address", addr, "error", cleanupErr.Error())
@@ -66,7 +66,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 
 	successCount := 0
 	for _, v := range s.Connections {
-		addr := fmt.Sprintf("%s:%s", v.Addr.Address, s.Port)
+		addr := fmt.Sprintf("%s:%d", v.Addr.Address, s.Port)
 		err = s.snip.configureTarget(ctx, s.Iqn, addr, s.Attributes)
 		if err != nil {
 			if len(s.Connections) <= 1 {

@@ -15,7 +15,7 @@ type share struct {
 
 	// FsPath    string `json:"fs_path"`
 	Nqn       string `json:"nqn"`
-	Port      string `json:"port"`
+	Port      int    `json:"port"`
 	Transport string `json:"transport"`
 }
 
@@ -44,9 +44,6 @@ func (sh *share) Validate() error {
 	}
 	if sh.Nqn == "" {
 		return fmt.Errorf("missing nqn")
-	}
-	if sh.Port == "" {
-		return fmt.Errorf("missing port")
 	}
 	if sh.Transport == "" {
 		return fmt.Errorf("missing transport")

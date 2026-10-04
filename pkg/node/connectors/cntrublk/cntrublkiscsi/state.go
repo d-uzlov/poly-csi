@@ -17,7 +17,7 @@ type state struct {
 	devFolder string              `json:"-"`
 	sv        cntrublk.Supervisor `json:"-"`
 
-	Uuid string `json:"uuid"`
+	Uuid    string               `json:"uuid"`
 	Address string               `json:"address"`
 	Pc      protocols.IscsiShare `json:"iscsi"`
 

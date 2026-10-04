@@ -13,7 +13,7 @@ type share struct {
 	tr transport.Transport `json:"-"`
 	gp globalParams        `json:"-"`
 
-	ConnectPort string `json:"connect_port"`
+	ConnectPort int    `json:"connect_port"`
 	ExportName  string `json:"export_name"`
 	DevicePath  string `json:"user_name"`
 }
@@ -40,9 +40,6 @@ func (sh *share) Serialize() (string, error) {
 func (sh *share) Validate() error {
 	if sh.tr == nil {
 		return fmt.Errorf("transport is nil")
-	}
-	if sh.ConnectPort == "" {
-		return fmt.Errorf("missing ConnectPort")
 	}
 	if sh.ExportName == "" {
 		return fmt.Errorf("missing ExportName")

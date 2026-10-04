@@ -1,19 +1,14 @@
 package protocols
 
-import (
-	"fmt"
-)
+import ()
 
 type NfsShare struct {
 	// public
-	Path string `map:"nfs.sharePath,omitempty" json:"path,omitempty"`
+	Path string `map:"nfs.sharePath,omitempty" json:"path,omitempty" validate:"required,filepath"`
 
 	// secret
 }
 
 func (v NfsShare) Validate() error {
-	if v.Path == "" {
-		return fmt.Errorf("missing share path")
-	}
 	return nil
 }
