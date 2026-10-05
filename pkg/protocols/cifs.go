@@ -8,7 +8,7 @@ type CifsShare struct {
 	UserName  string `map:"cifs.userName,omitempty"  json:"userName,omitempty"  validate:"required"`
 
 	// secret
-	UserPassword string `secret:"+" map:"userPassword" json:"userPassword,omitempty" validate:"required"`
+	UserPassword string `secret:"+" map:"userPassword,omitempty" json:"userPassword,omitempty" validate:"required"`
 }
 
 func (v CifsShare) Validate() error {

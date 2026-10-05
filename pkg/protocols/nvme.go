@@ -14,8 +14,8 @@ type NvmeShare struct {
 	TransportType string `map:"nvme.transportType,omitempty" json:"transportType,omitempty" validate:"required"`
 
 	// secret
-	HostKey       string `secret:"+" map:"nvme.hostKey"       json:"hostKey,omitempty"       validate:"required_if=AuthType dhchap-mutual"`
-	ControllerKey string `secret:"+" map:"nvme.controllerKey" json:"controllerKey,omitempty" validate:"required_if=AuthType dhchap-mutual"`
+	HostKey       string `secret:"+" map:"nvme.hostKey,omitempty"       json:"hostKey,omitempty"       validate:"required_if=AuthType dhchap-mutual"`
+	ControllerKey string `secret:"+" map:"nvme.controllerKey,omitempty" json:"controllerKey,omitempty" validate:"required_if=AuthType dhchap-mutual"`
 }
 
 const (

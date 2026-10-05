@@ -18,10 +18,10 @@ type IscsiShare struct {
 	AuthType  string `map:"iscsi.authType,omitempty"     json:"authType,omitempty"  validate:"required,oneof=none chap-mutual"`
 
 	// secret
-	ClientUser string `secret:"+" map:"iscsi.clientUser" json:"clientUser,omitempty" validate:"required_if=AuthType chap-mutual"`
-	ClientPass string `secret:"+" map:"iscsi.clientPass" json:"clientPass,omitempty" validate:"required_if=AuthType chap-mutual"`
-	TargetUser string `secret:"+" map:"iscsi.targetUser" json:"targetUser,omitempty" validate:"required_if=AuthType chap-mutual"`
-	TargetPass string `secret:"+" map:"iscsi.targetPass" json:"targetPass,omitempty" validate:"required_if=AuthType chap-mutual"`
+	ClientUser string `secret:"+" map:"iscsi.clientUser,omitempty" json:"clientUser,omitempty" validate:"required_if=AuthType chap-mutual"`
+	ClientPass string `secret:"+" map:"iscsi.clientPass,omitempty" json:"clientPass,omitempty" validate:"required_if=AuthType chap-mutual"`
+	TargetUser string `secret:"+" map:"iscsi.targetUser,omitempty" json:"targetUser,omitempty" validate:"required_if=AuthType chap-mutual"`
+	TargetPass string `secret:"+" map:"iscsi.targetPass,omitempty" json:"targetPass,omitempty" validate:"required_if=AuthType chap-mutual"`
 }
 
 func (v IscsiShare) Validate() error {

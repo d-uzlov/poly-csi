@@ -32,14 +32,16 @@ func ParseRemove[T any](src map[string]string, prefix string, remove bool, out *
 			continue
 		}
 
-		key := sf.Tag.Get(tag)
-		if key == "" {
+		tagValue := sf.Tag.Get(tag)
+		if tagValue == "" {
 			return fmt.Errorf("field %s: missing '%s' tag", sf.Name, tag)
 		}
-		if key == "-" {
+		if tagValue == "-" {
 			continue
 		}
 
+		tagFields := strings.Split(tagValue, ",")
+		key := tagFields[0]
 		mapKey := prefix + key
 		raw, ok := src[mapKey]
 		if !ok {
