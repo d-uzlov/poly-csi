@@ -10,6 +10,8 @@ import (
 )
 
 type connector struct {
+	connectors.NoInfo
+
 	conf connectors.CommonConfig
 	sv   cntrublk.Supervisor
 }
@@ -23,13 +25,10 @@ func New(sv cntrublk.Supervisor, conf connectors.CommonConfig) connectors.Manage
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	return connectors.Capabilities{
+		Protocol:       protocols.Nbd,
+		HasNodeInfo:    false,
 		ConnectType:    connectors.ConnectTypeBlock,
-		ManagedUnmount: true,
 	}, nil
-}
-
-func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	return &connectors.ConnectorNodeInfo{}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {

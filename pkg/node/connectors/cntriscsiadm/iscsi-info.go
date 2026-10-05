@@ -2,30 +2,21 @@ package cntriscsiadm
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+func (c *connector) GetInfo(ctx context.Context) (protocols.NodeInfo, error) {
 	iqn, err := c.parseIqn(c.commonConfig.Tr, ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	public, err := json.Marshal(protocols.IscsiNodeInfo{
+	return &protocols.IscsiNodeInfo{
 		InitiatorIqn: iqn,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &connectors.ConnectorNodeInfo{
-		Public: string(public),
 	}, nil
 }
 

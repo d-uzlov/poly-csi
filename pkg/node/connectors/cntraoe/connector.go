@@ -10,6 +10,8 @@ import (
 )
 
 type connector struct {
+	connectors.NoInfo
+
 	conf connectors.CommonConfig
 }
 
@@ -52,7 +54,6 @@ func (c *connector) setAoeModuleParams(ctx context.Context, conf aoeConfig) erro
 	if err != nil {
 		return fmt.Errorf("set aoe_deadsecs: %w", err)
 	}
-	
 
 	if conf.MaxOut == "" {
 		conf.MaxOut = "64"
@@ -76,13 +77,10 @@ func (c *connector) setAoeModuleParams(ctx context.Context, conf aoeConfig) erro
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	return connectors.Capabilities{
+		Protocol:    protocols.Aoe,
 		HasNodeInfo: false,
 		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
-}
-
-func (m *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	return &connectors.ConnectorNodeInfo{}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {

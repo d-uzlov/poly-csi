@@ -54,10 +54,11 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 	}
 
 	var iscsiInfo protocols.IscsiNodeInfo
-	if req.ConInfo.Public != "" {
-		err := json.Unmarshal([]byte(req.ConInfo.Public), &iscsiInfo)
-		if err != nil {
-			return nil, fmt.Errorf("parse connector info as iscsi: %w", err)
+	if req.ConInfo != nil {
+		ok := false
+		iscsiInfo, ok = req.ConInfo.(protocols.IscsiNodeInfo)
+		if !ok {
+			return nil, fmt.Errorf("node info is not iscsi")
 		}
 	}
 

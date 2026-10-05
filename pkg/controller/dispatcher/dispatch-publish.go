@@ -96,7 +96,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 
 	pc, err := shareHandle.Publish(ctx, shares.PublishRequest{
 		NodeName: req.NodeId,
-		ConInfo:  conInfo,
+		ConInfo:  conInfo.Info,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("shareHandle.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)

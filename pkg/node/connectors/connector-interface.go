@@ -5,6 +5,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/node/addropt"
+	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -15,12 +16,18 @@ type Manager interface {
 	Capabilities(ctx context.Context) (Capabilities, error)
 	// GetInfo returns opaque string containing connector-specific info about the node.
 	// Controller can parse this info and use it to publish the volume.
-	GetInfo(ctx context.Context) (*ConnectorNodeInfo, error)
+	GetInfo(ctx context.Context) (protocols.NodeInfo, error)
 	// GetHandle creates a handle to manage a connection.
 	// Connector must parse params and create a handle, without making any changes in OS.
 	GetHandle(ctx context.Context, req ConnectRequest) (Handle, error)
 	// ParseHandle recreates state object from State.Serialize result
 	ParseHandle(serializedData string) (Handle, error)
+}
+
+type NoInfo struct{}
+
+func (i *NoInfo) GetInfo(ctx context.Context) (protocols.NodeInfo, error) {
+	return nil, nil
 }
 
 type Handle interface {
@@ -53,6 +60,8 @@ type CommonConfig struct {
 }
 
 type Capabilities struct {
+	Protocol protocols.Name
+
 	// HasNodeInfo indicates if GetInfo of this connector provides essential info needed to create shares
 	HasNodeInfo bool `json:"has_node_info"`
 

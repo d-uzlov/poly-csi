@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/protocols"
 )
 
@@ -63,7 +62,7 @@ type CreateShareRequest struct {
 
 type PublishRequest struct {
 	NodeName string
-	ConInfo  connectors.ConnectorNodeInfo
+	ConInfo  protocols.NodeInfo
 }
 
 type PublishContext struct {

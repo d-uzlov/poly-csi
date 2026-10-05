@@ -9,6 +9,8 @@ import (
 )
 
 type connector struct {
+	connectors.NoInfo
+
 	conf connectors.CommonConfig
 }
 
@@ -20,13 +22,11 @@ func New(conf connectors.CommonConfig) (connectors.Manager, error) {
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	return connectors.Capabilities{
+		Protocol:       protocols.Smb,
+		HasNodeInfo:    false,
 		ConnectType:    connectors.ConnectTypePublishFolder,
 		ManagedUnmount: true,
 	}, nil
-}
-
-func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	return &connectors.ConnectorNodeInfo{}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {

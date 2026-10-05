@@ -1,19 +1,25 @@
 package nodeinfo
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 type NodeInfo struct {
-	Id         string                                  `json:"id"`
-	PublicKey  encrypt.RsaPublicKey                    `json:"public_key"`
-	Connectors map[string]connectors.ConnectorNodeInfo `json:"connectors"`
-	Ips        []string                                `json:"ips"`
-	Presets    []string                                `json:"presets"`
+	Id         string                   `json:"id"`
+	PublicKey  encrypt.RsaPublicKey     `json:"public_key"`
+	Connectors map[string]ConnectorInfo `json:"connectors"`
+	Ips        []string                 `json:"ips"`
+	Presets    []string                 `json:"presets"`
+}
+
+type ConnectorInfo struct {
+	Protocol protocols.Name     `json:"protocol"`
+	Info     protocols.NodeInfo `json:"info"`
 }
 
 func (ni *NodeInfo) Validate() error {
@@ -35,21 +41,18 @@ func (ni *NodeInfo) Serialize() (map[string]string, error) {
 		"ips":             strings.Join(ni.Ips, ","),
 		"presets":         strings.Join(ni.Presets, ","),
 	}
-	for k, v := range ni.Connectors {
-		serialized, err := v.Serialize()
-		if err != nil {
-			return nil, fmt.Errorf("connector %s: serialize failed: %w", k, err)
-		}
-		key := "connector." + k
-		result[key] = serialized
+	connectorsSerialized, err := json.Marshal(ni.Connectors)
+	if err != nil {
+		return nil, err
 	}
+	result["connectors"] = string(connectorsSerialized)
 
 	return result, nil
 }
 
 func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
 	result := NodeInfo{
-		Connectors: map[string]connectors.ConnectorNodeInfo{},
+		Connectors: map[string]ConnectorInfo{},
 	}
 	for k, v := range src {
 		switch k {
@@ -70,15 +73,11 @@ func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
 			result.Ips = strings.Split(v, ",")
 		case "presets":
 			result.Presets = strings.Split(v, ",")
-		}
-		connectorId, foundConnector := strings.CutPrefix(k, "connector.")
-		if foundConnector {
-			mountInfo, err := connectors.DeserializeConnectorNodeInfo(v)
+		case "connectors":
+			err := json.Unmarshal([]byte(v), &result.Connectors)
 			if err != nil {
-				return nil, fmt.Errorf("deserialize connector %s info: %w", connectorId, err)
+				return nil, err
 			}
-			result.Connectors[connectorId] = mountInfo
-			continue
 		}
 		// TODO add logs for ignored fields?
 	}

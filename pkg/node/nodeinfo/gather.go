@@ -17,18 +17,26 @@ func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey
 	info := NodeInfo{
 		Id:         nodeId,
 		PublicKey:  nodePublicKey,
-		Connectors: map[string]connectors.ConnectorNodeInfo{},
+		Connectors: map[string]ConnectorInfo{},
 		Presets:    presets,
 	}
 
 	for k, v := range connectorList {
+		caps, err := v.Capabilities(ctx)
+		if err != nil {
+			slogctx.FromCtx(ctx).Error("connector.Capabilities failed", "error", err.Error())
+			continue
+		}
 		mi, err := v.GetInfo(ctx)
 		if err != nil {
 			// TODO transient errors are logged, but there are no confirmations when they are cleared
 			slogctx.FromCtx(ctx).Error("connector.GetInfo failed", "error", err.Error())
 			continue
 		}
-		info.Connectors[k] = *mi
+		info.Connectors[k] = ConnectorInfo{
+			Protocol: caps.Protocol,
+			Info:     mi,
+		}
 	}
 
 	interfaces, err := net.Interfaces()

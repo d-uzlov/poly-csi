@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -89,4 +91,36 @@ func FormatValidationError(err error) error {
 	}
 
 	return errors.New(strings.Join(errList, ", "))
+}
+
+type Sample struct {
+	Share Config
+	Info  NodeInfo
+}
+
+var protocols = map[string]Sample{
+	string(Aoe):   {Share: AoeShare{}, Info: nil},
+	string(Iscsi): {Share: IscsiShare{}, Info: IscsiNodeInfo{}},
+	string(Nbd):   {Share: NbdShare{}, Info: nil},
+	string(Nfs):   {Share: NfsShare{}, Info: nil},
+	string(Nvme):  {Share: NvmeShare{}, Info: nil},
+}
+
+func ParseNodeInfo(name Name, data string, out *NodeInfo) error {
+	sample, ok := protocols[string(name)]
+	if !ok {
+		return fmt.Errorf("unknown protocol name '%s', must be one of %v", name, strings.Join(slices.Collect(maps.Keys(protocols)), ", "))
+	}
+	if sample.Info == nil {
+		if data != "" {
+			return fmt.Errorf("trying to parse node info for a protocol that does not feature node info")
+		}
+	}
+
+	err := json.Unmarshal([]byte(data), &sample.Info)
+	if err != nil {
+		return err
+	}
+	*out = sample.Info
+	return nil
 }

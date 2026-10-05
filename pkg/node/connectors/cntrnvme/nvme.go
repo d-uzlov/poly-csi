@@ -11,6 +11,8 @@ import (
 )
 
 type connector struct {
+	connectors.NoInfo
+
 	commonConfig connectors.CommonConfig
 	snip         NvmeSnippets
 	config       Config
@@ -45,12 +47,10 @@ func New(conf connectors.CommonConfig) (connectors.Manager, error) {
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	return connectors.Capabilities{
+		Protocol:    protocols.Nvme,
+		HasNodeInfo: false,
 		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
-}
-
-func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
-	return &connectors.ConnectorNodeInfo{}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {

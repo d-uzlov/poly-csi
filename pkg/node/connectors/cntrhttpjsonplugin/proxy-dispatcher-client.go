@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type DispatcherClient struct {
@@ -61,7 +62,14 @@ func (c *DispatcherClient) Capabilities(ctx context.Context) (connectors.Capabil
 	return res, nil
 }
 
-func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+func (c *DispatcherClient) GetInfo(ctx context.Context) (protocols.NodeInfo, error) {
+	caps, err := c.Capabilities(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if caps.HasNodeInfo {
+		return nil, nil
+	}
 	req := PluginRequest{
 		Method:        MethodGetInfo,
 		ConnectorId:   c.cc.RemoteId,
@@ -73,13 +81,14 @@ func (c *DispatcherClient) GetInfo(ctx context.Context) (*connectors.ConnectorNo
 		return nil, err
 	}
 
-	var res connectors.ConnectorNodeInfo
+	var res protocols.NodeInfo
+	err = protocols.ParseNodeInfo(caps.Protocol, resp, &res)
 	err = json.Unmarshal([]byte(resp), &res)
 	if err != nil {
 		return nil, err
 	}
 
-	return &res, nil
+	return res, nil
 }
 
 func (c *DispatcherClient) GetHandle(ctx context.Context, cReq connectors.ConnectRequest) (connectors.Handle, error) {
