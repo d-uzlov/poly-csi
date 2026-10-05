@@ -19,7 +19,7 @@ parameters:
 
   zfs.parentDataset: rose/test
 
-  fsType: cifs
+  # fsType: cifs
 
 # mountOptions:
 # - noatime

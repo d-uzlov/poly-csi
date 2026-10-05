@@ -92,7 +92,6 @@ type ConnectRequest struct {
 
 type ConnectFolderRequest struct {
 	FsMountPath string   `json:"fsMountPath"`
-	FsType      string   `json:"fsType"`
 	MountFlags  []string `json:"mountFlags"`
 	MountGroup  string   `json:"mountGroup"`
 }

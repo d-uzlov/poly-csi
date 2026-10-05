@@ -188,7 +188,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 
 		cr := connectors.ConnectFolderRequest{
 			FsMountPath: req.StagingTargetPath + stageFolderMount,
-			FsType:      mountParams.FsType,
 			MountFlags:  mountParams.MountFlags,
 			// MountGroup:  mountParams.VolumeMountGroup,
 		}

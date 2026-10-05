@@ -76,7 +76,6 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 
 		cr := connectors.ConnectFolderRequest{
 			FsMountPath: req.TargetPath,
-			FsType:      mountParams.FsType,
 			MountFlags:  mountParams.MountFlags,
 			MountGroup:  mountParams.VolumeMountGroup,
 		}

@@ -33,7 +33,7 @@ func (s *state) ConnectBlock(ctx context.Context) error {
 }
 
 func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.FsMountPath, req.FsType, req.MountFlags)
+	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.FsMountPath, "nfs", req.MountFlags)
 	if err != nil {
 		return err
 	}

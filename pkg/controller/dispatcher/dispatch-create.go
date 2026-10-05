@@ -112,7 +112,7 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 	}
 
 	dc.volCapsFs = req.VolumeCapabilities[0].GetMount()
-	if dc.volCapsFs != nil {
+	if dc.volCapsFs != nil && dc.volCapsFs.FsType != "" {
 		dc.fs = volumeinit.GetFromType(dc.volCapsFs.FsType)
 		if dc.fs == nil {
 			return fmt.Errorf("filesystem handler for fs type '%s' is not found", dc.volCapsFs.FsType)
@@ -211,7 +211,7 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	}
 
 	if shrCaps.OpaqueVolume != "" {
-		if shrCaps.OpaqueVolume == strCaps.OpaqueVolumeType {
+		if shrCaps.OpaqueVolume != strCaps.OpaqueVolumeType {
 			return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.p.StorageType, strCaps.OpaqueVolumeType)
 		}
 		dc.shareViaVolume = true
@@ -331,6 +331,9 @@ func (dc *dispatchCreate) createFromScratch(ctx context.Context) error {
 		return fmt.Errorf("CreateState: %w", err)
 	}
 	if dc.p.JournalVolume != "none" {
+		if dc.fs == nil {
+			return fmt.Errorf("trying to make journal without a filesystem helper")
+		}
 		size := dc.fs.CalcPreferredJournalSize(dc.size)
 		err = dc.volJournal.CreateState(ctx, size)
 		if err != nil {
@@ -677,65 +680,67 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 	journalProps := volumeinit.StorageProperties{}
 	var journalState *storage.VolumeState
-	if dc.p.JournalVolume != "none" {
-		journalState, err = dc.volJournal.ReadState(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("read journal state: %w", err)
-		}
-		if journalState == nil {
-			return nil, fmt.Errorf("read journal state: nil result")
-		}
-		if dc.strJ.GetCapabilities().LocalPathType != "" {
-			if journalState.FsPath == "" {
-				return nil, fmt.Errorf("storage did not set journal FsPath")
-			}
-			// when using local volumes, we can check common stuff here, to avoid repeating it in each share
-			err = checkFile(ctx, dc.srv.trInstance, strCaps.LocalPathType, journalState.FsPath)
-			if err != nil {
-				return nil, fmt.Errorf("check journal local file: %w", err)
-			}
-		}
-
-		journalProps = volumeinit.StorageProperties{
-			InitialEmpty:     dc.strJ.GetCapabilities().BlockInitialEmpty,
-			RMWSize:          journalState.RMWSize,
-			OptimalWriteSize: journalState.OptimalWriteSize,
-			AtomicSize:       journalState.AtomicSize,
-		}
-	}
-	dc.fs.SetVolumeProps(volumeinit.StorageProperties{
-		InitialEmpty:     strCaps.BlockInitialEmpty,
-		RMWSize:          volumeState.RMWSize,
-		OptimalWriteSize: volumeState.OptimalWriteSize,
-		AtomicSize:       volumeState.AtomicSize,
-	}, journalProps)
-	vi.VolumeContext.FsType = dc.volCapsFs.FsType
-	vi.VolumeContext.FsData, err = dc.fs.Serialize()
-	if err != nil {
-		return nil, fmt.Errorf("format.Serialize: %w", err)
-	}
-
-	if dc.volCapsFs == nil ||
-		strCaps.LocalPathType != storage.VolDevice ||
-		dc.p.FsFormatSide != FsFormatController {
-		vi.Storage.NeedsControllerFormat = false
-	}
-	if vi.Storage.NeedsControllerFormat {
-		if volumeState.FsPath == "" {
-			return nil, fmt.Errorf("read state: empty fs path")
-		}
-
+	if dc.volCapsFs != nil && dc.volCapsFs.FsType != "" {
 		if dc.p.JournalVolume != "none" {
-			dc.fs.SetWithJournal(volumeState.FsPath, journalState.FsPath)
-		} else {
-			dc.fs.SetSingleDevice(volumeState.FsPath)
+			journalState, err = dc.volJournal.ReadState(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("read journal state: %w", err)
+			}
+			if journalState == nil {
+				return nil, fmt.Errorf("read journal state: nil result")
+			}
+			if dc.strJ.GetCapabilities().LocalPathType != "" {
+				if journalState.FsPath == "" {
+					return nil, fmt.Errorf("storage did not set journal FsPath")
+				}
+				// when using local volumes, we can check common stuff here, to avoid repeating it in each share
+				err = checkFile(ctx, dc.srv.trInstance, strCaps.LocalPathType, journalState.FsPath)
+				if err != nil {
+					return nil, fmt.Errorf("check journal local file: %w", err)
+				}
+			}
+
+			journalProps = volumeinit.StorageProperties{
+				InitialEmpty:     dc.strJ.GetCapabilities().BlockInitialEmpty,
+				RMWSize:          journalState.RMWSize,
+				OptimalWriteSize: journalState.OptimalWriteSize,
+				AtomicSize:       journalState.AtomicSize,
+			}
+		}
+		dc.fs.SetVolumeProps(volumeinit.StorageProperties{
+			InitialEmpty:     strCaps.BlockInitialEmpty,
+			RMWSize:          volumeState.RMWSize,
+			OptimalWriteSize: volumeState.OptimalWriteSize,
+			AtomicSize:       volumeState.AtomicSize,
+		}, journalProps)
+		vi.VolumeContext.FsType = dc.volCapsFs.FsType
+		vi.VolumeContext.FsData, err = dc.fs.Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("format.Serialize: %w", err)
 		}
 
-		err = dc.fs.Format(ctx, dc.srv.trInstance)
-		if err != nil {
-			return nil, fmt.Errorf("run format: %w", err)
+		if dc.volCapsFs == nil ||
+			strCaps.LocalPathType != storage.VolDevice ||
+			dc.p.FsFormatSide != FsFormatController {
+			vi.Storage.NeedsControllerFormat = false
 		}
-		vi.Storage.NeedsControllerFormat = false
+		if vi.Storage.NeedsControllerFormat {
+			if volumeState.FsPath == "" {
+				return nil, fmt.Errorf("read state: empty fs path")
+			}
+
+			if dc.p.JournalVolume != "none" {
+				dc.fs.SetWithJournal(volumeState.FsPath, journalState.FsPath)
+			} else {
+				dc.fs.SetSingleDevice(volumeState.FsPath)
+			}
+
+			err = dc.fs.Format(ctx, dc.srv.trInstance)
+			if err != nil {
+				return nil, fmt.Errorf("run format: %w", err)
+			}
+			vi.Storage.NeedsControllerFormat = false
+		}
 	}
 
 	err = wrapped.SetVolumeInfo(ctx, *vi)

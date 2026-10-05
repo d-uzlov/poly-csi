@@ -34,17 +34,13 @@ func (s *state) ConnectBlock(ctx context.Context) error {
 }
 
 func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	if req.FsType != "cifs" {
-		return fmt.Errorf("expected cifs fs type but got %s", req.FsType)
-	}
-
 	flags := req.MountFlags
 	if req.MountGroup != "" {
 		flags = append(flags, fmt.Sprintf("gid=%s", req.MountGroup))
 	}
 	flags = append(flags, fmt.Sprintf("username=%s", s.Username), fmt.Sprintf("password=%s", s.Password))
 
-	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.SharePath, req.FsMountPath, req.FsType, flags)
+	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.SharePath, req.FsMountPath, "cifs", flags)
 	if err != nil {
 		return err
 	}
