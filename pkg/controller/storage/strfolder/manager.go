@@ -20,9 +20,9 @@ func New(tr transport.Transport, globalParams map[string]string) storage.Storage
 
 func (m *manager) GetCapabilities() storage.Capabilities {
 	return storage.Capabilities{
-		LocalPathType:    storage.VolFolder,
-		OpaqueVolumeType: "",
-		NativeSnapshot:   false,
+		LocalPathType:  storage.VolFolder,
+		OpaqueType:     "",
+		NativeSnapshot: false,
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/volumecontext"
 )
 
@@ -30,13 +31,13 @@ type VolumeStorageInfo struct {
 	JournalStorageData string `json:"journal_storage_data"`
 
 	// LocalPathType is the saved value from storage.StorageManager.GetCapabilities().LocalPathType
-	LocalPathType string `json:"local_type"`
+	LocalPathType storage.LocalVolumeType `json:"local_type"`
 	// Size is the saved value of storage.Volume.GetState().Size
 	Size int64 `json:"size"`
 }
 
 type VolumeInfo struct {
-	Storage    VolumeStorageInfo `json:"storage"`
+	Storage VolumeStorageInfo `json:"storage"`
 
 	ShareType string `json:"share_type"`
 	ShareData string `json:"share_data"`

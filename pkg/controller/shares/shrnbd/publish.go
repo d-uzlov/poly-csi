@@ -9,7 +9,7 @@ import (
 
 func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Context: protocols.NbdShare{
+		Protocol: protocols.NbdShare{
 			ExportName: sh.ExportName,
 			Port:       sh.ConnectPort,
 		},

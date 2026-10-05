@@ -68,16 +68,15 @@ type CreateRequest struct {
 
 type Capabilities struct {
 	// LocalPathType holds type of volume in filesystem.
-	// It must be one of well-known types.
 	// If volume is not available in filesystem, LocalPathType must be empty.
 	// Dispatcher can use this info for filesystem checks.
 	// Filesystem-based share methods can use this to expose volume to network.
-	LocalPathType string
+	LocalPathType LocalVolumeType
 
-	// OpaqueVolumeType holds storage-specific volume type.
-	// Unlike LocalPathType, OpaqueVolumeType does not use well-known values.
+	// OpaqueType holds storage-specific volume type.
+	// Unlike LocalPathType, OpaqueType does not use well-known values.
 	// Storage-specific share methods can use this to expose volume to network.
-	OpaqueVolumeType string
+	OpaqueType OpaqueVolumeType
 
 	// Indicates whether volumes in this storage support instantaneous online snapshots.
 	NativeSnapshot bool
@@ -94,10 +93,13 @@ type Capabilities struct {
 	BlockInitialEmpty bool
 }
 
+type LocalVolumeType string
+type OpaqueVolumeType string
+
 // well-known local path types
 const (
-	VolFolder = "vol_type_folder"
-	VolDevice = "vol_type_device"
+	VolFolder = LocalVolumeType("vol_type_folder")
+	VolDevice = LocalVolumeType("vol_type_device")
 )
 
 type VolumeState struct {

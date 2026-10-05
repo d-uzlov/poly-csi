@@ -9,7 +9,7 @@ import (
 
 func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Context: protocols.CifsShare{
+		Protocol: protocols.CifsShare{
 			ShareName:    sh.ShareName,
 			UserName:     sh.UserName,
 			UserPassword: sh.UserPass,

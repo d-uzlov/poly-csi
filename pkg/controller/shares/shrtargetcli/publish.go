@@ -82,7 +82,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 
 	if sh.AuthType == authTypeNone {
 		return &shares.PublishContext{
-			Context:   pc,
+			Protocol:  pc,
 			LocalData: pd,
 		}, nil
 	}
@@ -101,7 +101,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 		}
 
 		return &shares.PublishContext{
-			Context:   pc,
+			Protocol:  pc,
 			LocalData: pd,
 		}, nil
 	}
@@ -136,7 +136,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 	}
 
 	return &shares.PublishContext{
-		Context:   pc,
+		Protocol:  pc,
 		LocalData: pd,
 	}, nil
 }

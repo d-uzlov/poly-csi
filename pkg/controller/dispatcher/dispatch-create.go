@@ -202,7 +202,7 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	shrCaps := dc.shr.GetCapabilities()
 
 	// storage-to-share checks
-	if strCaps.LocalPathType == "" && strCaps.OpaqueVolumeType == "" {
+	if strCaps.LocalPathType == "" && strCaps.OpaqueType == "" {
 		return fmt.Errorf("storage reported empty for both LocalPathType and OpaqueVolumeType")
 	}
 
@@ -211,8 +211,8 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	}
 
 	if shrCaps.OpaqueVolume != "" {
-		if shrCaps.OpaqueVolume != strCaps.OpaqueVolumeType {
-			return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.p.StorageType, strCaps.OpaqueVolumeType)
+		if shrCaps.OpaqueVolume != strCaps.OpaqueType {
+			return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.p.StorageType, strCaps.OpaqueType)
 		}
 		dc.shareViaVolume = true
 	}
@@ -224,7 +224,7 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 			return fmt.Errorf("share '%s' does not support multiple volumes", dc.p.ShareType)
 		}
 
-		if strJCaps.LocalPathType == "" && strJCaps.OpaqueVolumeType == "" {
+		if strJCaps.LocalPathType == "" && strJCaps.OpaqueType == "" {
 			return fmt.Errorf("journal storage reported empty for both LocalPathType and OpaqueVolumeType")
 		}
 
@@ -233,8 +233,8 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 		}
 
 		if shrCaps.OpaqueVolume != "" {
-			if shrCaps.OpaqueVolume == strJCaps.OpaqueVolumeType {
-				return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.j.StorageType, strCaps.OpaqueVolumeType)
+			if shrCaps.OpaqueVolume == strJCaps.OpaqueType {
+				return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", dc.p.ShareType, shrCaps.OpaqueVolume, dc.j.StorageType, strCaps.OpaqueType)
 			}
 			dc.shareViaVolume = true
 		}

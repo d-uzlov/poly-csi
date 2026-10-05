@@ -25,10 +25,10 @@ func New(tr transport.Transport, globalParams map[string]string) (storage.Storag
 
 func (m *manager) GetCapabilities() storage.Capabilities {
 	return storage.Capabilities{
-		LocalPathType:    storage.VolFolder,
-		OpaqueVolumeType: "zfs-dataset",
-		NativeSnapshot:   true,
-		LocalSendType:    "zfs-dataset",
+		LocalPathType:  storage.VolFolder,
+		OpaqueType:     "zfs-dataset",
+		NativeSnapshot: true,
+		LocalSendType:  "zfs-dataset",
 	}
 }
 

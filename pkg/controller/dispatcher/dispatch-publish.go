@@ -102,7 +102,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("shareHandle.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
 	}
 	logger.Info("share.Publish: success")
-	if pc.Context == nil {
+	if pc.Protocol == nil {
 		return nil, fmt.Errorf("share did not set publish context")
 	}
 
@@ -110,7 +110,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("share did not set publish context data")
 	}
 	validate := validator.New(validator.WithRequiredStructEnabled())
-	err = validate.Struct(pc.Context)
+	err = validate.Struct(pc.Protocol)
 	if err != nil {
 		err = protocols.FormatValidationError(err)
 		return nil, fmt.Errorf("validate share protocol data: %w", err)
@@ -122,7 +122,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("inject address options: %w", err)
 	}
 
-	public, secret, err := protocols.SplitSecret(pc.Context)
+	public, secret, err := protocols.SplitSecret(pc.Protocol)
 	if err != nil {
 		return nil, fmt.Errorf("split protocol info: %w", err)
 	}

@@ -3,6 +3,7 @@ package shares
 import (
 	"context"
 
+	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/protocols"
 )
@@ -38,10 +39,10 @@ type Capabilities struct {
 	UnpublishAll bool
 	// LocalVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.LocalVolume.
 	// When empty, this check is skipped.
-	LocalVolume string
+	LocalVolume storage.LocalVolumeType
 	// OpaqueVolume indicates which types of volumes are accepted for this share, matching storage.StorageManager.GetCapabilities.OpaqueVolume.
 	// When empty, this check is skipped.
-	OpaqueVolume string
+	OpaqueVolume storage.OpaqueVolumeType
 	// MultiShare indicates that Share.SharePath accept the index parameter
 	// and can be called multiple times. All shared paths/volumes will be connected via a single connection.
 	MultiShare bool
@@ -65,12 +66,8 @@ type PublishRequest struct {
 }
 
 type PublishContext struct {
-	// Context data is passed to node deployment as cleartext.
-	// Users (both human and automated controllers) can inspect it.
-	//
-	// It is serialized using serialmaps package.
-	// It must be a struct with fields annotated with `map:"map_key"` tags
-	Context protocols.Config `json:"public"`
+	// Protocol data is passed to node connector
+	Protocol protocols.Config `json:"public"`
 	// LocalData is an arbitrary storage for internal information for ShareManager.Publish and ShareManager.Unpublish.
 	// Can be empty/nil if ShareManager.Unpublish is a no-op.
 	// It is serialized into JSON, annotate it accordingly.

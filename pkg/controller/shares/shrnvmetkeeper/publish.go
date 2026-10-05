@@ -102,7 +102,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 	}
 
 	return &shares.PublishContext{
-		Context: pc,
+		Protocol: pc,
 		LocalData: &publishData{
 			HostNqn: hostNqn,
 		},

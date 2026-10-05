@@ -73,7 +73,7 @@ func (d *Dispatcher) getSnapshotHandle(ctx context.Context, snapshotId string) (
 	}, nil
 }
 
-func checkFile(ctx context.Context, tr transport.Transport, expectedType string, path string) error {
+func checkFile(ctx context.Context, tr transport.Transport, expectedType storage.LocalVolumeType, path string) error {
 	var stat transport.StatResult
 	var err error
 

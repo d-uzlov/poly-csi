@@ -9,7 +9,7 @@ import (
 
 func (s *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
 	return &shares.PublishContext{
-		Context: protocols.AoeShare{
+		Protocol: protocols.AoeShare{
 			Shelf: new(int(s.Shelf)),
 			Slot:  new(int(s.Slot)),
 		},
