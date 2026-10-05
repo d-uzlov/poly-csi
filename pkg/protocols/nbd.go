@@ -1,6 +1,6 @@
 package protocols
 
-import ()
+const Nbd = Name("nbd")
 
 type NbdShare struct {
 	// public

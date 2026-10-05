@@ -1,5 +1,7 @@
 package protocols
 
+const Aoe = Name("aoe")
+
 type AoeShare struct {
 	// public
 	Shelf *int `map:"aoe.shelf,omitempty" json:"shelf,omitempty" validate:"required"`

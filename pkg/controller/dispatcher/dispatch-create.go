@@ -201,6 +201,10 @@ func (dc *dispatchCreate) initStorageHandles(findServer func(name string) (resul
 	strJCaps := dc.strJ.GetCapabilities()
 	shrCaps := dc.shr.GetCapabilities()
 
+	if shrCaps.ProtocolName == "" {
+		return fmt.Errorf("share did not set protocol name")
+	}
+
 	// storage-to-share checks
 	if strCaps.LocalPathType == "" && strCaps.OpaqueType == "" {
 		return fmt.Errorf("storage reported empty for both LocalPathType and OpaqueVolumeType")

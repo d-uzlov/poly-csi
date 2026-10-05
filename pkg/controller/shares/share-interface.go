@@ -34,6 +34,7 @@ type Share interface {
 }
 
 type Capabilities struct {
+	ProtocolName protocols.Name
 	// UnpublishAll indicates whether this ShareManager implements an optimized UnpublishAll method.
 	// When false, dispatcher will call Unpublish for each published node instead of attempting to use UnpublishAll.
 	UnpublishAll bool

@@ -4,18 +4,22 @@ import (
 	"fmt"
 )
 
+const Iscsi = Name("iscsi")
+
+type IscsiChap string
+
 const (
-	IscsiAuthNone = "none"
-	IscsiAuthChap = "chap-mutual"
+	IscsiAuthNone = IscsiChap("none")
+	IscsiAuthChap = IscsiChap("chap-mutual")
 )
 
 type IscsiShare struct {
 	// public
-	Initiator string `map:"iscsi.initiator,omitempty"    json:"initiator,omitempty" validate:"required"`
-	Iqn       string `map:"iscsi.nqn,omitempty"          json:"iqn,omitempty"       validate:"required"`
-	Port      int    `map:"iscsi.port,omitempty"         json:"port,omitempty"      validate:"required,port"`
-	Transport string `map:"iscsi.transport,omitempty"    json:"transport,omitempty" validate:"required"`
-	AuthType  string `map:"iscsi.authType,omitempty"     json:"authType,omitempty"  validate:"required,oneof=none chap-mutual"`
+	Initiator string    `map:"iscsi.initiator,omitempty"    json:"initiator,omitempty" validate:"required"`
+	Iqn       string    `map:"iscsi.nqn,omitempty"          json:"iqn,omitempty"       validate:"required"`
+	Port      int       `map:"iscsi.port,omitempty"         json:"port,omitempty"      validate:"required,port"`
+	Transport string    `map:"iscsi.transport,omitempty"    json:"transport,omitempty" validate:"required"`
+	AuthType  IscsiChap `map:"iscsi.authType,omitempty"     json:"authType,omitempty"  validate:"required,oneof=none chap-mutual"`
 
 	// secret
 	ClientUser string `secret:"+" map:"iscsi.clientUser,omitempty" json:"clientUser,omitempty" validate:"required_if=AuthType chap-mutual"`

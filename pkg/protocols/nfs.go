@@ -1,6 +1,6 @@
 package protocols
 
-import ()
+const Nfs = Name("nfs")
 
 type NfsShare struct {
 	// public

@@ -4,14 +4,18 @@ import (
 	"fmt"
 )
 
+const Nvme = Name("nvme")
+
+type NvmeChap string
+
 type NvmeShare struct {
 	// public
-	TargetNqn     string `map:"nvme.targetNqn,omitempty"     json:"targetNqn,omitempty"     validate:"required"`
-	HostNqn       string `map:"nvme.hostNqn,omitempty"       json:"hostNqn,omitempty"       validate:"required"`
-	HostId        string `map:"nvme.hostId,omitempty"        json:"hostId,omitempty"        validate:"required"`
-	AuthType      string `map:"nvme.authType,omitempty"      json:"authType,omitempty"      validate:"required,oneof=nqn dhchap-mutual"`
-	ConnectPort   int    `map:"nvme.connectPort,omitempty"   json:"connectPort,omitempty"   validate:"required,port"`
-	TransportType string `map:"nvme.transportType,omitempty" json:"transportType,omitempty" validate:"required"`
+	TargetNqn     string   `map:"nvme.targetNqn,omitempty"     json:"targetNqn,omitempty"     validate:"required"`
+	HostNqn       string   `map:"nvme.hostNqn,omitempty"       json:"hostNqn,omitempty"       validate:"required"`
+	HostId        string   `map:"nvme.hostId,omitempty"        json:"hostId,omitempty"        validate:"required"`
+	AuthType      NvmeChap `map:"nvme.authType,omitempty"      json:"authType,omitempty"      validate:"required,oneof=nqn dhchap-mutual"`
+	ConnectPort   int      `map:"nvme.connectPort,omitempty"   json:"connectPort,omitempty"   validate:"required,port"`
+	TransportType string   `map:"nvme.transportType,omitempty" json:"transportType,omitempty" validate:"required"`
 
 	// secret
 	HostKey       string `secret:"+" map:"nvme.hostKey,omitempty"       json:"hostKey,omitempty"       validate:"required_if=AuthType dhchap-mutual"`
@@ -19,8 +23,8 @@ type NvmeShare struct {
 }
 
 const (
-	NvmeAuthNqn    = "nqn"
-	NvmeAuthDhChap = "dhchap-mutual"
+	NvmeAuthNqn    = NvmeChap("nqn")
+	NvmeAuthDhChap = NvmeChap("dhchap-mutual")
 )
 
 func (v NvmeShare) Validate() error {

@@ -1,8 +1,8 @@
 package protocols
 
-import ()
+const Smb = Name("smb")
 
-type CifsShare struct {
+type SmbShare struct {
 	// public
 	ShareName string `map:"cifs.shareName,omitempty" json:"shareName,omitempty" validate:"required"`
 	UserName  string `map:"cifs.userName,omitempty"  json:"userName,omitempty"  validate:"required"`
@@ -11,6 +11,6 @@ type CifsShare struct {
 	UserPassword string `secret:"+" map:"userPassword,omitempty" json:"userPassword,omitempty" validate:"required"`
 }
 
-func (v CifsShare) Validate() error {
+func (v SmbShare) Validate() error {
 	return nil
 }

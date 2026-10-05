@@ -5,6 +5,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/storage"
+	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -26,6 +27,7 @@ func New(tr transport.Transport, globalParams map[string]string) (shares.ShareMa
 
 func (sh *manager) GetCapabilities() shares.Capabilities {
 	return shares.Capabilities{
+		ProtocolName: protocols.Iscsi,
 		UnpublishAll: false,
 		LocalVolume:  storage.VolDevice,
 		OpaqueVolume: "zfs-zvol",

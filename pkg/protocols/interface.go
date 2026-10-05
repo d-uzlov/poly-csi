@@ -16,6 +16,8 @@ type Config interface {
 	Validate() error
 }
 
+type Name string
+
 func Parse[T Config](public map[string]string, secret []byte) (T, error) {
 	var result T
 	err := serialmaps.Parse(public, "", &result)

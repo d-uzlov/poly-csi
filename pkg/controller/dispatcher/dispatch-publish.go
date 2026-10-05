@@ -116,7 +116,9 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("validate share protocol data: %w", err)
 	}
 
-	publishContext := map[string]string{}
+	publishContext := map[string]string{
+		"protocol": string(shrInstance.GetCapabilities().ProtocolName),
+	}
 	err = InjectAddressOptions(addressOptions, publishContext)
 	if err != nil {
 		return nil, fmt.Errorf("inject address options: %w", err)
