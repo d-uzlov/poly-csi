@@ -25,7 +25,7 @@ spec:
       hostNetwork: true
       # hostPID can be required on older kernels due to ublk bug
       #     https://lkml.rescloud.iu.edu/hypermail/linux/kernel/2601.1/06849.html
-      hostPID: true
+      # hostPID: true
       # hostUsers: false
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
@@ -191,7 +191,7 @@ spec:
       - name: host-var-lib-kubelet-csi
         hostPath:
           path: /var/lib/kubelet/plugins/kubernetes.io/csi/io.meoe.poly-csi/
-          type: Directory
+          type: DirectoryOrCreate
       - name: host-var-lib-kubelet-pods
         hostPath:
           path: /var/lib/kubelet/pods/
@@ -199,14 +199,6 @@ spec:
       - name: host-dev
         hostPath:
           path: /dev
-          type: Directory
-      - name: host-sys
-        hostPath:
-          path: /sys
-          type: Directory
-      - name: host-proc
-        hostPath:
-          path: /proc
           type: Directory
       - name: poly-csi-plugins
         hostPath:
