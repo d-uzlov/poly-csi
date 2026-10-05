@@ -112,6 +112,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	err = validate.Struct(pc.Context)
 	if err != nil {
+		err = protocols.FormatValidationError(err)
 		return nil, fmt.Errorf("validate share protocol data: %w", err)
 	}
 

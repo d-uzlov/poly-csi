@@ -2,8 +2,10 @@ package protocols
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	
+	"strings"
+
 	"github.com/go-playground/validator/v10"
 
 	"meoe.io/poly-csi/pkg/utils/secrets"
@@ -32,6 +34,7 @@ func Parse[T Config](public map[string]string, secret []byte) (T, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	err = validate.Struct(result)
 	if err != nil {
+		err = FormatValidationError(err)
 		return result, err
 	}
 
@@ -54,4 +57,32 @@ func SplitSecret[T Config](conf T) (public T, secret T, err error) {
 		return zero, zero, err
 	}
 	return
+}
+
+func FormatValidationError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var validationErrors validator.ValidationErrors
+	ok := errors.As(err, &validationErrors)
+	if !ok {
+		return err
+	}
+
+	var errList []string
+
+	for _, e := range validationErrors {
+		if e.Param() != "" {
+			errList = append(errList, fmt.Sprintf("field '%s=%v' failed rule '%s=%s'", e.Field(), e.Value(), e.Tag(), e.Param()))
+		} else {
+			errList = append(errList, fmt.Sprintf("field '%s=%v' failed rule '%s'", e.Field(), e.Value(), e.Tag()))
+		}
+	}
+
+	if len(errList) == 0 {
+		panic("error is not not but list of errors is empty")
+	}
+
+	return errors.New(strings.Join(errList, ", "))
 }
