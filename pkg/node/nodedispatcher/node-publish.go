@@ -53,6 +53,15 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 			if nvi.FsMountPath == "" {
 				return nil, fmt.Errorf("node volume info: FsMountPath is empty")
 			}
+			if mountParams.VolumeMountGroup != "" {
+				if nvi.VolumeGroup != "" && nvi.VolumeGroup != mountParams.VolumeMountGroup {
+					return nil, fmt.Errorf("requested to mount as group '%s' but this volume is already attached with group '%s'", mountParams.VolumeMountGroup, nvi.VolumeGroup)
+				}
+				err = tr.Cmds().Chown(ctx, nvi.FsMountPath, "root", mountParams.VolumeMountGroup, false)
+				if err != nil {
+					return nil, fmt.Errorf("chown fs root: %w", err)
+				}
+			}
 			fsnip := fsutils.New(tr)
 			var bindOpts []fsutils.BindMountOption
 			// if nvi.ManagedOps.AllowIdMap {

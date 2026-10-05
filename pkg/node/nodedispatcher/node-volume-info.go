@@ -24,20 +24,21 @@ const (
 
 type NodeVolumeInfo struct {
 	// ConnectorId holds id of the connector, so that deserialization can create an instance.
-	ConnectorId string `json:"connector_id"`
+	ConnectorId string `json:"connectorId"`
 	// MountType tells if connector provides block device or filesystem
-	MountType string `json:"mount_type"`
+	MountType string `json:"mountType"`
 	// FsRootDirMode sets access more for mount root dir
-	FsRootDirMode string `json:"fs_root_dir_mode"`
+	FsRootDirMode string `json:"fsRootDirMode"`
 	// FsMountPath points to the root folder of the mount
-	FsMountPath          string            `json:"folder_path"`
-	JournalVolume        string            `json:"journal_volume"`
-	MultipathData        string            `json:"multipath_data"`
-	MultipathJournalData string            `json:"multipath_journal_data"`
-	ConnectorData        string            `json:"connector_data"`
-	FsType               string            `json:"fs_type"`
-	FsData               string            `json:"fs_data"`
+	FsMountPath          string            `json:"fsMountPath"`
+	JournalVolume        string            `json:"journalVolume"`
+	MultipathData        string            `json:"multipathData"`
+	MultipathJournalData string            `json:"multipathJournalData"`
+	ConnectorData        string            `json:"connectorData"`
+	FsType               string            `json:"fsType"`
+	FsData               string            `json:"fsData"`
 	Preset               map[string]string `json:"preset"`
+	VolumeGroup          string            `json:"volumeGroup"`
 
 	tr           transport.Transport         `json:"-"`
 	connector    connectors.Manager          `json:"-"`

@@ -666,7 +666,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		PresetName:    dc.p.NodePreset,
 		FsGroupMethod: dc.p.FsGroupPolicy,
 		// TODO customize
-		FsRootDirMode: "777",
+		FsRootDirMode: "2777",
 	}
 
 	switch dc.p.JournalVolume {
