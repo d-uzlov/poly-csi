@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -55,17 +55,16 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 
 	snip := nvmet.NewSnippets(ctx, sh.tr, true)
 
-	nvmeInfo, err := cntrnvme.ParseNvmeInfo(req.ConInfo)
-	if err != nil {
-		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
-	}
-	err = snip.ConfigureHost(nvmet.Host{
-		Nqn: nvmeInfo.HostNqn,
+	hostNqn := sh.Nqn + ":" + req.NodeName
+	hostId := uuid.NewSHA1(uuid.Max, []byte(hostNqn)).String()
+
+	err := snip.ConfigureHost(nvmet.Host{
+		Nqn: hostNqn,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("configure host: %w", err)
 	}
-	err = snip.AllowHost(sh.Nqn, nvmeInfo.HostNqn)
+	err = snip.AllowHost(sh.Nqn, hostNqn)
 	if err != nil {
 		return nil, fmt.Errorf("allow host: %w", err)
 	}
@@ -77,8 +76,8 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 
 	pc := protocols.NvmeShare{
 		TargetNqn:     sh.Nqn,
-		HostNqn:       nvmeInfo.HostNqn,
-		HostId:        nvmeInfo.HostId,
+		HostNqn:       hostNqn,
+		HostId:        hostId,
 		AuthType:      protocols.NvmeAuthNqn,
 		ConnectPort:   sh.Port,
 		TransportType: sh.Transport,
@@ -87,7 +86,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 	return &shares.PublishContext{
 		Protocol: pc,
 		LocalData: &publishData{
-			HostNqn: nvmeInfo.HostNqn,
+			HostNqn: hostNqn,
 		},
 	}, nil
 }

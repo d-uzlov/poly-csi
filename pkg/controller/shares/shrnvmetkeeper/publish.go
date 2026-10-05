@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
 	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
@@ -52,15 +51,8 @@ func parsePublishData(serialized string) (publishData, error) {
 }
 
 func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*shares.PublishContext, error) {
-	nvmeInfo, err := cntrnvme.ParseNvmeInfo(req.ConInfo)
-	if err != nil {
-		return nil, fmt.Errorf("parse connector info as nvme: %w", err)
-	}
-
-	// todo this will create ephemeral one-use hosts on every publish
-	// we need to try to limit this and run cleanup when possible
-	hostId := uuid.NewString()
-	hostNqn := nvmeInfo.HostNqn + ":" + hostId
+	hostNqn := sh.Nqn + ":" + req.NodeName
+	hostId := uuid.NewSHA1(uuid.Max, []byte(hostNqn)).String()
 
 	pc := protocols.NvmeShare{
 		TargetNqn:     sh.Nqn,
@@ -80,7 +72,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 			Nqn:      hostNqn,
 			NeedAuth: false,
 		}.Json())
-		err = transport.CheckedRun(ctx, sh.tr, cmd)
+		err := transport.CheckedRun(ctx, sh.tr, cmd)
 		if err != nil {
 			return nil, fmt.Errorf("host create: %w", err)
 		}
@@ -96,7 +88,7 @@ func (sh *share) Publish(ctx context.Context, req shares.PublishRequest) (*share
 	}
 
 	cmd := append(nvmetKeeperCmd, "subsys", "allow", sh.Nqn, hostNqn)
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
+	err := transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("subsys allow: %w", err)
 	}

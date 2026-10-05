@@ -49,6 +49,10 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 	}, nil
 }
 
+func (c *connector) GetInfo(ctx context.Context) (*connectors.ConnectorNodeInfo, error) {
+	return &connectors.ConnectorNodeInfo{}, nil
+}
+
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
 	pc, err := protocols.Parse[protocols.NvmeShare](req.PublishContext, req.PublishSecret)
 	if err != nil {

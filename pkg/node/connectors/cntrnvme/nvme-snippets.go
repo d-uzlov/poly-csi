@@ -32,21 +32,6 @@ type nvmeNodeInfo struct {
 	hostId  string
 }
 
-func nvmeGetNodeInfo(ctx context.Context, tr transport.Transport) (*nvmeNodeInfo, error) {
-	hostNqn, err := tr.Cmds().Read(ctx, "/etc/nvme/hostnqn", true)
-	if err != nil {
-		return nil, fmt.Errorf("read /etc/nvme/hostnqn: %w", err)
-	}
-	hostId, err := tr.Cmds().Read(ctx, "/etc/nvme/hostid", true)
-	if err != nil {
-		return nil, fmt.Errorf("read /etc/nvme/hostid: %w", err)
-	}
-	return &nvmeNodeInfo{
-		hostNqn: string(hostNqn),
-		hostId:  string(hostId),
-	}, nil
-}
-
 func initKernelMessageParser(prefix string) (getMessages func() []string, err error) {
 	kMsgReader, err := kmsgparser.NewParser()
 	if err != nil {
