@@ -18,6 +18,8 @@ type Config interface {
 
 type Name string
 
+type NodeInfo Config
+
 func Parse[T Config](public map[string]string, secret []byte) (T, error) {
 	var result T
 	err := serialmaps.Parse(public, "", &result)
@@ -83,7 +85,7 @@ func FormatValidationError(err error) error {
 	}
 
 	if len(errList) == 0 {
-		panic("error is not not but list of errors is empty")
+		panic("error is not nil but list of errors is empty")
 	}
 
 	return errors.New(strings.Join(errList, ", "))

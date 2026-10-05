@@ -10,6 +10,8 @@ type NbdShare struct {
 	// secret
 }
 
+var _ Config = NbdShare{}
+
 func (v NbdShare) Validate() error {
 	return nil
 }

@@ -22,6 +22,8 @@ type NvmeShare struct {
 	ControllerKey string `secret:"+" map:"nvme.controllerKey,omitempty" json:"controllerKey,omitempty" validate:"required_if=AuthType dhchap-mutual"`
 }
 
+var _ Config = NvmeShare{}
+
 const (
 	NvmeAuthNqn    = NvmeChap("nqn")
 	NvmeAuthDhChap = NvmeChap("dhchap-mutual")

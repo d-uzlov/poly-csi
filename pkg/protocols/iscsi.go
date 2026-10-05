@@ -28,6 +28,8 @@ type IscsiShare struct {
 	TargetPass string `secret:"+" map:"iscsi.targetPass,omitempty" json:"targetPass,omitempty" validate:"required_if=AuthType chap-mutual"`
 }
 
+var _ Config = IscsiShare{}
+
 func (v IscsiShare) Validate() error {
 	switch v.AuthType {
 	case "":
@@ -55,4 +57,10 @@ func (v IscsiShare) Validate() error {
 
 type IscsiNodeInfo struct {
 	InitiatorIqn string `map:"initiatorIqn"`
+}
+
+var _ NodeInfo = IscsiNodeInfo{}
+
+func (i IscsiNodeInfo) Validate() error {
+	return nil
 }

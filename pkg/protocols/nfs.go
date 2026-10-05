@@ -9,6 +9,8 @@ type NfsShare struct {
 	// secret
 }
 
+var _ Config = NfsShare{}
+
 func (v NfsShare) Validate() error {
 	return nil
 }

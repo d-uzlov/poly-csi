@@ -10,6 +10,8 @@ type AoeShare struct {
 	// secret
 }
 
+var _ Config = AoeShare{}
+
 func (v AoeShare) Validate() error {
 	return nil
 }

@@ -11,6 +11,8 @@ type SmbShare struct {
 	UserPassword string `secret:"+" map:"userPassword,omitempty" json:"userPassword,omitempty" validate:"required"`
 }
 
+var _ Config = SmbShare{}
+
 func (v SmbShare) Validate() error {
 	return nil
 }
