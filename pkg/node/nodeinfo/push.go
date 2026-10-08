@@ -4,14 +4,13 @@ import (
 	"context"
 	"time"
 
+	"meoe.io/poly-csi/pkg/api/node_registry"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
-	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
+	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
 )
 
-func PeriodicInfoPush(ctx context.Context, logConfig logs.Config, address string, interval time.Duration, getInfo func(ctx context.Context) (regnodeinfo.RegNodeInfo, error), doneCallback func()) {
+func PeriodicInfoPush(ctx context.Context, logConfig logs.Config, client noderegclient.Client, interval time.Duration, getInfo func(ctx context.Context) (*NodeInfo, error), doneCallback func()) {
 	defer doneCallback()
-	reg := nodremotereg.NewNodeRemoteRegistry(address)
 
 	startLogger := logConfig.MakeInstance()
 
@@ -20,7 +19,7 @@ func PeriodicInfoPush(ctx context.Context, logConfig logs.Config, address string
 
 	startLogger.MicroOp("starting node info push")
 	for ctx.Err() == nil {
-		pushInfo(ctx, logConfig, reg, getInfo)
+		pushInfo(ctx, logConfig, client, getInfo)
 
 		select {
 		case <-ctx.Done():
@@ -30,7 +29,7 @@ func PeriodicInfoPush(ctx context.Context, logConfig logs.Config, address string
 	startLogger.MicroOp("stopped node info push")
 }
 
-func pushInfo(ctx context.Context, logConfig logs.Config, reg nodremotereg.NodeRemoteRegistry, getInfo func(ctx context.Context) (regnodeinfo.RegNodeInfo, error)) {
+func pushInfo(ctx context.Context, logConfig logs.Config, reg noderegclient.Client, getInfo func(ctx context.Context) (*NodeInfo, error)) {
 	logger := logConfig.MakeInstance()
 	ctx = logs.NewCtx(ctx, logger)
 
@@ -41,7 +40,17 @@ func pushInfo(ctx context.Context, logConfig logs.Config, reg nodremotereg.NodeR
 		return
 	}
 
-	err = reg.Set(nodeInfo)
+	serialized, err := nodeInfo.Serialize()
+	if err != nil {
+		logger.Error("failed to serialize node info", "error", err.Error())
+		logger.Commit(false)
+		return
+	}
+
+	err = reg.Register(ctx, node_registry.RegisterRequest{
+		ID:   nodeInfo.Id,
+		Info: serialized,
+	})
 	if err != nil {
 		logger.Error("failed to push node info to registry", "error", err.Error())
 		logger.Commit(false)

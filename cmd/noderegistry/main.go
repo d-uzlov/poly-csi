@@ -41,8 +41,10 @@ func main() {
 
 	doneCh := make(chan struct{})
 
-	reg := noderegsrv.NewNodeRegistry(logger)
-	reg.StartNodeRegistry(ctx, time.Second, func(err error) {
+	srv := noderegsrv.Server{
+		Reg: noderegsrv.NewNodeRegistry(logger),
+	}
+	srv.Start(ctx, time.Second, func(err error) {
 		if err != nil {
 			logger.Error("error on shutdown", "error", err.Error())
 		}

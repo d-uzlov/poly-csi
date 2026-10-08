@@ -13,7 +13,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
-	"meoe.io/poly-csi/pkg/noderegistry/nodremotereg"
+	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
 	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -51,16 +51,13 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		}
 	}
 
-	nodeReg := nodremotereg.NewNodeRemoteRegistry(d.conf.NodeInfoDb.Address)
-	rawNodeInfo, err := nodeReg.Get(req.NodeId)
+	nodeReg := noderegclient.New(d.conf.NodeInfoDb.Address)
+	rawNodeInfo, err := nodeReg.Get(ctx, req.NodeId)
 	if err != nil {
 		return nil, fmt.Errorf("node_info: failed to get: %w", err)
 	}
-	if rawNodeInfo == nil {
-		return nil, fmt.Errorf("node_info: node id not found")
-	}
 
-	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo.Data)
+	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo)
 	if err != nil {
 		return nil, fmt.Errorf("node_info: parse: %w", err)
 	}

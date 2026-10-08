@@ -3,8 +3,8 @@ package nodeinfo
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	"meoe.io/poly-csi/pkg/api/node_registry"
 	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
@@ -33,53 +33,52 @@ func (ni *NodeInfo) Validate() error {
 	return nil
 }
 
-func (ni *NodeInfo) Serialize() (map[string]string, error) {
-	result := map[string]string{
-		"id":              ni.Id,
-		"node_public_key": string(ni.PublicKey.SerializePem()),
-		"has_multipath":   "0",
-		"ips":             strings.Join(ni.Ips, ","),
-		"presets":         strings.Join(ni.Presets, ","),
+func (ni *NodeInfo) Serialize() (node_registry.NodeInfo, error) {
+	result := node_registry.NodeInfo{
+		IPS:        ni.Ips,
+		Presets:    ni.Presets,
+		PublicKey:  string(ni.PublicKey.SerializePem()),
+		Connectors: map[string]node_registry.ConnectorInfo{},
 	}
-	connectorsSerialized, err := json.Marshal(ni.Connectors)
-	if err != nil {
-		return nil, err
+	for k, v := range ni.Connectors {
+		data, err := json.Marshal(v.Info)
+		if err != nil {
+			return result, fmt.Errorf("connector '%s': marshal protocol '%s' info %v: %w", k, v.Protocol, v.Info, err)
+		}
+		result.Connectors[k] = node_registry.ConnectorInfo{
+			Protocol: string(v.Protocol),
+			Data:     string(data),
+		}
 	}
-	result["connectors"] = string(connectorsSerialized)
 
 	return result, nil
 }
 
-func ParseNodeInfo(src map[string]string) (*NodeInfo, error) {
+func ParseNodeInfo(src node_registry.NodeInfo) (*NodeInfo, error) {
 	result := NodeInfo{
+		Ips:        src.IPS,
+		Presets:    src.Presets,
 		Connectors: map[string]ConnectorInfo{},
 	}
-	for k, v := range src {
-		switch k {
-		case "id":
-			result.Id = v
-			continue
-		case "node_public_key":
-			pk, err := encrypt.ParsePublicRsaPem([]byte(v))
-			if err != nil {
-				return nil, fmt.Errorf("parse node public key: %w", err)
-			}
-			if pk == nil {
-				return nil, fmt.Errorf("parse node public key: nil")
-			}
-			result.PublicKey = *pk
-			continue
-		case "ips":
-			result.Ips = strings.Split(v, ",")
-		case "presets":
-			result.Presets = strings.Split(v, ",")
-		case "connectors":
-			err := json.Unmarshal([]byte(v), &result.Connectors)
-			if err != nil {
-				return nil, err
-			}
-		}
-		// TODO add logs for ignored fields?
+	pk, err := encrypt.ParsePublicRsaPem([]byte(src.PublicKey))
+	if err != nil {
+		return nil, fmt.Errorf("public key: %w", err)
 	}
+	if pk == nil {
+		return nil, fmt.Errorf("node public key: nil")
+	}
+	result.PublicKey = *pk
+
+	for k, v := range src.Connectors {
+		ci := ConnectorInfo{
+			Protocol: protocols.Name(v.Protocol),
+		}
+		err := protocols.ParseNodeInfo(protocols.Name(v.Protocol), v.Data, &ci.Info)
+		if err != nil {
+			return nil, fmt.Errorf("parse connector '%s' protocol '%s' info: %w", k, v.Protocol, err)
+		}
+		result.Connectors[k] = ci
+	}
+
 	return &result, nil
 }

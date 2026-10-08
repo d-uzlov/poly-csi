@@ -115,6 +115,7 @@ func ParseNodeInfo(name Name, data string, out *NodeInfo) error {
 		if data != "" {
 			return fmt.Errorf("trying to parse node info for a protocol that does not feature node info")
 		}
+		return nil
 	}
 
 	err := json.Unmarshal([]byte(data), &sample.Info)

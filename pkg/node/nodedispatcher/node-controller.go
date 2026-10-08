@@ -10,7 +10,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
-	"meoe.io/poly-csi/pkg/noderegistry/regnodeinfo"
+	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
 )
 
 func New(logger *slog.Logger, name string, version string, nodeId string) (*Node, error) {
@@ -53,9 +53,11 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 		presetNames = append(presetNames, k)
 	}
 
+	registryClient := noderegclient.New(newConf.NodeInfoDb.Address)
+
 	slogctx.FromCtx(ctx).Debug("starting node info push", "presets", presetNames)
-	go nodeinfo.PeriodicInfoPush(pushCtx, newConf.GetNodeInfoLogConfig(), newConf.NodeInfoDb.Address, newConf.NodeInfoDb.Interval,
-		func(ctx context.Context) (regnodeinfo.RegNodeInfo, error) {
+	go nodeinfo.PeriodicInfoPush(pushCtx, newConf.GetNodeInfoLogConfig(), registryClient, newConf.NodeInfoDb.Interval,
+		func(ctx context.Context) (*nodeinfo.NodeInfo, error) {
 			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, newConf.Connectors, newConf.Networks, presetNames)
 		}, func() {
 			close(pushCh)
