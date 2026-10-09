@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/controller/storage"
-	"meoe.io/poly-csi/pkg/controller/volumecontext"
 )
 
 const mainVolumeModule = "volume.json"

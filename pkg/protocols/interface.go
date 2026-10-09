@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"meoe.io/poly-csi/pkg/controller/volumecontext"
+	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/utils/secrets"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )

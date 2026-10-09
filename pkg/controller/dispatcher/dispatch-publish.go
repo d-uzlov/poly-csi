@@ -9,9 +9,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-playground/validator/v10"
+	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
-	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"

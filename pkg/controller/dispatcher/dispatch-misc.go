@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
-	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )

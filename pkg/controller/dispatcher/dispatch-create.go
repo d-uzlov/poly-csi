@@ -10,13 +10,13 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 
+	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/storagefactory"
 	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
-	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 	"meoe.io/poly-csi/pkg/utils/volumeinit"
@@ -132,14 +132,14 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 	dc.journalMutableParams = map[string]string{}
 
 	for k, v := range dc.rawStaticParams {
-		kk, ok := strings.CutPrefix(k, paramsJournalPrefix + ".")
+		kk, ok := strings.CutPrefix(k, paramsJournalPrefix+".")
 		if ok {
 			dc.journalStaticParams[kk] = v
 		}
 	}
 
 	for k, v := range dc.rawMutableParams {
-		kk, ok := strings.CutPrefix(k, paramsJournalPrefix + ".")
+		kk, ok := strings.CutPrefix(k, paramsJournalPrefix+".")
 		if ok {
 			dc.journalMutableParams[kk] = v
 		}
