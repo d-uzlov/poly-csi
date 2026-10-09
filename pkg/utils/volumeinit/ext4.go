@@ -23,7 +23,7 @@ type Ext4 struct {
 	journalDevice string `map:"-" json:"-"`
 }
 
-const ext4Prefix = "ext4."
+const ext4Prefix = "ext4"
 
 func NewExt4() FilesystemHelper {
 	return &Ext4{}

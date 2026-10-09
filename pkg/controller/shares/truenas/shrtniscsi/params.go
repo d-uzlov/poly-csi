@@ -15,7 +15,7 @@ type params struct {
 	authType         string
 }
 
-const paramsPrefix = "lio."
+const paramsPrefix = "lio"
 
 const (
 	keyIqnBase          = "iqnBase"

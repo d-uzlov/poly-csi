@@ -25,7 +25,7 @@ type Xfs struct {
 	journalDevice string `map:"-" json:"-"`
 }
 
-const xfsPrefix = "xfs."
+const xfsPrefix = "xfs"
 
 func NewXfs() FilesystemHelper {
 	return &Xfs{}

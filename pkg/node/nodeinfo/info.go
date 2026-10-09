@@ -54,8 +54,9 @@ func (ni *NodeInfo) Serialize() (node_registry.NodeInfo, error) {
 	return result, nil
 }
 
-func ParseNodeInfo(src node_registry.NodeInfo) (*NodeInfo, error) {
+func ParseNodeInfo(id string, src node_registry.NodeInfo) (*NodeInfo, error) {
 	result := NodeInfo{
+		Id:         id,
 		Ips:        src.IPS,
 		Presets:    src.Presets,
 		Connectors: map[string]ConnectorInfo{},

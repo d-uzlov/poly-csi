@@ -11,6 +11,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
+	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
@@ -57,7 +58,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: failed to get: %w", err)
 	}
 
-	ni, err := nodeinfo.ParseNodeInfo(rawNodeInfo)
+	ni, err := nodeinfo.ParseNodeInfo(req.NodeId, rawNodeInfo)
 	if err != nil {
 		return nil, fmt.Errorf("node_info: parse: %w", err)
 	}
@@ -114,7 +115,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 	}
 
 	publishContext := map[string]string{
-		"protocol": string(shrInstance.GetCapabilities().ProtocolName),
+		volumecontext.ProtocolKey: string(shrInstance.GetCapabilities().ProtocolName),
 	}
 	err = InjectAddressOptions(addressOptions, publishContext)
 	if err != nil {
@@ -126,7 +127,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("split protocol info: %w", err)
 	}
 
-	_, err = serialmaps.SerializeInto(public, publishContext, "")
+	_, err = serialmaps.SerializeInto(public, publishContext, volumecontext.ProtocolPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("inject public data: %w", err)
 	}

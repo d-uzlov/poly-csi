@@ -47,7 +47,7 @@ func ParseCgroupIoLimits(preset map[string]string) (limit blockdevice.IoLimit, f
 		ReadIops:  "max",
 		WriteIops: "max",
 	}
-	const prefix = "cgroup_io_max."
+	const prefix = "cgroup_io_max"
 	for k, v := range preset {
 		type_, ok := strings.CutPrefix(k, prefix)
 		if !ok {

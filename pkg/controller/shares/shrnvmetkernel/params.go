@@ -47,7 +47,7 @@ type params struct {
 	ConnectPort   int    `map:"connectPort"`
 }
 
-const paramsPrefix = "nvmet."
+const paramsPrefix = "nvmet"
 
 const (
 	keyNqnBase = "nqnBase"

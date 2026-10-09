@@ -24,7 +24,7 @@ type globalParams struct {
 type params struct {
 }
 
-const paramsPrefix = "samba."
+const paramsPrefix = "samba"
 
 func parseGlobalParams(src map[string]string) (globalParams, error) {
 	result := globalParams{}

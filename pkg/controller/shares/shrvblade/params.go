@@ -25,7 +25,7 @@ type Params struct {
 	Interfaces string `map:"interfaces"`
 }
 
-const paramsPrefix = "vblade."
+const paramsPrefix = "vblade"
 
 func parseGlobalParams(src map[string]string) (globalParams, error) {
 	result := globalParams{}

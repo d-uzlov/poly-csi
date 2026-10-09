@@ -9,7 +9,7 @@ import (
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-const secretPrefix = "_secret."
+const secretPrefix = "_secret"
 const encTypeAesGcm = "aes_gcm"
 
 type SecretWrapper struct {

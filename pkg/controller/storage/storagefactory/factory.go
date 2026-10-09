@@ -2,6 +2,9 @@ package storagefactory
 
 import (
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 
 	"meoe.io/poly-csi/pkg/controller/storage"
 	"meoe.io/poly-csi/pkg/controller/storage/strbtrfs"
@@ -20,18 +23,22 @@ const (
 	VolumeManagerLvmThick   = "lvm-thick"
 )
 
+type InflateFunc func(tr transport.Transport, globalParams map[string]string) (storage.StorageManager, error)
+
+var types = map[string]InflateFunc{
+	VolumeManagerZfsDataset: strzfsdataset.New,
+	VolumeManagerZfsZvol:    strzfszvol.New,
+	VolumeManagerFolder:     strfolder.New,
+	VolumeManagerBtrfs:      strbtrfs.New,
+	VolumeManagerLvmThick:   strlvm.New,
+}
+
 func StorageFromType(tr transport.Transport, vmType string, globalParams map[string]string) (storage.StorageManager, error) {
-	switch vmType {
-	case VolumeManagerZfsDataset:
-		return strzfsdataset.New(tr, globalParams)
-	case VolumeManagerZfsZvol:
-		return strzfszvol.New(tr, globalParams)
-	case VolumeManagerFolder:
-		return strfolder.New(tr, globalParams), nil
-	case VolumeManagerBtrfs:
-		return strbtrfs.New(tr, globalParams)
-	case VolumeManagerLvmThick:
-		return strlvm.New(tr, globalParams)
+	v, ok := types[vmType]
+	if !ok {
+		keys := slices.Collect(maps.Keys(types))
+		slices.Sort(keys)
+		return nil, fmt.Errorf("unknown storage type: '%s', must be one of: %s", vmType, strings.Join(keys, ", "))
 	}
-	return nil, fmt.Errorf("unknown storage type: %s", vmType)
+	return v(tr, globalParams)
 }

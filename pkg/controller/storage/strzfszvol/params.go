@@ -12,7 +12,7 @@ type params struct {
 	ReservationPercent string `map:"reservedPercent"`
 }
 
-const paramsPrefix = "zfs."
+const paramsPrefix = "zfs"
 
 func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
 

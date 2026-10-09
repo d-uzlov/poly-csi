@@ -132,14 +132,14 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 	dc.journalMutableParams = map[string]string{}
 
 	for k, v := range dc.rawStaticParams {
-		kk, ok := strings.CutPrefix(k, paramsJournalPrefix)
+		kk, ok := strings.CutPrefix(k, paramsJournalPrefix + ".")
 		if ok {
 			dc.journalStaticParams[kk] = v
 		}
 	}
 
 	for k, v := range dc.rawMutableParams {
-		kk, ok := strings.CutPrefix(k, paramsJournalPrefix)
+		kk, ok := strings.CutPrefix(k, paramsJournalPrefix + ".")
 		if ok {
 			dc.journalMutableParams[kk] = v
 		}

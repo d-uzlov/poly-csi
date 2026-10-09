@@ -35,7 +35,7 @@ const (
 
 type InflateFunc func(tr transport.Transport, globalParams map[string]string) (shares.ShareManager, error)
 
-var shareTypes = map[string]InflateFunc{
+var types = map[string]InflateFunc{
 	shareNvmetKernel: shrnvmetkernel.New,
 	shareNvmetKeeper: shrnvmetkeeper.New,
 	shareZfsSharenfs: shrzfssharenfs.New,
@@ -49,9 +49,11 @@ var shareTypes = map[string]InflateFunc{
 }
 
 func ShareFromType(tr transport.Transport, vmType string, globalParams map[string]string) (shares.ShareManager, error) {
-	v, ok := shareTypes[vmType]
+	v, ok := types[vmType]
 	if !ok {
-		return nil, fmt.Errorf("unknown share type: '%s', must be one of: %v", vmType, strings.Join(slices.Collect(maps.Keys(shareTypes)), ", "))
+		keys := slices.Collect(maps.Keys(types))
+		slices.Sort(keys)
+		return nil, fmt.Errorf("unknown share type: '%s', must be one of: %s", vmType, strings.Join(keys, ", "))
 	}
 	return v(tr, globalParams)
 }

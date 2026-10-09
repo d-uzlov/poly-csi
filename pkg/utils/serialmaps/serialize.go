@@ -41,13 +41,6 @@ func serializeDispatch(v reflect.Value, out map[string]string, prefix string, ta
 		v = v.Elem()
 	}
 
-	if tagValue == "-" {
-		return nil
-	}
-	if tagValue == "" {
-		return fmt.Errorf("missing '%s' tag", structMapTagName)
-	}
-
 	tagFields := strings.Split(tagValue, ",")
 	omitempty := slices.Contains(tagFields, "omitempty")
 
@@ -128,6 +121,12 @@ func serializeStruct(v reflect.Value, out map[string]string, prefix string) erro
 		}
 
 		tagValue := sf.Tag.Get(structMapTagName)
+		if tagValue == "" {
+			return fmt.Errorf("missing '%s' tag", structMapTagName)
+		}
+		if tagValue == "-" {
+			return nil
+		}
 
 		err := serializeDispatch(sv, out, prefix, tagValue)
 		if err != nil {

@@ -10,7 +10,7 @@ type params struct {
 	customOptions string
 }
 
-const paramsPrefix = "btrfs."
+const paramsPrefix = "btrfs"
 
 const (
 	keyParentPath    = "btrfs.parentPath"

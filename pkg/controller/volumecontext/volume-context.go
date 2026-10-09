@@ -39,3 +39,7 @@ func (v *VolumeContext) Validate() error {
 	}
 	return nil
 }
+
+// fields used in publish context
+const ProtocolKey = "protocol"
+const ProtocolPrefix = "proto"

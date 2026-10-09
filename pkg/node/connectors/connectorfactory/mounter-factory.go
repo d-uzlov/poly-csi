@@ -24,7 +24,7 @@ const (
 	TypePlugin   = "plugin_json"
 )
 
-var builtinTypes = map[string]connectors.InflateFunc{
+var types = map[string]connectors.InflateFunc{
 	TypeNfs:      cntrnfs.New,
 	TypeCifs:     cntrcifs.New,
 	TypeNvme:     cntrnvme.New,
@@ -37,9 +37,11 @@ var builtinTypes = map[string]connectors.InflateFunc{
 }
 
 func GetByType(mtype string) (connectors.InflateFunc, error) {
-	v, ok := builtinTypes[mtype]
+	v, ok := types[mtype]
 	if !ok {
-		return nil, fmt.Errorf("unknown connector type: '%s', must be one of: %v", mtype, strings.Join(slices.Collect(maps.Keys(builtinTypes)), ", "))
+		keys := slices.Collect(maps.Keys(types))
+		slices.Sort(keys)
+		return nil, fmt.Errorf("unknown connector type: '%s', must be one of: %s", mtype, strings.Join(keys, ", "))
 	}
 	return v, nil
 }

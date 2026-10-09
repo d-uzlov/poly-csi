@@ -32,7 +32,7 @@ type params struct {
 	AuthType   string `map:"authType"`
 }
 
-const paramsPrefix = "lio."
+const paramsPrefix = "lio"
 
 const (
 	keyIqnBase = "iqnBase"

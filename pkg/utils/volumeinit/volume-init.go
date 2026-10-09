@@ -6,7 +6,7 @@ import (
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-const PreferredPrefix = "init."
+const PreferredPrefix = "init"
 
 type FilesystemHelper interface {
 	Capabilities() Capabilities

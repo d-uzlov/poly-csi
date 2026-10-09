@@ -19,7 +19,7 @@ type params struct {
 	ConnectPort int `map:"connectPort"`
 }
 
-const paramsPrefix = "nbd."
+const paramsPrefix = "nbd"
 
 func parseGlobalParams(src map[string]string) (globalParams, error) {
 	result := globalParams{}

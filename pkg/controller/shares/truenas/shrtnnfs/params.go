@@ -12,7 +12,7 @@ type params struct {
 	shareOptions  string
 }
 
-const paramsPrefix = "nfs."
+const paramsPrefix = "nfs"
 
 const (
 	keyShareOptions  = "nfs.shareOptions"

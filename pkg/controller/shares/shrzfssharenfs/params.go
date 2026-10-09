@@ -11,7 +11,7 @@ type params struct {
 	ShareOptions string `map:"shareOptions"`
 }
 
-const paramsPrefix = "nfs."
+const paramsPrefix = "nfs"
 
 func parseParams(static map[string]string, mutable map[string]string) (params, error) {
 	result := params{}

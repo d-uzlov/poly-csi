@@ -41,13 +41,6 @@ func parseDispatch(src map[string]string, v reflect.Value, prefix string, tagVal
 		v = v.Elem()
 	}
 
-	if tagValue == "" {
-		return fmt.Errorf("missing '%s' tag", structMapTagName)
-	}
-	if tagValue == "-" {
-		return nil
-	}
-
 	tagFields := strings.Split(tagValue, ",")
 	key := tagFields[0]
 	mapKey := key
@@ -137,6 +130,13 @@ func parseStruct(src map[string]string, v reflect.Value, prefix string, remove b
 		}
 
 		tagValue := sf.Tag.Get(structMapTagName)
+		if tagValue == "" {
+			return fmt.Errorf("missing '%s' tag", structMapTagName)
+		}
+		if tagValue == "-" {
+			return nil
+		}
+
 		if err := parseDispatch(src, v.Field(i), prefix, tagValue, remove); err != nil {
 			return fmt.Errorf("field %s: %w", sf.Name, err)
 		}

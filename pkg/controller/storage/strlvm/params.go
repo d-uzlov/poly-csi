@@ -9,7 +9,7 @@ type params struct {
 	vgName string
 }
 
-const paramsPrefix = "lvm."
+const paramsPrefix = "lvm"
 
 const (
 	keyVgName = "lvm.vgName"

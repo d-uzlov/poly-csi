@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
+	"meoe.io/poly-csi/pkg/controller/volumecontext"
 	"meoe.io/poly-csi/pkg/utils/secrets"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
@@ -24,7 +25,7 @@ type NodeInfo Config
 
 func Parse[T Config](public map[string]string, secret []byte) (T, error) {
 	var result T
-	err := serialmaps.Parse(public, "", &result)
+	err := serialmaps.Parse(public, volumecontext.ProtocolPrefix, &result)
 	if err != nil {
 		return result, fmt.Errorf("public: %w", err)
 	}
@@ -104,16 +105,19 @@ var protocols = map[string]Sample{
 	string(Nbd):   {Share: NbdShare{}, Info: nil},
 	string(Nfs):   {Share: NfsShare{}, Info: nil},
 	string(Nvme):  {Share: NvmeShare{}, Info: nil},
+	string(Smb):   {Share: SmbShare{}, Info: nil},
 }
 
 func ParseNodeInfo(name Name, data string, out *NodeInfo) error {
 	sample, ok := protocols[string(name)]
 	if !ok {
-		return fmt.Errorf("unknown protocol name '%s', must be one of %v", name, strings.Join(slices.Collect(maps.Keys(protocols)), ", "))
+		keys := slices.Collect(maps.Keys(protocols))
+		slices.Sort(keys)
+		return fmt.Errorf("unknown protocol name '%s', must be one of %v", name, strings.Join(keys, ", "))
 	}
 	if sample.Info == nil {
-		if data != "" {
-			return fmt.Errorf("trying to parse node info for a protocol that does not feature node info")
+		if data != "" && data != "null" {
+			return fmt.Errorf("trying to parse node info for a protocol '%s' that does not feature node info: data='%s'", name, data)
 		}
 		return nil
 	}

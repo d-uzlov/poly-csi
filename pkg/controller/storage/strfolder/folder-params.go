@@ -9,7 +9,7 @@ type params struct {
 	parentFolder string
 }
 
-const paramsPrefix = "folder."
+const paramsPrefix = "folder"
 
 const (
 	keyParentFolder = "folder.parentFolder"

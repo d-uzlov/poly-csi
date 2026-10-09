@@ -12,10 +12,10 @@ type manager struct {
 	tr transport.Transport
 }
 
-func New(tr transport.Transport, globalParams map[string]string) storage.StorageManager {
+func New(tr transport.Transport, globalParams map[string]string) (storage.StorageManager, error) {
 	return &manager{
 		tr: tr,
-	}
+	}, nil
 }
 
 func (m *manager) GetCapabilities() storage.Capabilities {

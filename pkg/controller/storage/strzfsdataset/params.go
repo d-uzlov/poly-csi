@@ -10,7 +10,7 @@ type params struct {
 	customOptions string
 }
 
-const paramsPrefix = "zfs."
+const paramsPrefix = "zfs"
 
 const (
 	keyParentDataset = "zfs.parentDataset"

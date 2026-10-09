@@ -16,15 +16,17 @@ const (
 	TypeIscsi = "ublk_iscsi"
 )
 
-var builtinTypes = map[string]cntrublk.InflateFunc{
+var types = map[string]cntrublk.InflateFunc{
 	TypeNbd:   cntrublknbd.New,
 	TypeIscsi: cntrublkiscsi.New,
 }
 
 func GetByType(mtype string) (cntrublk.InflateFunc, error) {
-	v, ok := builtinTypes[mtype]
+	v, ok := types[mtype]
 	if !ok {
-		return nil, fmt.Errorf("unknown connector type: '%s', must be one of: %v", mtype, strings.Join(slices.Collect(maps.Keys(builtinTypes)), ", "))
+		keys := slices.Collect(maps.Keys(types))
+		slices.Sort(keys)
+		return nil, fmt.Errorf("unknown connector type: '%s', must be one of: %s", mtype, strings.Join(keys, ", "))
 	}
 	return v, nil
 }

@@ -18,7 +18,7 @@ type connector struct {
 	config       Config
 }
 
-const mapPrefix = "nvme."
+const mapPrefix = "nvme"
 
 type PresetData struct {
 	IoQueues              string `map:"ioQueues"`

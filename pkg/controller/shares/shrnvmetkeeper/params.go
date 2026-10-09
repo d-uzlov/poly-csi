@@ -22,7 +22,7 @@ type params struct {
 	// TODO add fallback to reading ListenPort from current nvmet state
 }
 
-const paramsPrefix = "nvmet."
+const paramsPrefix = "nvmet"
 
 const (
 	keyNqnBase = "nqnBase"

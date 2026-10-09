@@ -28,8 +28,8 @@ const (
 	FsFormatNodeNode   = "node"
 )
 
-const paramsPrefix = "dispatch."
-const paramsJournalPrefix = "journal."
+const paramsPrefix = "dispatch"
+const paramsJournalPrefix = "journal"
 
 const (
 	keyStorageType       = "dispatch.storageType"
