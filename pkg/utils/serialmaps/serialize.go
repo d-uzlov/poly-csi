@@ -151,7 +151,7 @@ func serializeStruct(v reflect.Value, out map[string]string, prefix string) erro
 			return fmt.Errorf("missing '%s' tag", structMapTagName)
 		}
 		if tagValue == "-" {
-			return nil
+			continue
 		}
 
 		err := serializeDispatch(sv, out, prefix, tagValue)

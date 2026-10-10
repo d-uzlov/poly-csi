@@ -208,7 +208,7 @@ func (p *parser) parseStruct(v reflect.Value, prefix string) error {
 			return fmt.Errorf("missing '%s' tag", structMapTagName)
 		}
 		if tagValue == "-" {
-			return nil
+			continue
 		}
 
 		f := v.Field(i)
