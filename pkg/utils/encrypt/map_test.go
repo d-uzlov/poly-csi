@@ -1,7 +1,6 @@
 package encrypt_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"meoe.io/poly-csi/pkg/utils/encrypt"
@@ -19,34 +18,28 @@ func TestFullCycle(t *testing.T) {
 		t.FailNow()
 	}
 
-	storage := map[string]string{}
+	cleartext := "123"
 
-	secretData := EncryptTestData{
-		Qwe: "123",
-		Asd: "456",
-	}
-
-	err = encrypt.InjectSecretIntoMap(storage, private.GetPublicKey(), secretData)
+	wrap, err := encrypt.NewWrapper(private.GetPublicKey())
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
 
-	decryptedBytes, err := encrypt.ExtractSecretFromMap(storage, *private)
+	err = wrap.SetData([]byte(cleartext))
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
 
-	var decrypted EncryptTestData
-	err = json.Unmarshal(decryptedBytes, &decrypted)
+	decrypted, err := wrap.Extract(*private)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
 
-	if secretData != decrypted {
-		t.Errorf("secretData %#v != decrypted %#v", secretData, decrypted)
+	if cleartext != string(decrypted) {
+		t.Errorf("cleartext %#v != decrypted %#v", cleartext, decrypted)
 		t.FailNow()
 	}
 }

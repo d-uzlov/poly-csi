@@ -2,7 +2,7 @@ package volumecontext
 
 import "fmt"
 
-const Prefix = "poly-csi.meoe.io/"
+const Prefix = "poly-csi/"
 
 type VolumeContext struct {
 	ServerName    string `map:"server_name"`
@@ -39,7 +39,3 @@ func (v *VolumeContext) Validate() error {
 	}
 	return nil
 }
-
-// fields used in publish context
-const ProtocolKey = "protocol"
-const ProtocolPrefix = "proto"

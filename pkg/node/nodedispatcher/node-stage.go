@@ -12,14 +12,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/blockdevice"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
@@ -70,29 +69,32 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("get connector capabilities: %w", err)
 	}
 
-	secretPlaintext, err := encrypt.ExtractSecretFromMap(req.PublishContext, conf.Encrypt.NodeKey)
+	pc, err := publishcontext.Parse(req.PublishContext)
 	if err != nil {
-		return nil, fmt.Errorf("ExtractSecretFromMap: %w", err)
+		return nil, fmt.Errorf("parse publish context: %w", err)
+	}
+	err = pc.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validateContext: %w", err)
 	}
 
-	addressOptions, err := addropt.Parse(req.PublishContext)
+	proto, err := pc.GetProtocol(conf.Encrypt.NodeKey)
 	if err != nil {
-		return nil, fmt.Errorf("parse address options from publish context: %w", err)
+		return nil, fmt.Errorf("extract protocol info from publish context: %w", err)
 	}
 
-	connectorContext := map[string]string{}
-	for k, v := range req.PublishContext {
-		if strings.HasPrefix(k, caps.ContextPrefix) {
-			connectorContext[k] = v
-		}
-	}
+	// connectorContext := map[string]string{}
+	// for k, v := range req.PublishContext {
+	// 	if strings.HasPrefix(k, caps.ContextPrefix) {
+	// 		connectorContext[k] = v
+	// 	}
+	// }
 
 	ch, err := con.GetHandle(ctx, connectors.ConnectRequest{
 		Uuid:                    vc.Uuid,
-		AddressOptions:          addressOptions,
+		AddressOptions:          pc.AddressList,
 		VolumeContext:           req.VolumeContext,
-		PublishContext:          connectorContext,
-		PublishSecret:           secretPlaintext,
+		Proto:                   proto,
 		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
 		Preset:                  fullPreset,
 	})

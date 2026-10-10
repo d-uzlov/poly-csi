@@ -56,3 +56,11 @@ func (v NvmeShare) Validate() error {
 	}
 	return nil
 }
+
+func (v NvmeShare) RegisterSerialmapsType() string {
+	return string(Nvme)
+}
+
+func (v NvmeShare) Clone() Config {
+	return v
+}

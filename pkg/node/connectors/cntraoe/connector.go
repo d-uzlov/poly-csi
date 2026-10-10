@@ -88,15 +88,15 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		return nil, fmt.Errorf("aoe connector does not support more than one address")
 	}
 
-	pc, err := protocols.Parse[protocols.AoeShare](req.PublishContext, req.PublishSecret)
-	if err != nil {
-		return nil, fmt.Errorf("protocols.Parse: %w", err)
+	proto, ok := req.Proto.(protocols.AoeShare)
+	if !ok {
+		return nil, fmt.Errorf("protocol mismatch")
 	}
 
 	return &state{
 		tr:        c.conf.Tr,
 		devFolder: c.conf.DevFolder,
-		Pc:        pc,
+		Pc:        proto,
 	}, nil
 }
 

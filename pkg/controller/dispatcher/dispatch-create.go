@@ -101,7 +101,7 @@ func (dc *dispatchCreate) parseParams(req *csi.CreateVolumeRequest) error {
 	dc.p = dispatchParams
 
 	journalParams := dispatchParams
-	err = serialmaps.ParseRemove(req.Parameters, paramsJournalPrefix, true, &journalParams)
+	err = serialmaps.Parse(req.Parameters, paramsJournalPrefix, &journalParams, serialmaps.WithRemove(true))
 	if err != nil {
 		return fmt.Errorf("parse journal params: %w", err)
 	}

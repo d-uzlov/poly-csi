@@ -121,6 +121,7 @@
     "preconfigured",
     "prezeroed",
     "protosanitizer",
+    "publishcontext",
     "pubout",
     "pyparsing",
     "qgroup",

@@ -34,12 +34,12 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		return nil, fmt.Errorf("nfs connector does not support more than one address")
 	}
 
-	pc, err := protocols.Parse[protocols.NfsShare](req.PublishContext, req.PublishSecret)
-	if err != nil {
-		return nil, fmt.Errorf("protocols.Parse: %w", err)
+	proto, ok := req.Proto.(protocols.NfsShare)
+	if !ok {
+		return nil, fmt.Errorf("protocol mismatch")
 	}
 
-	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, pc.Path)
+	nfsPath := fmt.Sprintf("%s:%s", req.AddressOptions[0].Address, proto.Path)
 
 	return &state{
 		tr:      c.conf.Tr,

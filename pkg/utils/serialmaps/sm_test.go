@@ -35,7 +35,7 @@ func TestSimple(t *testing.T) {
 		t.Error("serialized != expected")
 		t.Error("serialized", serialized)
 		t.Error("expected  ", expected)
-		t.Fail()
+		t.FailNow()
 	}
 
 	serialized2, err := Serialize(input, "prefix")
@@ -55,7 +55,7 @@ func TestSimple(t *testing.T) {
 		t.Error("serialized2 != expected2")
 		t.Error("serialized2", serialized2)
 		t.Error("expected2  ", expected2)
-		t.Fail()
+		t.FailNow()
 	}
 
 	parsed := Simple{}
@@ -71,7 +71,7 @@ func TestSimple(t *testing.T) {
 		t.Error("parsed != expected")
 		t.Error("parsed", parsed)
 		t.Error("expected", input)
-		t.Fail()
+		t.FailNow()
 	}
 }
 
@@ -108,7 +108,7 @@ func TestWithArray(t *testing.T) {
 		t.Error("serialized != expected")
 		t.Error("serialized", serialized)
 		t.Error("expected  ", expected)
-		t.Fail()
+		t.FailNow()
 	}
 
 	parsed := WithArray{}
@@ -122,7 +122,7 @@ func TestWithArray(t *testing.T) {
 		t.Error("parsed != expected")
 		t.Error("parsed", parsed)
 		t.Error("expected", input)
-		t.Fail()
+		t.FailNow()
 	}
 }
 
@@ -153,7 +153,7 @@ func TestWithMap(t *testing.T) {
 		t.Error("serialized != expected")
 		t.Error("serialized", serialized)
 		t.Error("expected  ", expected)
-		t.Fail()
+		t.FailNow()
 	}
 
 	parsed := WithMap{}
@@ -167,7 +167,7 @@ func TestWithMap(t *testing.T) {
 		t.Error("parsed != expected")
 		t.Error("parsed", parsed)
 		t.Error("expected", input)
-		t.Fail()
+		t.FailNow()
 	}
 }
 
@@ -210,7 +210,7 @@ func TestWithNested(t *testing.T) {
 		t.Error("serialized != expected")
 		t.Error("serialized", serialized)
 		t.Error("expected  ", expected)
-		t.Fail()
+		t.FailNow()
 	}
 
 	parsed := WithNestedStructs{}
@@ -225,5 +225,71 @@ func TestWithNested(t *testing.T) {
 		t.Error("parsed", parsed)
 		t.Error("expected", input)
 		t.Fail()
+	}
+}
+
+type TestInt interface {
+	Check()
+}
+
+type Impl1 struct {
+	Qwe string `map:"qwe"`
+}
+
+func (i Impl1) Check() {}
+
+func (i Impl1) RegisterSerialmapsType() string { return "impl1" }
+
+type Impl2 struct {
+	Asd string `map:"asd"`
+}
+
+func (i *Impl2) Check() {}
+
+func (i *Impl2) RegisterSerialmapsType() string { return "impl2" }
+
+type WithInterface struct {
+	Int1 TestInt `map:"i1"`
+	Int2 TestInt `map:"i2"`
+}
+
+func TestWithInterface(t *testing.T) {
+	input := WithInterface{
+		Int1: Impl1{Qwe: "1"},
+		Int2: &Impl2{Asd: "2"},
+	}
+
+	serialized, err := Serialize(input, "zzz")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	expected := map[string]string{
+		"zzz.i1.t":     "impl1",
+		"zzz.i1.v.qwe": "1",
+		"zzz.i2.t":     "impl2",
+		"zzz.i2.v.asd": "2",
+	}
+
+	if !maps.Equal(serialized, expected) {
+		t.Error("serialized != expected")
+		t.Error("serialized", serialized)
+		t.Error("expected  ", expected)
+		t.FailNow()
+	}
+
+	parsed := WithInterface{}
+	err = Parse(serialized, "zzz", &parsed, WithRegister(Impl1{}, &Impl2{}))
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	if !reflect.DeepEqual(parsed, input) {
+		t.Error("parsed != expected")
+		t.Error("parsed", parsed)
+		t.Error("expected", input)
+		t.FailNow()
 	}
 }

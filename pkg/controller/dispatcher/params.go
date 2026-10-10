@@ -56,7 +56,7 @@ func parseDispatchParams(prefix string, global map[string]string, static map[str
 	}
 
 	result := DispatchParams{}
-	err := serialmaps.ParseRemove(static, prefix, true, &result)
+	err := serialmaps.Parse(static, prefix, &result, serialmaps.WithRemove(true))
 	if err != nil {
 		return DispatchParams{}, fmt.Errorf("static params: %w", err)
 	}

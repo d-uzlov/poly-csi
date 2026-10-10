@@ -40,7 +40,7 @@ func (f *Xfs) Capabilities() Capabilities {
 }
 
 func (f *Xfs) Configure(params map[string]string) error {
-	err := serialmaps.ParseRemove(params, xfsPrefix, true, f)
+	err := serialmaps.Parse(params, xfsPrefix, f, serialmaps.WithRemove(true))
 	if err != nil {
 		return err
 	}

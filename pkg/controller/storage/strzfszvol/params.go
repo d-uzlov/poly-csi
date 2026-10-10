@@ -17,12 +17,12 @@ const paramsPrefix = "zfs"
 func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
 
 	var result params
-	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	err := serialmaps.Parse(static, paramsPrefix, &result, serialmaps.WithRemove(true))
 	if err != nil {
 		return nil, fmt.Errorf("static params: %w", err)
 	}
 	var mutableParams params
-	err = serialmaps.ParseRemove(mutable, paramsPrefix, true, &mutableParams)
+	err = serialmaps.Parse(mutable, paramsPrefix, &mutableParams, serialmaps.WithRemove(true))
 	if err != nil {
 		return nil, fmt.Errorf("mutable params: %w", err)
 	}

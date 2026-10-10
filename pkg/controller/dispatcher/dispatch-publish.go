@@ -10,13 +10,13 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-playground/validator/v10"
 	"meoe.io/poly-csi/pkg/api/protocols"
+	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
@@ -114,28 +114,18 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("validate share protocol data: %w", err)
 	}
 
-	publishContext := map[string]string{
-		volumecontext.ProtocolKey: string(shrInstance.GetCapabilities().ProtocolName),
+	pcObj := publishcontext.PublishContext{}
+	for _, v := range addressOptions {
+		pcObj.AddressList = append(pcObj.AddressList, publishcontext.AddressOption{
+			Name:    v.Name,
+			Address: v.Address,
+		})
 	}
-	err = InjectAddressOptions(addressOptions, publishContext)
-	if err != nil {
-		return nil, fmt.Errorf("inject address options: %w", err)
-	}
+	pcObj.SetProtocol(shrInstance.GetCapabilities().ProtocolName, pc.Protocol, ni.PublicKey)
 
-	public, secret, err := protocols.SplitSecret(pc.Protocol)
+	pcMap, err := serialmaps.Serialize(pcObj, volumecontext.Prefix)
 	if err != nil {
-		return nil, fmt.Errorf("split protocol info: %w", err)
-	}
-
-	_, err = serialmaps.SerializeInto(public, publishContext, volumecontext.ProtocolPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("inject public data: %w", err)
-	}
-
-	logger.Info("creating encrypted publish secret")
-	err = encrypt.InjectSecretIntoMap(publishContext, ni.PublicKey, secret)
-	if err != nil {
-		return nil, fmt.Errorf("inject secret: %w", err)
+		return nil, fmt.Errorf("serialize publish context object: %w", err)
 	}
 
 	if pc.LocalData != nil {
@@ -150,7 +140,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 	}
 
 	return &csi.ControllerPublishVolumeResponse{
-		PublishContext: publishContext,
+		PublishContext: pcMap,
 	}, nil
 }
 

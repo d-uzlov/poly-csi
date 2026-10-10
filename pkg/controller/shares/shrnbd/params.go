@@ -45,7 +45,7 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 
 func parseParams(static map[string]string, mutable map[string]string) (params, error) {
 	result := params{}
-	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	err := serialmaps.Parse(static, paramsPrefix, &result, serialmaps.WithRemove(true))
 	if err != nil {
 		return params{}, fmt.Errorf("static params: %w", err)
 	}

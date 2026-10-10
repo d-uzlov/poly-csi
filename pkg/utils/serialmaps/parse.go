@@ -9,14 +9,39 @@ import (
 
 const structMapTagName = "map"
 
-// Parse fills a struct of type T from map[string]string using the `map` tag.
-// Example: `Qwe string `map:"qwe"“
-func Parse[T any](src map[string]string, prefix string, out *T) error {
-	return ParseRemove(src, prefix, false, out)
+type Registrar interface {
+	RegisterSerialmapsType() string
 }
 
-// ParseRemove parses struct from a map, removing any fields that it uses from src
-func ParseRemove[T any](src map[string]string, prefix string, remove bool, out *T) error {
+type parser struct {
+	src                  map[string]string
+	removeTaken          bool
+	registeredInterfaces map[string]reflect.Type
+}
+
+type ParseOption func(p *parser)
+
+func WithRemove(val bool) ParseOption {
+	return func(p *parser) {
+		p.removeTaken = val
+	}
+}
+
+func WithRegister(reg ...Registrar) ParseOption {
+	return func(p *parser) {
+		if p.registeredInterfaces == nil {
+			p.registeredInterfaces = map[string]reflect.Type{}
+		}
+		for _, v := range reg {
+			typename := v.RegisterSerialmapsType()
+			p.registeredInterfaces[typename] = reflect.TypeOf(v)
+		}
+	}
+}
+
+// Parse fills a struct of type T from map[string]string using the `map` tag.
+// Example: `Qwe string `map:"qwe"“
+func Parse[T any](src map[string]string, prefix string, out *T, opts ...ParseOption) error {
 	if out == nil {
 		return fmt.Errorf("nil out pointer")
 	}
@@ -26,10 +51,16 @@ func ParseRemove[T any](src map[string]string, prefix string, remove bool, out *
 	}
 	tagValue := prefix
 	prefix = ""
-	return parseDispatch(src, v.Elem(), prefix, tagValue, remove)
+	p := parser{
+		src: src,
+	}
+	for _, v := range opts {
+		v(&p)
+	}
+	return p.parseDispatch(v.Elem(), prefix, tagValue)
 }
 
-func parseDispatch(src map[string]string, v reflect.Value, prefix string, tagValue string, remove bool) error {
+func (p *parser) parseDispatch(v reflect.Value, prefix string, tagValue string) error {
 	if !v.CanSet() {
 		return fmt.Errorf("not settable")
 	}
@@ -54,23 +85,30 @@ func parseDispatch(src map[string]string, v reflect.Value, prefix string, tagVal
 
 	switch v.Kind() {
 	case reflect.Struct:
-		return parseStruct(src, v, mapKey, remove)
+		return p.parseStruct(v, mapKey)
 
 	case reflect.Map:
-		return parseMap(src, v, mapKey, remove)
+		return p.parseMap(v, mapKey)
 
 	case reflect.Array, reflect.Slice:
-		return parseArray(src, v, mapKey, remove)
+		return p.parseArray(v, mapKey)
+
+	case reflect.Interface:
+		return p.parseInterface(v, mapKey)
+
+	case reflect.Chan:
+		return fmt.Errorf("value kind %s is not supported", v.Kind())
+
 	default:
 		// continue to simplified parsing below
 	}
 
-	s, ok := src[mapKey]
+	s, ok := p.src[mapKey]
 	if !ok {
 		return nil
 	}
-	if remove {
-		delete(src, mapKey)
+	if p.removeTaken {
+		delete(p.src, mapKey)
 	}
 
 	switch v.Kind() {
@@ -115,7 +153,42 @@ func parseDispatch(src map[string]string, v reflect.Value, prefix string, tagVal
 	}
 }
 
-func parseStruct(src map[string]string, v reflect.Value, prefix string, remove bool) error {
+func (p *parser) parseInterface(v reflect.Value, prefix string) error {
+	if v.Kind() != reflect.Interface {
+		return fmt.Errorf("expected interface, got %s", v.Kind())
+	}
+
+	if !v.IsNil() {
+		return p.parseDispatch(v.Elem(), prefix, "v")
+	}
+
+	typeKey := prefix + ".t"
+	typename, ok := p.src[typeKey]
+	if !ok {
+		return fmt.Errorf("missing key '%s'", typeKey)
+	}
+	if typename == "nil" {
+		// the interface was nil during serialize
+		return nil
+	}
+
+	regT, ok := p.registeredInterfaces[typename]
+	if !ok {
+		return fmt.Errorf("type '%s' is not registered", typename)
+	}
+
+	elem := reflect.New(regT).Elem()
+
+	err := p.parseDispatch(elem, prefix, "v")
+	if err != nil {
+		return err
+	}
+	// need to set after parsing in case the interface is stored by value
+	v.Set(elem)
+	return nil
+}
+
+func (p *parser) parseStruct(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("expected struct, got %s", v.Kind())
 	}
@@ -137,7 +210,9 @@ func parseStruct(src map[string]string, v reflect.Value, prefix string, remove b
 			return nil
 		}
 
-		if err := parseDispatch(src, v.Field(i), prefix, tagValue, remove); err != nil {
+		f := v.Field(i)
+		err := p.parseDispatch(f, prefix, tagValue)
+		if err != nil {
 			return fmt.Errorf("field %s: %w", sf.Name, err)
 		}
 	}
@@ -145,13 +220,13 @@ func parseStruct(src map[string]string, v reflect.Value, prefix string, remove b
 	return nil
 }
 
-func parseArray(src map[string]string, v reflect.Value, prefix string, remove bool) error {
+func (p *parser) parseArray(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
 		return fmt.Errorf("expected slice, got %s", v.Kind())
 	}
 
 	lenKey := prefix + ".len"
-	lenStr, ok := src[lenKey]
+	lenStr, ok := p.src[lenKey]
 	if !ok {
 		return fmt.Errorf("missing key: '%s'", lenKey)
 	}
@@ -170,7 +245,7 @@ func parseArray(src map[string]string, v reflect.Value, prefix string, remove bo
 		if instance.Kind() == reflect.Pointer && instance.IsNil() {
 			instance = reflect.New(v.Type().Elem())
 		}
-		err := parseDispatch(src, instance, prefix, strconv.Itoa(i), remove)
+		err := p.parseDispatch(instance, prefix, strconv.Itoa(i))
 		if err != nil {
 			return fmt.Errorf("elem %d: %w", i, err)
 		}
@@ -179,13 +254,13 @@ func parseArray(src map[string]string, v reflect.Value, prefix string, remove bo
 	return nil
 }
 
-func parseMap(src map[string]string, v reflect.Value, prefix string, remove bool) error {
+func (p *parser) parseMap(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Map {
 		return fmt.Errorf("expected map, got %s", v.Kind())
 	}
 
 	keysKey := prefix + ".keys"
-	keysStr, ok := src[keysKey]
+	keysStr, ok := p.src[keysKey]
 	if !ok {
 		return fmt.Errorf("missing key: '%s'", keysKey)
 	}
@@ -198,7 +273,7 @@ func parseMap(src map[string]string, v reflect.Value, prefix string, remove bool
 	for _, k := range keys {
 		key := reflect.ValueOf(k)
 		instance := reflect.New(v.Type().Elem()).Elem()
-		err := parseDispatch(src, instance, prefix, k, remove)
+		err := p.parseDispatch(instance, prefix, k)
 		if err != nil {
 			return fmt.Errorf("elem '%s': %w", k, err)
 		}

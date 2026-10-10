@@ -38,7 +38,7 @@ func (f *Ext4) Capabilities() Capabilities {
 }
 
 func (f *Ext4) Configure(params map[string]string) error {
-	err := serialmaps.ParseRemove(params, ext4Prefix, true, f)
+	err := serialmaps.Parse(params, ext4Prefix, f, serialmaps.WithRemove(true))
 	if err != nil {
 		return err
 	}

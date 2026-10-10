@@ -16,3 +16,11 @@ var _ Config = SmbShare{}
 func (v SmbShare) Validate() error {
 	return nil
 }
+
+func (v SmbShare) RegisterSerialmapsType() string {
+	return string(Smb)
+}
+
+func (v SmbShare) Clone() Config {
+	return v
+}

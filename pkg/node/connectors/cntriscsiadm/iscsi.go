@@ -40,26 +40,26 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
-	pc, err := protocols.Parse[protocols.IscsiShare](req.PublishContext, req.PublishSecret)
-	if err != nil {
-		return nil, fmt.Errorf("protocols.Parse: %w", err)
+	proto, ok := req.Proto.(protocols.IscsiShare)
+	if !ok {
+		return nil, fmt.Errorf("protocol mismatch")
 	}
 
 	snip := newIscsiSnippets(c.commonConfig.Tr, c.config.IscsiadmCmd)
 
 	attributes := map[string]string{}
 
-	switch pc.AuthType {
+	switch proto.AuthType {
 	case protocols.IscsiAuthNone:
 		attributes["node.session.auth.authmethod"] = "None"
 	case protocols.IscsiAuthChap:
 		attributes["node.session.auth.authmethod"] = "CHAP"
-		attributes["node.session.auth.username"] = pc.ClientUser
-		attributes["node.session.auth.password"] = pc.ClientPass
-		attributes["node.session.auth.username_in"] = pc.TargetUser
-		attributes["node.session.auth.password_in"] = pc.TargetPass
+		attributes["node.session.auth.username"] = proto.ClientUser
+		attributes["node.session.auth.password"] = proto.ClientPass
+		attributes["node.session.auth.username_in"] = proto.TargetUser
+		attributes["node.session.auth.password_in"] = proto.TargetPass
 	default:
-		return nil, fmt.Errorf("unknown chap type: '%s'", pc.AuthType)
+		return nil, fmt.Errorf("unknown chap type: '%s'", proto.AuthType)
 	}
 
 	var ecs []Connection
@@ -75,8 +75,8 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		snip:                    &snip,
 		DevFolder:               c.commonConfig.DevFolder,
 		DisableCleanupOnFailure: req.DisableCleanupOnFailure,
-		Iqn:                     pc.Iqn,
-		Port:                    pc.Port,
+		Iqn:                     proto.Iqn,
+		Port:                    proto.Port,
 		Attributes:              attributes,
 		Connections:             ecs,
 	}, nil

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -27,9 +27,9 @@ type state struct {
 }
 
 type ExpectedConnection struct {
-	Addr       addropt.AddressOption `json:"addr"`
-	Controller string                `json:"controller"`
-	Ip         string                `json:"ip"`
+	Addr       publishcontext.AddressOption `json:"addr"`
+	Controller string                       `json:"controller"`
+	Ip         string                       `json:"ip"`
 }
 
 var _ connectors.Handle = &state{}

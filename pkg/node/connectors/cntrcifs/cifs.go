@@ -33,18 +33,19 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	if len(req.AddressOptions) != 1 {
 		return nil, fmt.Errorf("smb connector does not support more than one address")
 	}
-	pc, err := protocols.Parse[protocols.SmbShare](req.PublishContext, req.PublishSecret)
-	if err != nil {
-		return nil, fmt.Errorf("protocols.Parse: %w", err)
+
+	proto, ok := req.Proto.(protocols.SmbShare)
+	if !ok {
+		return nil, fmt.Errorf("protocol mismatch")
 	}
 
-	smbPath := fmt.Sprintf("//%s/%s", req.AddressOptions[0].Address, pc.ShareName)
+	smbPath := fmt.Sprintf("//%s/%s", req.AddressOptions[0].Address, proto.ShareName)
 
 	return &state{
 		tr:        c.conf.Tr,
 		SharePath: smbPath,
-		Username:  pc.UserName,
-		Password:  pc.UserPassword,
+		Username:  proto.UserName,
+		Password:  proto.UserPassword,
 	}, nil
 }
 

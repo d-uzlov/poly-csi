@@ -55,6 +55,14 @@ func (v IscsiShare) Validate() error {
 	return nil
 }
 
+func (v IscsiShare) RegisterSerialmapsType() string {
+	return string(Iscsi)
+}
+
+func (v IscsiShare) Clone() Config {
+	return v
+}
+
 type IscsiNodeInfo struct {
 	InitiatorIqn string `map:"initiatorIqn"`
 }
@@ -63,4 +71,12 @@ var _ NodeInfo = IscsiNodeInfo{}
 
 func (i IscsiNodeInfo) Validate() error {
 	return nil
+}
+
+func (v IscsiNodeInfo) RegisterSerialmapsType() string {
+	return string(Iscsi)
+}
+
+func (v IscsiNodeInfo) Clone() Config {
+	return v
 }

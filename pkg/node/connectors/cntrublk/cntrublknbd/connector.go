@@ -36,13 +36,9 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		return nil, fmt.Errorf("nbd connector does not support more than one address")
 	}
 
-	pc, err := protocols.Parse[protocols.NbdShare](req.PublishContext, req.PublishSecret)
-	if err != nil {
-		return nil, fmt.Errorf("protocols.Parse: %w", err)
-	}
-	err = pc.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("validateContext: %w", err)
+	proto, ok := req.Proto.(protocols.NbdShare)
+	if !ok {
+		return nil, fmt.Errorf("protocol mismatch")
 	}
 
 	return &state{
@@ -51,7 +47,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		devFolder: c.conf.DevFolder,
 		Uuid:      req.Uuid,
 		Address:   req.AddressOptions[0].Address,
-		Pc:        pc,
+		Pc:        proto,
 	}, nil
 }
 

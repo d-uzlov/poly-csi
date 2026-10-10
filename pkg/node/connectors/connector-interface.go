@@ -5,7 +5,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/api/protocols"
-	"meoe.io/poly-csi/pkg/node/addropt"
+	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -74,7 +74,7 @@ type Capabilities struct {
 	ManagedUnmount bool `json:"managed_unmount"`
 
 	// ContextPrefix indicated which keys in CSI publish context are part of the connector config.
-	ContextPrefix string `json:"context_prefix"`
+	// ContextPrefix string `json:"context_prefix"`
 }
 
 // constants for Capabilities.ConnectType
@@ -89,12 +89,10 @@ const (
 )
 
 type ConnectRequest struct {
-	Uuid           string                  `json:"uuid"`
-	AddressOptions []addropt.AddressOption `json:"addressOptions"`
-	VolumeContext  map[string]string       `json:"volumeContext"`
-	PublishContext map[string]string       `json:"publishContext"`
-	// PublishSecret is a decrypted secret from publish context
-	PublishSecret           []byte            `json:"publishSecret"`
+	Uuid                    string                         `json:"uuid"`
+	AddressOptions          []publishcontext.AddressOption `json:"addressOptions"`
+	VolumeContext           map[string]string              `json:"volumeContext"`
+	Proto                   protocols.Config
 	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
 	Preset                  map[string]string `json:"preset"`
 }

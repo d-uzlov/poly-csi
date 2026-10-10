@@ -54,29 +54,29 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 }
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
-	pc, err := protocols.Parse[protocols.NvmeShare](req.PublishContext, req.PublishSecret)
-	if err != nil {
-		return nil, fmt.Errorf("protocols.Parse: %w", err)
+	proto, ok := req.Proto.(protocols.NvmeShare)
+	if !ok {
+		return nil, fmt.Errorf("protocol mismatch")
 	}
 
 	var parsedPreset PresetData
-	err = serialmaps.Parse(req.Preset, mapPrefix, &parsedPreset)
+	err := serialmaps.Parse(req.Preset, mapPrefix, &parsedPreset)
 	if err != nil {
 		return nil, fmt.Errorf("parse preset: %w", err)
 	}
 
 	cp := ConnectParams{
-		TargetNqn:     pc.TargetNqn,
-		HostNqn:       pc.HostNqn,
-		HostId:        pc.HostId,
-		Port:          pc.ConnectPort,
-		NvmeTransport: pc.TransportType,
+		TargetNqn:     proto.TargetNqn,
+		HostNqn:       proto.HostNqn,
+		HostId:        proto.HostId,
+		Port:          proto.ConnectPort,
+		NvmeTransport: proto.TransportType,
 	}
 	var auth *ConnectAuth
-	if pc.HostKey != "" && pc.ControllerKey != "" {
+	if proto.HostKey != "" && proto.ControllerKey != "" {
 		auth = &ConnectAuth{
-			HostKey:       pc.HostKey,
-			ControllerKey: pc.ControllerKey,
+			HostKey:       proto.HostKey,
+			ControllerKey: proto.ControllerKey,
 		}
 	}
 	extra := ConnectExtra{

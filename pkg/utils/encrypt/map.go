@@ -3,99 +3,83 @@ package encrypt
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-
-	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
-const secretPrefix = "_secret"
 const encTypeAesGcm = "aes_gcm"
 
 type SecretWrapper struct {
-	PubKeyHash      string `map:"pub_key_hash"`
-	EncType         string `map:"enc_type"`
-	AesKeyPkBase64  string `map:"aes_key_pk_base64"`
-	SecretAesBase64 string `map:"secret_aes_base64"`
+	aesKey []byte `map:"-"`
+	// PubKeyHash is the hash of the public key used to create this secret.
+	// Should be checked to avoid decoding errors when there is a key mismatch.
+	PubKeyHash string `map:"pub_key_hash" validate:"required"`
+	// EncType describes how secret data was encrypted
+	EncType string `map:"enc_type" validate:"required,oneof=aes_gcm"`
+	// EncryptedAesKey is base64(rsa(aes_key))
+	EncryptedAesKey string `map:"aes_key" validate:"required"`
+	// Ciphertext is base64(aes(data))
+	Ciphertext string `map:"ciphertext" validate:"required"`
 }
 
-func ExtractSecretFromMap(src map[string]string, privateKey RsaPrivateKey) ([]byte, error) {
-	var wrap SecretWrapper
-	err := serialmaps.ParseRemove(src, secretPrefix, true, &wrap)
+func NewWrapper(publicKey RsaPublicKey) (SecretWrapper, error) {
+	result := SecretWrapper{
+		PubKeyHash: publicKey.Hash(),
+		aesKey:     make([]byte, 32),
+		EncType:    encTypeAesGcm,
+	}
+	// rand.Read is guaranteed to not fail
+	_, _ = rand.Read(result.aesKey)
+	aesKeyPk, err := publicKey.Encrypt(result.aesKey)
 	if err != nil {
-		return nil, fmt.Errorf("parse secret: %w", err)
+		return SecretWrapper{}, fmt.Errorf("encrypt aes key: %w", err)
 	}
-	if wrap.SecretAesBase64 == "" {
-		return nil, nil
-	}
+	result.EncryptedAesKey = base64.StdEncoding.EncodeToString(aesKeyPk)
 
-	if wrap.PubKeyHash == "" {
-		return nil, fmt.Errorf("missing public key hash")
-	}
-	if wrap.EncType == "" {
-		return nil, fmt.Errorf("missing enc type")
-	}
-	if wrap.AesKeyPkBase64 == "" {
-		return nil, fmt.Errorf("missing secret key")
-	}
-
-	if wrap.PubKeyHash != privateKey.GetPublicKey().Hash() {
-		return nil, fmt.Errorf("public key hash does not match private key")
-	}
-
-	if wrap.EncType != encTypeAesGcm {
-		return nil, fmt.Errorf("unknown enc type: '%s'", wrap.EncType)
-	}
-
-	aesKeyPk, err := base64.StdEncoding.DecodeString(wrap.AesKeyPkBase64)
-	if err != nil {
-		return nil, fmt.Errorf("aes key: decode base64: %w", err)
-	}
-	aesKey, err := privateKey.Decrypt(aesKeyPk)
-	if err != nil {
-		return nil, fmt.Errorf("eas key: decrypt pk: %w", err)
-	}
-
-	ciphertext, err := base64.StdEncoding.DecodeString(wrap.SecretAesBase64)
-	if err != nil {
-		return nil, fmt.Errorf("ciphertext: decode base64: %w", err)
-	}
-	pcSecretPlaintext, err := DecryptAes(aesKey, ciphertext)
-	if err != nil {
-		return nil, fmt.Errorf("ciphertext: DecryptAes: %w", err)
-	}
-
-	return pcSecretPlaintext, nil
+	return result, nil
 }
 
-func InjectSecretIntoMap(dst map[string]string, publicKey RsaPublicKey, src any) error {
-	aesKey := make([]byte, 32)
-	_, err := rand.Read(aesKey)
-	if err != nil {
-		return fmt.Errorf("generate aes key: %w", err)
-	}
-	aesKeyPk, err := publicKey.Encrypt(aesKey)
-	if err != nil {
-		return fmt.Errorf("aes key: encrypt pk: %w", err)
-	}
-	secretJson, err := json.Marshal(src)
-	if err != nil {
-		return fmt.Errorf("marshal secret: %w", err)
-	}
-	secretJsonEnc, err := EncryptAes(aesKey, secretJson)
+func (wrap *SecretWrapper) SetData(data []byte) error {
+	ciphertext, err := EncryptAes(wrap.aesKey, data)
 	if err != nil {
 		return fmt.Errorf("EncryptAes: %w", err)
 	}
-
-	wrap := SecretWrapper{
-		PubKeyHash:      publicKey.Hash(),
-		EncType:         encTypeAesGcm,
-		AesKeyPkBase64:  base64.StdEncoding.EncodeToString(aesKeyPk),
-		SecretAesBase64: base64.StdEncoding.EncodeToString(secretJsonEnc),
-	}
-	_, err = serialmaps.SerializeInto(wrap, dst, secretPrefix)
-	if err != nil {
-		return fmt.Errorf("serialize: %w", err)
-	}
+	wrap.Ciphertext = base64.StdEncoding.EncodeToString(ciphertext)
 	return nil
+}
+
+func (wrap *SecretWrapper) Extract(privateKey RsaPrivateKey) ([]byte, error) {
+	if wrap.Ciphertext == "" {
+		return nil, nil
+	}
+
+	privKeyHash := privateKey.GetPublicKey().Hash()
+	if wrap.PubKeyHash != privKeyHash {
+		return nil, fmt.Errorf("public key hash '%s' does not match private key hash '%s'", wrap.PubKeyHash, privKeyHash)
+	}
+
+	encryptedAesKey, err := base64.StdEncoding.DecodeString(wrap.EncryptedAesKey)
+	if err != nil {
+		return nil, fmt.Errorf("aes key: decode base64: %w", err)
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(wrap.Ciphertext)
+	if err != nil {
+		return nil, fmt.Errorf("ciphertext: decode base64: %w", err)
+	}
+
+	switch wrap.EncType {
+	case encTypeAesGcm:
+		aesKey, err := privateKey.Decrypt(encryptedAesKey)
+		if err != nil {
+			return nil, fmt.Errorf("eas key: decrypt pk: %w", err)
+		}
+
+		pcSecretPlaintext, err := DecryptAes(aesKey, ciphertext)
+		if err != nil {
+			return nil, fmt.Errorf("ciphertext: DecryptAes: %w", err)
+		}
+
+		return pcSecretPlaintext, nil
+	default:
+		return nil, fmt.Errorf("unknown encryption type '%s'", wrap.EncType)
+	}
 }

@@ -78,13 +78,13 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 
 func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
 	result := params{}
-	err := serialmaps.ParseRemove(static, paramsPrefix, true, &result)
+	err := serialmaps.Parse(static, paramsPrefix, &result, serialmaps.WithRemove(true))
 	if err != nil {
 		return nil, fmt.Errorf("static params: %w", err)
 	}
 
 	resMutable := params{}
-	err = serialmaps.ParseRemove(mutable, paramsPrefix, true, &resMutable)
+	err = serialmaps.Parse(mutable, paramsPrefix, &resMutable, serialmaps.WithRemove(true))
 	if err != nil {
 		return nil, fmt.Errorf("mutable params: %w", err)
 	}

@@ -77,6 +77,8 @@ func serializeDispatch(v reflect.Value, out map[string]string, prefix string, ta
 	}
 
 	switch v.Kind() {
+	case reflect.Interface:
+		return serializeInterface(v, out, mapKey)
 	case reflect.Struct:
 		return serializeStruct(v, out, mapKey)
 	case reflect.Map:
@@ -100,6 +102,29 @@ func serializeDispatch(v reflect.Value, out map[string]string, prefix string, ta
 		return fmt.Errorf("unsupported field kind: %s", v.Kind())
 	}
 	return nil
+}
+
+func serializeInterface(v reflect.Value, out map[string]string, prefix string) error {
+	if v.Kind() != reflect.Interface {
+		return fmt.Errorf("expected interface, got %s", v.Kind())
+	}
+
+	if v.IsNil() {
+		typeKey := prefix + ".t"
+		out[typeKey] = "nil"
+		return nil
+	}
+
+	reg, ok := v.Interface().(Registrar)
+	if !ok {
+		return fmt.Errorf("interface must implement Registrar")
+	}
+
+	typename := reg.RegisterSerialmapsType()
+	typeKey := prefix + ".t"
+	out[typeKey] = typename
+
+	return serializeDispatch(v.Elem(), out, prefix, "v")
 }
 
 func serializeStruct(v reflect.Value, out map[string]string, prefix string) error {

@@ -10,48 +10,19 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/utils/secrets"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type Config interface {
+	serialmaps.Registrar
 	Validate() error
+	Clone() Config
 }
 
 type Name string
 
 type NodeInfo Config
-
-func Parse[T Config](public map[string]string, secret []byte) (T, error) {
-	var result T
-	err := serialmaps.Parse(public, volumecontext.ProtocolPrefix, &result)
-	if err != nil {
-		return result, fmt.Errorf("public: %w", err)
-	}
-
-	if len(secret) != 0 {
-		err = json.Unmarshal(secret, &result)
-		if err != nil {
-			return result, fmt.Errorf("secret: %w", err)
-		}
-	}
-
-	// TODO cache validator instance
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	err = validate.Struct(result)
-	if err != nil {
-		err = FormatValidationError(err)
-		return result, err
-	}
-
-	err = result.Validate()
-	if err != nil {
-		return result, fmt.Errorf("validateContext: %w", err)
-	}
-
-	return result, nil
-}
 
 func SplitSecret[T Config](conf T) (public T, secret T, err error) {
 	var zero T
@@ -106,6 +77,14 @@ var protocols = map[string]Sample{
 	string(Nfs):   {Share: NfsShare{}, Info: nil},
 	string(Nvme):  {Share: NvmeShare{}, Info: nil},
 	string(Smb):   {Share: SmbShare{}, Info: nil},
+}
+
+func ListShareTypes() []Config {
+	var result []Config
+	for _, v := range protocols {
+		result = append(result, v.Share)
+	}
+	return result
 }
 
 func ParseNodeInfo(name Name, data string, out *NodeInfo) error {

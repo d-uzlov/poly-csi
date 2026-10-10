@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/addropt"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -25,7 +25,7 @@ type state struct {
 }
 
 type Connection struct {
-	Addr addropt.AddressOption
+	Addr publishcontext.AddressOption
 }
 
 var _ connectors.Handle = &state{}

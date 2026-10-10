@@ -15,3 +15,11 @@ var _ Config = AoeShare{}
 func (v AoeShare) Validate() error {
 	return nil
 }
+
+func (v AoeShare) RegisterSerialmapsType() string {
+	return string(Aoe)
+}
+
+func (v AoeShare) Clone() Config {
+	return v
+}
