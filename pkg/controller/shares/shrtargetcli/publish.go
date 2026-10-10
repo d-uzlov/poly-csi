@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/thanhpk/randstr"
+	"meoe.io/poly-csi/pkg/api/protocols"
 	"meoe.io/poly-csi/pkg/controller/shares"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type publishData struct {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/api/protocols"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type connector struct {

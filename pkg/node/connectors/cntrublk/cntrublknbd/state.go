@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/api/protocols"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
-	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/ublk"
 )

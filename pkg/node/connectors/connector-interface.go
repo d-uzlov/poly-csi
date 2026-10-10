@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"go.yaml.in/yaml/v3"
+	"meoe.io/poly-csi/pkg/api/protocols"
 	"meoe.io/poly-csi/pkg/node/addropt"
-	"meoe.io/poly-csi/pkg/protocols"
 	"meoe.io/poly-csi/pkg/transport"
 )
 

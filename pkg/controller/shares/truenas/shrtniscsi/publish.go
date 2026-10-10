@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/api/protocols"
 	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/protocols"
 )
 
 type publishData struct {
