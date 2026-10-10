@@ -6,13 +6,13 @@ import (
 	"slices"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/node/blockcon/cntraoe"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntriscsiadm"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrnvme"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntraoe"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrcifs"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
-	"meoe.io/poly-csi/pkg/node/connectors/cntriscsiadm"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrnfs"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrnvme"
+	"meoe.io/poly-csi/pkg/node/filecon/cntrcifs"
+	"meoe.io/poly-csi/pkg/node/filecon/cntrnfs"
 )
 
 const (

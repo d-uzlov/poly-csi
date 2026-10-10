@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/cntrublkiscsi"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/cntrublknbd"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/cntrublkiscsi"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/cntrublknbd"
 )
 
 const (

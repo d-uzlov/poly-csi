@@ -14,10 +14,10 @@ import (
 	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/supervisor"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/ublkfactory"
 	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/supervisor"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk/ublkfactory"
 	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 

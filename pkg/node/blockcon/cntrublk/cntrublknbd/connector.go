@@ -1,12 +1,12 @@
-package cntrublkiscsi
+package cntrublknbd
 
 import (
 	"context"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/protocols"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
 	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrublk"
 )
 
 type connector struct {
@@ -25,7 +25,7 @@ func New(sv cntrublk.Supervisor, conf connectors.CommonConfig) connectors.Manage
 
 func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
 	return connectors.Capabilities{
-		Protocol:    protocols.Iscsi,
+		Protocol:    protocols.Nbd,
 		HasNodeInfo: false,
 		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
@@ -33,10 +33,10 @@ func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, 
 
 func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
 	if len(req.AddressOptions) != 1 {
-		return nil, fmt.Errorf("ublk iscsi connector does not support more than one address")
+		return nil, fmt.Errorf("nbd connector does not support more than one address")
 	}
 
-	proto, ok := req.Proto.(protocols.IscsiShare)
+	proto, ok := req.Proto.(protocols.NbdShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}
