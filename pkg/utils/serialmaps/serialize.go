@@ -1,6 +1,7 @@
 package serialmaps
 
 import (
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"slices"
@@ -165,6 +166,11 @@ func serializeStruct(v reflect.Value, out map[string]string, prefix string) erro
 func serializeArray(v reflect.Value, out map[string]string, prefix string) error {
 	if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
 		return fmt.Errorf("expected slice, got %s", v.Kind())
+	}
+	elemKind := v.Type().Elem().Kind()
+	if elemKind == reflect.Uint8 {
+		out[prefix] = base64.StdEncoding.EncodeToString(v.Interface().([]byte))
+		return nil
 	}
 	lenKey := prefix + ".len"
 	out[lenKey] = strconv.Itoa(v.Len())

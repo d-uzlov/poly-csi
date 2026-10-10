@@ -1,6 +1,7 @@
 package serialmaps
 
 import (
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -223,6 +224,16 @@ func (p *parser) parseStruct(v reflect.Value, prefix string) error {
 func (p *parser) parseArray(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
 		return fmt.Errorf("expected slice, got %s", v.Kind())
+	}
+
+	elemKind := v.Type().Elem().Kind()
+	if elemKind == reflect.Uint8 {
+		arr, err := base64.StdEncoding.DecodeString(p.src[prefix])
+		if err != nil {
+			return fmt.Errorf("base64 decode: %w", err)
+		}
+		v.Set(reflect.ValueOf(arr))
+		return nil
 	}
 
 	lenKey := prefix + ".len"

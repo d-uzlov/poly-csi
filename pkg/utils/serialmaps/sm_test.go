@@ -293,3 +293,47 @@ func TestWithInterface(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+type WithPack struct {
+	Bytes  []byte `map:"b"`
+	Bytes2 []byte `map:"b2"`
+}
+
+func TestWithPack(t *testing.T) {
+	input := WithPack{
+		Bytes:  []byte("123"),
+		Bytes2: []byte{},
+	}
+
+	serialized, err := Serialize(input, "zzz")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	expected := map[string]string{
+		"zzz.b": "MTIz",
+		"zzz.b2": "",
+	}
+
+	if !maps.Equal(serialized, expected) {
+		t.Error("serialized != expected")
+		t.Error("serialized", serialized)
+		t.Error("expected  ", expected)
+		t.FailNow()
+	}
+
+	parsed := WithPack{}
+	err = Parse(serialized, "zzz", &parsed, WithRegister(Impl1{}, &Impl2{}))
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	if !reflect.DeepEqual(parsed, input) {
+		t.Error("parsed != expected")
+		t.Error("parsed", parsed)
+		t.Error("expected", input)
+		t.FailNow()
+	}
+}
