@@ -10,27 +10,40 @@ import (
 )
 
 // Serialize converts a struct value into map[string]string using the `map` tag.
-func Serialize[T any](in T, prefix string) (map[string]string, error) {
-	return SerializeInto(in, nil, prefix)
+func Serialize[T any](in T, prefix string, opts ...Option) (map[string]string, error) {
+	return SerializeInto(in, nil, prefix, opts...)
 }
 
 // SerializeInto will inject values into provided map if out is not nil
 // If out already contains required key, SerializeInto will return an error.
-func SerializeInto[T any](in T, out map[string]string, prefix string) (map[string]string, error) {
+func SerializeInto[T any](in T, out map[string]string, prefix string, opts ...Option) (map[string]string, error) {
 	v := reflect.ValueOf(in)
 	if out == nil {
 		out = map[string]string{}
 	}
+	opt := options{}
+	for _, v := range opts {
+		v(&opt)
+	}
+	s := serializer{
+		out: out,
+		opt: opt,
+	}
 	tagValue := prefix
 	prefix = ""
-	err := serializeDispatch(v, out, prefix, tagValue)
+	err := s.serializeDispatch(v, prefix, tagValue)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func serializeDispatch(v reflect.Value, out map[string]string, prefix string, tagValue string) error {
+type serializer struct {
+	out map[string]string
+	opt options
+}
+
+func (s *serializer) serializeDispatch(v reflect.Value, prefix string, tagValue string) error {
 	if !v.IsValid() {
 		return fmt.Errorf("invalid value")
 	}
@@ -54,7 +67,7 @@ func serializeDispatch(v reflect.Value, out map[string]string, prefix string, ta
 			mapKey = prefix + "." + key
 		}
 	}
-	_, ok := out[mapKey]
+	_, ok := s.out[mapKey]
 	if ok {
 		return fmt.Errorf("out map already contains key '%s'", mapKey)
 	}
@@ -64,7 +77,7 @@ func serializeDispatch(v reflect.Value, out map[string]string, prefix string, ta
 			if omitempty {
 				return nil
 			}
-			out[mapKey] = ""
+			s.out[mapKey] = ""
 			return nil
 		}
 		v = v.Elem()
@@ -79,56 +92,60 @@ func serializeDispatch(v reflect.Value, out map[string]string, prefix string, ta
 
 	switch v.Kind() {
 	case reflect.Interface:
-		return serializeInterface(v, out, mapKey)
+		return s.serializeInterface(v, mapKey)
 	case reflect.Struct:
-		return serializeStruct(v, out, mapKey)
+		return s.serializeStruct(v, mapKey)
 	case reflect.Map:
-		return serializeMap(v, out, mapKey)
+		return s.serializeMap(v, mapKey)
 	case reflect.Array, reflect.Slice:
-		return serializeArray(v, out, mapKey)
+		return s.serializeArray(v, mapKey)
 	case reflect.Pointer:
 		// serializable data types should not contain pointers to pointers
 		return fmt.Errorf("multilevel pointers are not supported")
+	}
+
+	result := ""
+	switch v.Kind() {
 	case reflect.String:
-		out[mapKey] = v.String()
+		result = v.String()
 	case reflect.Bool:
-		out[mapKey] = strconv.FormatBool(v.Bool())
+		result = strconv.FormatBool(v.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		out[mapKey] = strconv.FormatInt(v.Int(), 10)
+		result = strconv.FormatInt(v.Int(), 10)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		out[mapKey] = strconv.FormatUint(v.Uint(), 10)
+		result = strconv.FormatUint(v.Uint(), 10)
 	case reflect.Float32, reflect.Float64:
-		out[mapKey] = strconv.FormatFloat(v.Float(), 'f', -1, v.Type().Bits())
+		result = strconv.FormatFloat(v.Float(), 'f', -1, v.Type().Bits())
 	default:
 		return fmt.Errorf("unsupported field kind: %s", v.Kind())
 	}
+	s.out[mapKey] = result
 	return nil
 }
 
-func serializeInterface(v reflect.Value, out map[string]string, prefix string) error {
+func (s *serializer) serializeInterface(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Interface {
 		return fmt.Errorf("expected interface, got %s", v.Kind())
 	}
 
 	if v.IsNil() {
 		typeKey := prefix + ".t"
-		out[typeKey] = "nil"
+		s.out[typeKey] = "nil"
 		return nil
 	}
 
-	reg, ok := v.Interface().(Registrar)
-	if !ok {
-		return fmt.Errorf("interface must implement Registrar")
+	typename, err := s.opt.reg.NameOf(v.Elem())
+	if err != nil {
+		return err
 	}
 
-	typename := reg.RegisterSerialmapsType()
 	typeKey := prefix + ".t"
-	out[typeKey] = typename
+	s.out[typeKey] = typename
 
-	return serializeDispatch(v.Elem(), out, prefix, "v")
+	return s.serializeDispatch(v.Elem(), prefix, "v")
 }
 
-func serializeStruct(v reflect.Value, out map[string]string, prefix string) error {
+func (s *serializer) serializeStruct(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("expected struct, got %s", v.Kind())
 	}
@@ -154,7 +171,7 @@ func serializeStruct(v reflect.Value, out map[string]string, prefix string) erro
 			continue
 		}
 
-		err := serializeDispatch(sv, out, prefix, tagValue)
+		err := s.serializeDispatch(sv, prefix, tagValue)
 		if err != nil {
 			return fmt.Errorf("field %s: %w", sf.Name, err)
 		}
@@ -163,20 +180,20 @@ func serializeStruct(v reflect.Value, out map[string]string, prefix string) erro
 	return nil
 }
 
-func serializeArray(v reflect.Value, out map[string]string, prefix string) error {
+func (s *serializer) serializeArray(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
 		return fmt.Errorf("expected slice, got %s", v.Kind())
 	}
 	elemKind := v.Type().Elem().Kind()
 	if elemKind == reflect.Uint8 {
-		out[prefix] = base64.StdEncoding.EncodeToString(v.Interface().([]byte))
+		s.out[prefix] = base64.StdEncoding.EncodeToString(v.Interface().([]byte))
 		return nil
 	}
 	lenKey := prefix + ".len"
-	out[lenKey] = strconv.Itoa(v.Len())
+	s.out[lenKey] = strconv.Itoa(v.Len())
 	for i := range v.Len() {
 		arrayValue := v.Index(i)
-		err := serializeDispatch(arrayValue, out, prefix, strconv.Itoa(i))
+		err := s.serializeDispatch(arrayValue, prefix, strconv.Itoa(i))
 		if err != nil {
 			return fmt.Errorf("elem %d: %w", i, err)
 		}
@@ -184,7 +201,7 @@ func serializeArray(v reflect.Value, out map[string]string, prefix string) error
 	return nil
 }
 
-func serializeMap(v reflect.Value, out map[string]string, prefix string) error {
+func (s *serializer) serializeMap(v reflect.Value, prefix string) error {
 	if v.Kind() != reflect.Map {
 		return fmt.Errorf("expected map, got %s", v.Kind())
 	}
@@ -205,7 +222,7 @@ func serializeMap(v reflect.Value, out map[string]string, prefix string) error {
 
 	slices.Sort(keys)
 	keysKey := prefix + ".keys"
-	out[keysKey] = strings.Join(keys, ",")
+	s.out[keysKey] = strings.Join(keys, ",")
 
 	for i, k := range keys {
 		val := v.MapIndex(reflect.ValueOf(k))
@@ -213,7 +230,7 @@ func serializeMap(v reflect.Value, out map[string]string, prefix string) error {
 			return fmt.Errorf("elem '%s': invalid value", k)
 		}
 
-		err := serializeDispatch(val, out, prefix, strconv.Itoa(i))
+		err := s.serializeDispatch(val, prefix, strconv.Itoa(i))
 		if err != nil {
 			return fmt.Errorf("elem '%s': %w", k, err)
 		}

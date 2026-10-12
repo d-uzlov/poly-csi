@@ -10,39 +10,14 @@ import (
 
 const structMapTagName = "map"
 
-type Registrar interface {
-	RegisterSerialmapsType() string
-}
-
 type parser struct {
-	src                  map[string]string
-	removeTaken          bool
-	registeredInterfaces map[string]reflect.Type
-}
-
-type ParseOption func(p *parser)
-
-func WithRemove(val bool) ParseOption {
-	return func(p *parser) {
-		p.removeTaken = val
-	}
-}
-
-func WithRegister(reg ...Registrar) ParseOption {
-	return func(p *parser) {
-		if p.registeredInterfaces == nil {
-			p.registeredInterfaces = map[string]reflect.Type{}
-		}
-		for _, v := range reg {
-			typename := v.RegisterSerialmapsType()
-			p.registeredInterfaces[typename] = reflect.TypeOf(v)
-		}
-	}
+	src map[string]string
+	opt options
 }
 
 // Parse fills a struct of type T from map[string]string using the `map` tag.
 // Example: `Qwe string `map:"qwe"“
-func Parse[T any](src map[string]string, prefix string, out *T, opts ...ParseOption) error {
+func Parse[T any](src map[string]string, prefix string, out *T, opts ...Option) error {
 	if out == nil {
 		return fmt.Errorf("nil out pointer")
 	}
@@ -52,11 +27,13 @@ func Parse[T any](src map[string]string, prefix string, out *T, opts ...ParseOpt
 	}
 	tagValue := prefix
 	prefix = ""
+	opt := options{}
+	for _, v := range opts {
+		v(&opt)
+	}
 	p := parser{
 		src: src,
-	}
-	for _, v := range opts {
-		v(&p)
+		opt: opt,
 	}
 	return p.parseDispatch(v.Elem(), prefix, tagValue)
 }
@@ -108,7 +85,7 @@ func (p *parser) parseDispatch(v reflect.Value, prefix string, tagValue string) 
 	if !ok {
 		return nil
 	}
-	if p.removeTaken {
+	if p.opt.removeToken {
 		delete(p.src, mapKey)
 	}
 
@@ -173,19 +150,30 @@ func (p *parser) parseInterface(v reflect.Value, prefix string) error {
 		return nil
 	}
 
-	regT, ok := p.registeredInterfaces[typename]
-	if !ok {
-		return fmt.Errorf("type '%s' is not registered", typename)
+	elem, err := p.opt.reg.CreateInstance(typename)
+	if err != nil {
+		return err
+	}
+	t := v.Type()
+	if !elem.Type().Implements(t) {
+		return fmt.Errorf("type registered with '%s' does not implement interface %s", typename, t.String())
+	}
+	if elem.Kind() == reflect.Pointer {
+		elem = elem.Elem()
 	}
 
-	elem := reflect.New(regT).Elem()
-
-	err := p.parseDispatch(elem, prefix, "v")
+	err = p.parseDispatch(elem, prefix, "v")
 	if err != nil {
 		return err
 	}
 	// need to set after parsing in case the interface is stored by value
-	v.Set(elem)
+	if elem.Type().Implements(t) {
+		v.Set(elem)
+	} else if elem.Addr().Type().Implements(t) {
+		v.Set(elem.Addr())
+	} else {
+		return fmt.Errorf("type registered with '%s' does not implement interface %s", typename, t.String())
+	}
 	return nil
 }
 

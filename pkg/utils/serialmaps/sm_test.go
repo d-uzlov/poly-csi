@@ -4,6 +4,8 @@ import (
 	"maps"
 	"reflect"
 	"testing"
+
+	"meoe.io/poly-csi/pkg/utils/typeregistry"
 )
 
 type Simple struct {
@@ -228,7 +230,7 @@ func TestWithNested(t *testing.T) {
 	}
 }
 
-type TestInt interface {
+type TestInterface interface {
 	Check()
 }
 
@@ -238,28 +240,31 @@ type Impl1 struct {
 
 func (i Impl1) Check() {}
 
-func (i Impl1) RegisterSerialmapsType() string { return "impl1" }
-
 type Impl2 struct {
 	Asd string `map:"asd"`
 }
 
 func (i *Impl2) Check() {}
 
-func (i *Impl2) RegisterSerialmapsType() string { return "impl2" }
-
 type WithInterface struct {
-	Int1 TestInt `map:"i1"`
-	Int2 TestInt `map:"i2"`
+	Int1  TestInterface `map:"i1"`
+	Int2  TestInterface `map:"i2"`
+	Empty TestInterface `map:"empty"`
 }
+
+var testRegistry = typeregistry.NewPrepopulated([]typeregistry.Sample{
+	{Name: "impl1", Sample: Impl1{}},
+	{Name: "impl2", Sample: Impl2{}},
+})
 
 func TestWithInterface(t *testing.T) {
 	input := WithInterface{
-		Int1: Impl1{Qwe: "1"},
-		Int2: &Impl2{Asd: "2"},
+		Int1:  Impl1{Qwe: "1"},
+		Int2:  &Impl2{Asd: "2"},
+		Empty: nil,
 	}
 
-	serialized, err := Serialize(input, "zzz")
+	serialized, err := Serialize(input, "zzz", WithRegistry(testRegistry))
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -270,6 +275,7 @@ func TestWithInterface(t *testing.T) {
 		"zzz.i1.v.qwe": "1",
 		"zzz.i2.t":     "impl2",
 		"zzz.i2.v.asd": "2",
+		"zzz.empty.t":  "nil",
 	}
 
 	if !maps.Equal(serialized, expected) {
@@ -280,7 +286,7 @@ func TestWithInterface(t *testing.T) {
 	}
 
 	parsed := WithInterface{}
-	err = Parse(serialized, "zzz", &parsed, WithRegister(Impl1{}, &Impl2{}))
+	err = Parse(serialized, "zzz", &parsed, WithRegistry(testRegistry))
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -299,7 +305,7 @@ type WithPack struct {
 	Bytes2 []byte `map:"b2"`
 }
 
-func TestWithPack(t *testing.T) {
+func TestWithBytes(t *testing.T) {
 	input := WithPack{
 		Bytes:  []byte("123"),
 		Bytes2: []byte{},
@@ -324,7 +330,7 @@ func TestWithPack(t *testing.T) {
 	}
 
 	parsed := WithPack{}
-	err = Parse(serialized, "zzz", &parsed, WithRegister(Impl1{}, &Impl2{}))
+	err = Parse(serialized, "zzz", &parsed)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
