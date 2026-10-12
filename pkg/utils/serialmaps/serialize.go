@@ -190,28 +190,34 @@ func serializeMap(v reflect.Value, out map[string]string, prefix string) error {
 	}
 
 	var keys []string
-	iter := v.MapRange()
-	for iter.Next() {
-		k := iter.Key()
-		v := iter.Value()
-
+	for _, k := range v.MapKeys() {
 		if k.Kind() != reflect.String {
 			return fmt.Errorf("map key is not string")
 		}
 
-		key := k.String()
-		keys = append(keys, key)
-
-		err := serializeDispatch(v, out, prefix, key)
-		if err != nil {
-			return fmt.Errorf("elem %s: %w", key, err)
+		ks := k.String()
+		if strings.Contains(ks, ",") {
+			return fmt.Errorf("map key '%s' contains comma ','", ks)
 		}
+
+		keys = append(keys, ks)
 	}
 
-	// TODO handle comma in keys?
-	keysKey := prefix + ".keys"
 	slices.Sort(keys)
+	keysKey := prefix + ".keys"
 	out[keysKey] = strings.Join(keys, ",")
+
+	for i, k := range keys {
+		val := v.MapIndex(reflect.ValueOf(k))
+		if !val.IsValid() {
+			return fmt.Errorf("elem '%s': invalid value", k)
+		}
+
+		err := serializeDispatch(val, out, prefix, strconv.Itoa(i))
+		if err != nil {
+			return fmt.Errorf("elem '%s': %w", k, err)
+		}
+	}
 
 	return nil
 }

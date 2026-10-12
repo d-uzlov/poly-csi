@@ -281,10 +281,10 @@ func (p *parser) parseMap(v reflect.Value, prefix string) error {
 		v.Set(reflect.MakeMap(v.Type()))
 	}
 
-	for _, k := range keys {
+	for i, k := range keys {
 		key := reflect.ValueOf(k)
 		instance := reflect.New(v.Type().Elem()).Elem()
-		err := p.parseDispatch(instance, prefix, k)
+		err := p.parseDispatch(instance, prefix, strconv.Itoa(i))
 		if err != nil {
 			return fmt.Errorf("elem '%s': %w", k, err)
 		}

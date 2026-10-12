@@ -142,11 +142,11 @@ func TestWithMap(t *testing.T) {
 
 	expected := map[string]string{
 		"zzz.nested_map.keys": "k1,k2",
-		"zzz.nested_map.k1":   "v1",
-		"zzz.nested_map.k2":   "v2",
+		"zzz.nested_map.0":    "v1",
+		"zzz.nested_map.1":    "v2",
 		"zzz.map_ptr.keys":    "k1,k2",
-		"zzz.map_ptr.k1":      "v1",
-		"zzz.map_ptr.k2":      "v2",
+		"zzz.map_ptr.0":       "v1",
+		"zzz.map_ptr.1":       "v2",
 	}
 
 	if !maps.Equal(serialized, expected) {
@@ -197,13 +197,13 @@ func TestWithNested(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		"zzz.s.val":          "val",
-		"zzz.ptr.val":        "val_in_ptr",
-		"zzz.mapped.keys":    "key",
-		"zzz.mapped.key.val": "mapped_val",
-		"zzz.sliced.len":     "2",
-		"zzz.sliced.0.val":   "sliced_0",
-		"zzz.sliced.1.val":   "sliced_1",
+		"zzz.s.val":        "val",
+		"zzz.ptr.val":      "val_in_ptr",
+		"zzz.mapped.keys":  "key",
+		"zzz.mapped.0.val": "mapped_val",
+		"zzz.sliced.len":   "2",
+		"zzz.sliced.0.val": "sliced_0",
+		"zzz.sliced.1.val": "sliced_1",
 	}
 
 	if !maps.Equal(serialized, expected) {
@@ -312,7 +312,7 @@ func TestWithPack(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		"zzz.b": "MTIz",
+		"zzz.b":  "MTIz",
 		"zzz.b2": "",
 	}
 
