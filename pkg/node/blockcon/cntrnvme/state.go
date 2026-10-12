@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -27,12 +26,11 @@ type state struct {
 }
 
 type ExpectedConnection struct {
-	Addr       publishcontext.AddressOption `json:"addr"`
+	Addr       string `json:"addr"`
 	Controller string                       `json:"controller"`
-	Ip         string                       `json:"ip"`
 }
 
-var _ connectors.Handle = &state{}
+var _ blockcon.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -43,14 +41,10 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	return fmt.Errorf("nvme: ConnectFolder is not implemented")
-}
-
-func (s *state) ConnectBlock(ctx context.Context) error {
+func (s *state) Connect(ctx context.Context) error {
 	successCount := 0
 	for i, v := range s.Connections {
-		controllerName, err := s.snip.Connect(ctx, v.Addr.Address, s.Params, s.Auth, &s.ConExtra)
+		controllerName, err := s.snip.Connect(ctx, v.Addr, s.Params, s.Auth, &s.ConExtra)
 		if err != nil {
 			if len(s.Connections) <= 1 {
 				return fmt.Errorf("nvmeConnect: %w", err)
@@ -94,16 +88,18 @@ func (s *state) ConnectBlock(ctx context.Context) error {
 			// TODO is this even possible?
 			return fmt.Errorf("different controllers have different serial number")
 		}
-		for i, ec := range s.Connections {
-			if ec.Controller == v.Controller {
-				s.Connections[i].Ip = getIpFromNvmeAddr(v.Address)
-			}
-		}
+		// for i, ec := range s.Connections {
+		// 	if ec.Controller == v.Controller {
+		// 		s.Connections[i].Ip = getIpFromNvmeAddr(v.Address)
+		// 	}
+		// }
 	}
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
+func (s *state) GetDevices(ctx context.Context) ([]string, error) {
+	// TODO
+	index := 0
 	dev, ok := s.Devices[index]
 	if !ok {
 		return nil, fmt.Errorf("device not found")
@@ -128,29 +124,29 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
-	var issues []connectors.HealthMessage
+func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, error) {
+	var issues []blockcon.HealthMessage
 	subsys, err := s.snip.GetSubsysInfo(ctx, s.Params.TargetNqn)
 	if err != nil {
 		return nil, err
 	}
 	if subsys == nil {
-		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusInaccessible,
+		issues = append(issues, blockcon.HealthMessage{
+			Status:  blockcon.HealthStatusInaccessible,
 			Reason:  "NotConnected",
 			Message: "subsystem is no longer connected to this host",
 		})
 		return issues, nil
 	} else if len(subsys.Controllers) == 0 {
-		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusInaccessible,
+		issues = append(issues, blockcon.HealthMessage{
+			Status:  blockcon.HealthStatusInaccessible,
 			Reason:  "NotConnected",
 			Message: "subsystem is not associated with any controller",
 		})
 		return issues, nil
 	} else if len(subsys.Namespaces) == 0 {
-		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusInaccessible,
+		issues = append(issues, blockcon.HealthMessage{
+			Status:  blockcon.HealthStatusInaccessible,
 			Reason:  "NoNamespaces",
 			Message: "subsystem does not have any namespaces",
 		})
@@ -168,9 +164,9 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 		}
 		if !found {
 			if ec.Controller == "" {
-				missingControllers = append(missingControllers, fmt.Sprintf("missing controller for %s", ec.Addr.Name))
+				missingControllers = append(missingControllers, fmt.Sprintf("missing controller for %s", ec.Addr))
 			} else {
-				missingControllers = append(missingControllers, fmt.Sprintf("missing controller for %s (was %s)", ec.Addr.Name, ec.Controller))
+				missingControllers = append(missingControllers, fmt.Sprintf("missing controller for %s (was %s)", ec.Addr, ec.Controller))
 			}
 		}
 	}
@@ -187,15 +183,15 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 	}
 
 	if len(missingControllers) > 0 {
-		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusDegraded,
+		issues = append(issues, blockcon.HealthMessage{
+			Status:  blockcon.HealthStatusDegraded,
 			Reason:  "MultipathLoss",
 			Message: strings.Join(missingControllers, ", "),
 		})
 	}
 	if len(missingControllers) > 0 {
-		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusDegraded,
+		issues = append(issues, blockcon.HealthMessage{
+			Status:  blockcon.HealthStatusDegraded,
 			Reason:  "InternalError",
 			Message: strings.Join(internalErrors, ", "),
 		})
@@ -209,8 +205,8 @@ func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, er
 		}
 	}
 	if len(missingControllers) > 0 {
-		issues = append(issues, connectors.HealthMessage{
-			Status:  connectors.HealthStatusInaccessible,
+		issues = append(issues, blockcon.HealthMessage{
+			Status:  blockcon.HealthStatusInaccessible,
 			Reason:  "NamespaceFailed",
 			Message: strings.Join(failedNamespaces, ", "),
 		})

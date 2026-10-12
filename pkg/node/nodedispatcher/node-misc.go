@@ -8,8 +8,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -66,45 +64,25 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.Connectors)
+	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, conf.DevFolder, conf.BlockConnectors, conf.FsConnectors)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
 
-	if nvi.ConnectorData != "" {
-		err = nvi.conState.Expand(ctx)
+	for k, v := range nvi.Blocks {
+		err = v.handler.Expand(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("connector.Expand: %w", err)
+			return nil, fmt.Errorf("expand block volume '%s': %w", k, err)
 		}
-		logs.FromCtx(ctx).MicroOp("connector.Expand: success")
 	}
-	if nvi.MultipathData != "" {
-		err = mp.Expand(ctx, nvi.MultipathData)
-		if err != nil {
-			return nil, fmt.Errorf("multipath.Expand: %w", err)
-		}
-		logs.FromCtx(ctx).MicroOp("multipath.Expand: success")
+	if nvi.fsHandler == nil {
+		return nil, fmt.Errorf("fs handler is not initialized")
 	}
 
-	// Dispatcher expand manages filesystems mounted from block devices.
-	// Other cases should be handled in connectors.
-	if nvi.MountType == mountTypeBlock {
-		if nvi.fs == nil {
-			return nil, fmt.Errorf("nvi.fs is not initialized")
-		}
-		// TODO add support for journal
-		devices, err := nvi.conState.GetDevices(ctx, 0)
-		if err != nil {
-			return nil, fmt.Errorf("get connection devices: %w", err)
-		}
-		nvi.fs.SetSingleDevice(devices[0])
-		err = nvi.fs.Resize(ctx, tr)
-		if err != nil {
-			return nil, fmt.Errorf("ExpandFs: %w", err)
-		}
-		logs.FromCtx(ctx).MicroOp("ExpandFs: success")
+	err = nvi.fsHandler.Expand(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("expand filesystem: %w", err)
 	}
 
 	fsnip := fsutils.New(tr)
@@ -118,60 +96,52 @@ func (n *Node) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRe
 }
 
 func (n *Node) NodeGetVolumeHealth(ctx context.Context, req *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "volume id is empty")
-	}
-	if req.StagingTargetPath == "" {
-		return nil, status.Error(codes.InvalidArgument, "staging path is empty")
-	}
-	conf := FromCtx(ctx)
-	tr := localexec.New(conf.ExecConfig)
-	mp := conf.GetMultipath(tr)
+	return nil, fmt.Errorf("unimplemented")
+	// if req.VolumeId == "" {
+	// 	return nil, status.Error(codes.InvalidArgument, "volume id is empty")
+	// }
+	// if req.StagingTargetPath == "" {
+	// 	return nil, status.Error(codes.InvalidArgument, "staging path is empty")
+	// }
+	// conf := FromCtx(ctx)
+	// tr := localexec.New(conf.ExecConfig)
 
-	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.Connectors)
-	if err != nil {
-		return nil, fmt.Errorf("ParseMountInfo: %w", err)
-	}
+	// nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, conf.DevFolder, conf.BlockConnectors, conf.FsConnectors)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("ParseMountInfo: %w", err)
+	// }
 
-	if nvi.conState == nil {
-		return nil, fmt.Errorf("connection state is not initialized")
-	}
-	issues, err := nvi.conState.CheckHealth(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("CheckHealth: %w", err)
-	}
+	// result := &csi.NodeGetVolumeHealthResponse{
+	// 	VolumeHealth: &csi.VolumeHealth{
+	// 		VolumeId: req.VolumeId,
+	// 	},
+	// }
 
-	result := &csi.NodeGetVolumeHealthResponse{
-		VolumeHealth: &csi.VolumeHealth{
-			VolumeId: req.VolumeId,
-		},
-	}
+	// for _, v := range issues {
+	// 	if len(v.Reason) > 100 {
+	// 		v.Message = v.Message[:100]
+	// 	}
+	// 	if len(v.Message) > 500 {
+	// 		v.Message = v.Message[:500]
+	// 	}
+	// 	result.VolumeHealth.HealthStatuses = append(result.VolumeHealth.HealthStatuses, &csi.VolumeHealth_VolumeHealthEntry{
+	// 		Status:  convertHealthStatus(v.Status),
+	// 		Reason:  v.Reason,
+	// 		Message: v.Message,
+	// 	})
+	// }
 
-	for _, v := range issues {
-		if len(v.Reason) > 100 {
-			v.Message = v.Message[:100]
-		}
-		if len(v.Message) > 500 {
-			v.Message = v.Message[:500]
-		}
-		result.VolumeHealth.HealthStatuses = append(result.VolumeHealth.HealthStatuses, &csi.VolumeHealth_VolumeHealthEntry{
-			Status:  convertHealthStatus(v.Status),
-			Reason:  v.Reason,
-			Message: v.Message,
-		})
-	}
-
-	return result, nil
+	// return result, nil
 }
 
-func convertHealthStatus(connectorStatus string) csi.VolumeHealthErrorType {
-	switch connectorStatus {
-	case connectors.HealthStatusDegraded:
-		return csi.VolumeHealthErrorType_DEGRADED
-	case connectors.HealthStatusDataLoss:
-		return csi.VolumeHealthErrorType_DATA_LOSS
-	case connectors.HealthStatusInaccessible:
-		return csi.VolumeHealthErrorType_INACCESSIBLE
-	}
-	return csi.VolumeHealthErrorType_DEGRADED
-}
+// func convertHealthStatus(connectorStatus string) csi.VolumeHealthErrorType {
+// 	switch connectorStatus {
+// 	case connectors.HealthStatusDegraded:
+// 		return csi.VolumeHealthErrorType_DEGRADED
+// 	case connectors.HealthStatusDataLoss:
+// 		return csi.VolumeHealthErrorType_DATA_LOSS
+// 	case connectors.HealthStatusInaccessible:
+// 		return csi.VolumeHealthErrorType_INACCESSIBLE
+// 	}
+// 	return csi.VolumeHealthErrorType_DEGRADED
+// }

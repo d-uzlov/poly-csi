@@ -1,4 +1,4 @@
-package cntrnfs
+package fsnfs
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -17,7 +17,7 @@ type state struct {
 	NfsPath string `json:"nfsPath"`
 }
 
-var _ connectors.Handle = &state{}
+var _ filecon.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -28,12 +28,12 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) ConnectBlock(ctx context.Context) error {
-	return fmt.Errorf("nfs: ConnectBlock is not implemented")
+func (s *state) Prepare(ctx context.Context, req filecon.PrepareRequest) error {
+	return nil
 }
 
-func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.FsMountPath, "nfs", req.MountFlags)
+func (s *state) Mount(ctx context.Context, req filecon.MountRequest) error {
+	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.StagingPath, "nfs", req.Flags)
 	if err != nil {
 		return err
 	}
@@ -50,8 +50,8 @@ func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderR
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
-	return nil, fmt.Errorf("nfs does not create block devices")
+func (s *state) Unmount(ctx context.Context, path string) error {
+	return fsutils.New(s.tr).Unmount(ctx, path)
 }
 
 func (s *state) Disconnect(ctx context.Context) error {
@@ -64,7 +64,7 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
+func (s *state) CheckHealth(ctx context.Context) ([]filecon.HealthMessage, error) {
 	return nil, nil
 }
 

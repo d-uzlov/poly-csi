@@ -1,4 +1,4 @@
-package protocols
+package blockapi
 
 import (
 	"fmt"
@@ -16,13 +16,14 @@ type NvmeShare struct {
 	AuthType      NvmeChap `map:"nvme.authType,omitempty"      json:"authType,omitempty"      validate:"required,oneof=nqn dhchap-mutual"`
 	ConnectPort   int      `map:"nvme.connectPort,omitempty"   json:"connectPort,omitempty"   validate:"required,port"`
 	TransportType string   `map:"nvme.transportType,omitempty" json:"transportType,omitempty" validate:"required"`
+	ServerAddress []string `map:"nvme.addr,omitempty"    json:"server,omitempty"    validate:"required"`
 
 	// secret
 	HostKey       string `secret:"+" map:"nvme.hostKey,omitempty"       json:"hostKey,omitempty"       validate:"required_if=AuthType dhchap-mutual"`
 	ControllerKey string `secret:"+" map:"nvme.controllerKey,omitempty" json:"controllerKey,omitempty" validate:"required_if=AuthType dhchap-mutual"`
 }
 
-var _ Config = NvmeShare{}
+var _ Data = NvmeShare{}
 
 const (
 	NvmeAuthNqn    = NvmeChap("nqn")
@@ -61,6 +62,6 @@ func (v NvmeShare) RegisterSerialmapsType() string {
 	return string(Nvme)
 }
 
-func (v NvmeShare) Clone() Config {
+func (v NvmeShare) Clone() Data {
 	return v
 }

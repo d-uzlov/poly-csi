@@ -1,101 +1,164 @@
 package publishcontext
 
 import (
+	"crypto/hpke"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
-	"github.com/go-playground/validator/v10"
-	"meoe.io/poly-csi/pkg/api/protocols"
+	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/fsapi"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
+	"meoe.io/poly-csi/pkg/utils/secrets"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
+	"meoe.io/poly-csi/pkg/utils/typeregistry"
 )
 
 type PublishContext struct {
-	Protocol       protocols.Name        `map:"protocol" validate:"required"`
-	ProtocolPublic protocols.Config      `map:"public" validate:"-"`
-	ProtocolSecret encrypt.SecretWrapper `map:"secret" validate:"required"`
-	AddressList    []AddressOption       `map:"addr" validate:"required"`
+	BlockDevices map[string]Block `map:"block"`
+	Filesystem   fsapi.Data       `map:"fs"`
 }
 
-type AddressOption struct {
-	Name    string `map:"n" validate:"required"`
-	Address string `map:"a" validate:"required"`
+type Block struct {
+	ConnectorId string
+	Data        blockapi.Data
 }
 
-func (pc *PublishContext) SetProtocol(name protocols.Name, data protocols.Config, publicKey encrypt.RsaPublicKey) error {
-	pc.Protocol = name
+// type AddressOption struct {
+// 	Name    string `map:"n" json:"n" validate:"required"`
+// 	Address string `map:"a" json:"a" validate:"required"`
+// }
 
-	public, secret, err := protocols.SplitSecret(data)
-	if err != nil {
-		return fmt.Errorf("split protocol info: %w", err)
-	}
+type Serialized struct {
+	Enc   []byte
+	Block []SerializedBlock
+	Fs    SerializedFilesystem
+}
 
-	pc.ProtocolPublic = public
+type SerializedBlock struct {
+	ConnectorId string
+	Name        string
+	Public      blockapi.Data
+	Secret      []byte
+}
 
-	secretBytes, err := json.Marshal(secret)
+type SerializedFilesystem struct {
+	Public fsapi.Data
+	Secret []byte
+}
+
+var Registry = typeregistry.NewPrepopulated([]typeregistry.Sample{
+	{Name: string(blockapi.Aoe), Sample: blockapi.AoeShare{}},
+	{Name: string(blockapi.Iscsi), Sample: blockapi.IscsiShare{}},
+	{Name: string(blockapi.Nbd), Sample: blockapi.NbdShare{}},
+	{Name: string(blockapi.Nvme), Sample: blockapi.NvmeShare{}},
+	{Name: string(fsapi.Nfs), Sample: fsapi.NfsShare{}},
+	{Name: string(fsapi.Smb), Sample: fsapi.SmbShare{}},
+	{Name: string(fsapi.Ext4), Sample: fsapi.Ext4Data{}},
+	{Name: string(fsapi.Xfs), Sample: fsapi.XfsData{}},
+})
+
+func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.PublicKey) error {
+	enc, sender, err := hpke.NewSender(publicKey, hpke.HKDFSHA256(), hpke.AES256GCM(), nil)
 	if err != nil {
 		return err
 	}
-	pc.ProtocolSecret, err = encrypt.NewWrapper(publicKey)
-	if err != nil {
-		return err
+
+	s := Serialized{
+		Enc: enc,
 	}
-	err = pc.ProtocolSecret.SetData(secretBytes)
-	if err != nil {
-		return err
+
+	for k, b := range pc.BlockDevices {
+		public, secret, err := secrets.Split(b.Data)
+		if err != nil {
+			return fmt.Errorf("split protocol info: %w", err)
+		}
+
+		plaintext, err := json.Marshal(secret)
+		if err != nil {
+			return err
+		}
+		tag := []byte("block")
+		ciphertext, err := sender.Seal(tag, plaintext)
+		if err != nil {
+			return err
+		}
+
+		s.Block = append(s.Block, SerializedBlock{
+			ConnectorId: b.ConnectorId,
+			Name:        k,
+			Public:      public,
+			Secret:      ciphertext,
+		})
 	}
-	return nil
+
+	if pc.Filesystem != nil {
+		public, secret, err := secrets.Split(pc.Filesystem)
+		if err != nil {
+			return fmt.Errorf("split protocol info: %w", err)
+		}
+
+		plaintext, err := json.Marshal(secret)
+		if err != nil {
+			return err
+		}
+		tag := []byte("filesystem")
+		ciphertext, err := sender.Seal(tag, plaintext)
+		if err != nil {
+			return err
+		}
+
+		s.Fs = SerializedFilesystem{
+			Public: public,
+			Secret: ciphertext,
+		}
+	}
+
+	_, err = serialmaps.SerializeInto(s, out, volumecontext.Prefix, serialmaps.WithRegistry(Registry))
+	return err
 }
 
-func (pc *PublishContext) GetProtocol(key encrypt.RsaPrivateKey) (protocols.Config, error) {
-	result := pc.ProtocolPublic.Clone()
-	secretBytes, err := pc.ProtocolSecret.Extract(key)
-	if err != nil {
-		return nil, err
-	}
-	ptr := reflect.New(reflect.TypeOf(result))
-	ptr.Elem().Set(reflect.ValueOf(result))
-	err = json.Unmarshal(secretBytes, ptr.Interface())
-	if err != nil {
-		return nil, err
-	}
-	result = ptr.Elem().Interface().(protocols.Config)
+func Parse(src map[string]string, privateKey hpke.PrivateKey) (PublishContext, error) {
+	result := PublishContext{}
+	var s Serialized
 
-	// TODO cache validator instance
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	err = validate.Struct(result)
+	err := serialmaps.Parse(src, volumecontext.Prefix, &s, serialmaps.WithRegistry(Registry))
 	if err != nil {
-		err = protocols.FormatValidationError(err)
-		return result, err
+		return PublishContext{}, err
 	}
 
-	err = result.Validate()
+	receiver, err := hpke.NewRecipient(s.Enc, privateKey, hpke.HKDFSHA256(), hpke.AES256GCM(), nil)
 	if err != nil {
-		return result, fmt.Errorf("validateContext: %w", err)
+		return PublishContext{}, err
+	}
+
+	for _, v := range s.Block {
+		tag := []byte("block")
+		plaintext, err := receiver.Open(tag, v.Secret)
+		if err != nil {
+			return PublishContext{}, err
+		}
+		err = json.Unmarshal(plaintext, &v.Public)
+		if err != nil {
+			return PublishContext{}, err
+		}
+		result.BlockDevices[v.Name] = Block{
+			ConnectorId: v.ConnectorId,
+			Data: v.Public,
+		}
+	}
+
+	if s.Fs.Public != nil {
+		tag := []byte("block")
+		plaintext, err := receiver.Open(tag, s.Fs.Secret)
+		if err != nil {
+			return PublishContext{}, err
+		}
+		err = json.Unmarshal(plaintext, &s.Fs.Public)
+		if err != nil {
+			return PublishContext{}, err
+		}
+		result.Filesystem = s.Fs.Public
 	}
 
 	return result, nil
-}
-
-func (pc *PublishContext) Validate() error {
-	// TODO cache validator instance
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	err := validate.Struct(pc)
-	if err != nil {
-		err = protocols.FormatValidationError(err)
-		return err
-	}
-	return nil
-}
-
-func Parse(src map[string]string) (PublishContext, error) {
-	var result PublishContext
-	var proto []serialmaps.Registrar
-	for _, v := range protocols.ListShareTypes() {
-		proto = append(proto, v)
-	}
-	err := serialmaps.Parse(src, volumecontext.Prefix, &result, serialmaps.WithRegister(proto...))
-	return result, err
 }

@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/api/protocols"
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-func (c *connector) GetInfo(ctx context.Context) (protocols.NodeInfo, error) {
+func (c *connector) GetInfo(ctx context.Context) (blockapi.NodeInfo, error) {
 	iqn, err := c.parseIqn(c.commonConfig.Tr, ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return &protocols.IscsiNodeInfo{
+	return &blockapi.IscsiNodeInfo{
 		InitiatorIqn: iqn,
 	}, nil
 }

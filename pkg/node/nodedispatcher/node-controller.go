@@ -58,7 +58,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 	slogctx.FromCtx(ctx).Debug("starting node info push", "presets", presetNames)
 	go nodeinfo.PeriodicInfoPush(pushCtx, newConf.GetNodeInfoLogConfig(), registryClient, newConf.NodeInfoDb.Interval,
 		func(ctx context.Context) (*nodeinfo.NodeInfo, error) {
-			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, newConf.Connectors, newConf.Networks, presetNames)
+			return nodeinfo.GatherNodeInfo(ctx, n.nodeId, newConf.Encrypt.NodeKey, newConf.BlockConnectors, newConf.Networks, presetNames)
 		}, func() {
 			close(pushCh)
 		},

@@ -1,11 +1,11 @@
-package cntrcifs
+package fscifs
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -18,7 +18,7 @@ type state struct {
 	Password  string `json:"password"`
 }
 
-var _ connectors.Handle = &state{}
+var _ filecon.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -29,18 +29,18 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) ConnectBlock(ctx context.Context) error {
-	return fmt.Errorf("nvme: ConnectBlock is not implemented")
+func (s *state) Prepare(ctx context.Context, req filecon.PrepareRequest) error {
+	return nil
 }
 
-func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	flags := req.MountFlags
-	if req.MountGroup != "" {
-		flags = append(flags, fmt.Sprintf("gid=%s", req.MountGroup))
+func (s *state) Mount(ctx context.Context, req filecon.MountRequest) error {
+	flags := req.Flags
+	if req.FsGroup != "" {
+		flags = append(flags, fmt.Sprintf("gid=%s", req.FsGroup))
 	}
 	flags = append(flags, fmt.Sprintf("username=%s", s.Username), fmt.Sprintf("password=%s", s.Password))
 
-	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.SharePath, req.FsMountPath, "cifs", flags)
+	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.SharePath, req.TargetPath, "cifs", flags)
 	if err != nil {
 		return err
 	}
@@ -57,8 +57,8 @@ func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderR
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
-	return nil, fmt.Errorf("cifs does not create block devices")
+func (s *state) Unmount(ctx context.Context, path string) error {
+	return fsutils.New(s.tr).Unmount(ctx, path)
 }
 
 func (s *state) Disconnect(ctx context.Context) error {
@@ -71,7 +71,7 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
+func (s *state) CheckHealth(ctx context.Context) ([]filecon.HealthMessage, error) {
 	return nil, nil
 }
 

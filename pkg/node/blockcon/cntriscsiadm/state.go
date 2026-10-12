@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -21,14 +20,10 @@ type state struct {
 	Iqn                     string            `json:"iqn"`
 	Port                    int               `json:"port"`
 	Attributes              map[string]string `json:"attributes"`
-	Connections             []Connection      `json:"connections"`
+	Connections             []string          `json:"connections"`
 }
 
-type Connection struct {
-	Addr publishcontext.AddressOption
-}
-
-var _ connectors.Handle = &state{}
+var _ blockcon.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -39,11 +34,7 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	return fmt.Errorf("nvme: ConnectFolder is not implemented")
-}
-
-func (s *state) ConnectBlock(ctx context.Context) (err error) {
+func (s *state) Connect(ctx context.Context) (err error) {
 	// setting up cleanup before even attempting to connect
 	// because failure could be caused by invalid state, that should be forcefully disconnected.
 	// TODO remove this?
@@ -56,7 +47,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 		}
 		logs.FromCtx(ctx).MicroOp("detected failure, running cleanup")
 		for _, v := range s.Connections {
-			addr := fmt.Sprintf("%s:%d", v.Addr.Address, s.Port)
+			addr := fmt.Sprintf("%s:%d", v, s.Port)
 			cleanupErr := s.snip.disconnect(ctx, s.Iqn, addr)
 			if cleanupErr != nil {
 				logs.FromCtx(ctx).Error("failed to run cleanup", "address", addr, "error", cleanupErr.Error())
@@ -66,7 +57,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 
 	successCount := 0
 	for _, v := range s.Connections {
-		addr := fmt.Sprintf("%s:%d", v.Addr.Address, s.Port)
+		addr := fmt.Sprintf("%s:%d", v, s.Port)
 		err = s.snip.configureTarget(ctx, s.Iqn, addr, s.Attributes)
 		if err != nil {
 			if len(s.Connections) <= 1 {
@@ -95,7 +86,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
+func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 	is, err := s.snip.findSessions(ctx, s.Iqn)
 	if err != nil {
 		return nil, fmt.Errorf("find iscsi sessions: %w", err)
@@ -180,7 +171,7 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
+func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, error) {
 	return nil, nil
 }
 

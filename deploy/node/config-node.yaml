@@ -17,11 +17,7 @@ multipath:
     mapperFolder: /host/dev/mapper
     multipathdCmd: [ multipathd ]
 
-connectors:
-- id: nfs
-  type: nfs
-- id: smb
-  type: cifs
+blockConnectors:
 - id: nvme
   type: nvme
   config:
@@ -44,6 +40,16 @@ connectors:
     remoteId: ublk_iscsi
 - id: aoe
   type: aoe
+
+filesystems:
+- id: ext4
+  type: ext4
+- id: xfs
+  type: xfs
+- id: nfs
+  type: nfs
+- id: smb
+  type: cifs
 
 presets:
 - name: nvmeCon

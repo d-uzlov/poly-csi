@@ -1,4 +1,4 @@
-package protocols
+package blockapi
 
 const Aoe = Name("aoe")
 
@@ -10,7 +10,7 @@ type AoeShare struct {
 	// secret
 }
 
-var _ Config = AoeShare{}
+var _ Data = AoeShare{}
 
 func (v AoeShare) Validate() error {
 	return nil
@@ -20,6 +20,6 @@ func (v AoeShare) RegisterSerialmapsType() string {
 	return string(Aoe)
 }
 
-func (v AoeShare) Clone() Config {
+func (v AoeShare) Clone() Data {
 	return v
 }

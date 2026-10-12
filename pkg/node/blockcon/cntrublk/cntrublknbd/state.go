@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/protocols"
+	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
-	"meoe.io/poly-csi/pkg/node/connectors"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/ublk"
 )
@@ -19,12 +19,12 @@ type state struct {
 
 	Uuid    string             `json:"uuid"`
 	Address string             `json:"address"`
-	Pc      protocols.NbdShare `json:"nbd"`
+	Pc      blockapi.NbdShare `json:"nbd"`
 
 	DevId string `json:"devId"`
 }
 
-var _ connectors.Handle = &state{}
+var _ blockcon.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -35,7 +35,7 @@ func parseState(serialized string) (*state, error) {
 	return &result, nil
 }
 
-func (s *state) ConnectBlock(ctx context.Context) (err error) {
+func (s *state) Connect(ctx context.Context) (err error) {
 	defer func() {
 		if err != nil {
 			s.sv.Remove(s.Uuid)
@@ -64,11 +64,7 @@ func (s *state) ConnectBlock(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *state) ConnectFolder(ctx context.Context, req connectors.ConnectFolderRequest) error {
-	return fmt.Errorf("nbd: ConnectFolder is not implemented")
-}
-
-func (s *state) GetDevices(ctx context.Context, index int) ([]string, error) {
+func (s *state) GetDevices(ctx context.Context) ([]string, error) {
 	if s.DevId == "" {
 		return nil, fmt.Errorf("missing s.DevId")
 	}
@@ -84,7 +80,7 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]connectors.HealthMessage, error) {
+func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, error) {
 	return nil, nil
 }
 

@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/api/protocols"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type connector struct {
-	connectors.NoInfo
+	blockcon.NoInfo
 
-	commonConfig connectors.CommonConfig
+	commonConfig blockcon.CommonConfig
 	snip         NvmeSnippets
 	config       Config
 }
@@ -27,7 +27,7 @@ type PresetData struct {
 	ReconnectDelay        string `map:"reconnectDelaySec"`
 }
 
-func New(conf connectors.CommonConfig) (connectors.Manager, error) {
+func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
 	result := &connector{}
 	result.commonConfig = conf
 
@@ -45,16 +45,15 @@ func New(conf connectors.CommonConfig) (connectors.Manager, error) {
 	return result, nil
 }
 
-func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
-	return connectors.Capabilities{
-		Protocol:    protocols.Nvme,
+func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
+	return blockcon.Capabilities{
+		Protocol:    blockapi.Nvme,
 		HasNodeInfo: false,
-		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
-	proto, ok := req.Proto.(protocols.NvmeShare)
+func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
+	proto, ok := req.Proto.(blockapi.NvmeShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}
@@ -87,7 +86,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	}
 
 	ecs := []ExpectedConnection{}
-	for _, ao := range req.AddressOptions {
+	for _, ao := range proto.ServerAddress {
 		ecs = append(ecs, ExpectedConnection{
 			Addr: ao,
 		})
@@ -104,7 +103,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (blockcon.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

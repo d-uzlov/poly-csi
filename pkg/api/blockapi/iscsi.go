@@ -1,4 +1,4 @@
-package protocols
+package blockapi
 
 import (
 	"fmt"
@@ -15,11 +15,12 @@ const (
 
 type IscsiShare struct {
 	// public
-	Initiator string    `map:"iscsi.initiator,omitempty"    json:"initiator,omitempty" validate:"required"`
-	Iqn       string    `map:"iscsi.nqn,omitempty"          json:"iqn,omitempty"       validate:"required"`
-	Port      int       `map:"iscsi.port,omitempty"         json:"port,omitempty"      validate:"required,port"`
-	Transport string    `map:"iscsi.transport,omitempty"    json:"transport,omitempty" validate:"required"`
-	AuthType  IscsiChap `map:"iscsi.authType,omitempty"     json:"authType,omitempty"  validate:"required,oneof=none chap-mutual"`
+	Initiator     string    `map:"iscsi.initiator,omitempty"    json:"initiator,omitempty" validate:"required"`
+	Iqn           string    `map:"iscsi.nqn,omitempty"          json:"iqn,omitempty"       validate:"required"`
+	Port          int       `map:"iscsi.port,omitempty"         json:"port,omitempty"      validate:"required,port"`
+	Transport     string    `map:"iscsi.transport,omitempty"    json:"transport,omitempty" validate:"required"`
+	AuthType      IscsiChap `map:"iscsi.authType,omitempty"     json:"authType,omitempty"  validate:"required,oneof=none chap-mutual"`
+	ServerAddress []string  `map:"iscsi.addr,omitempty"    json:"server,omitempty"    validate:"required"`
 
 	// secret
 	ClientUser string `secret:"+" map:"iscsi.clientUser,omitempty" json:"clientUser,omitempty" validate:"required_if=AuthType chap-mutual"`
@@ -28,7 +29,7 @@ type IscsiShare struct {
 	TargetPass string `secret:"+" map:"iscsi.targetPass,omitempty" json:"targetPass,omitempty" validate:"required_if=AuthType chap-mutual"`
 }
 
-var _ Config = IscsiShare{}
+var _ Data = IscsiShare{}
 
 func (v IscsiShare) Validate() error {
 	switch v.AuthType {
@@ -59,7 +60,7 @@ func (v IscsiShare) RegisterSerialmapsType() string {
 	return string(Iscsi)
 }
 
-func (v IscsiShare) Clone() Config {
+func (v IscsiShare) Clone() Data {
 	return v
 }
 
@@ -77,6 +78,6 @@ func (v IscsiNodeInfo) RegisterSerialmapsType() string {
 	return string(Iscsi)
 }
 
-func (v IscsiNodeInfo) Clone() Config {
+func (v IscsiNodeInfo) Clone() Data {
 	return v
 }

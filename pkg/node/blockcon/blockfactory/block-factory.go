@@ -1,4 +1,4 @@
-package connectorfactory
+package blockfactory
 
 import (
 	"fmt"
@@ -6,13 +6,10 @@ import (
 	"slices"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntraoe"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrnvme"
-	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
-	"meoe.io/poly-csi/pkg/node/filecon/cntrcifs"
-	"meoe.io/poly-csi/pkg/node/filecon/cntrnfs"
 )
 
 const (
@@ -24,19 +21,17 @@ const (
 	TypePlugin   = "plugin_json"
 )
 
-var types = map[string]connectors.InflateFunc{
-	TypeNfs:      cntrnfs.New,
-	TypeCifs:     cntrcifs.New,
+var types = map[string]blockcon.InflateFunc{
 	TypeNvme:     cntrnvme.New,
 	TypeIscsiadm: cntriscsiadm.New,
 	TypeAoe:      cntraoe.New,
-	TypePlugin: func(conf connectors.CommonConfig) (connectors.Manager, error) {
-		httpClient := cntrhttpjsonplugin.NewHttpClient()
-		return cntrhttpjsonplugin.NewDispatcherClient(httpClient, conf)
-	},
+	// TypePlugin: func(conf blockcon.CommonConfig) (blockcon.Manager, error) {
+	// 	httpClient := cntrhttpjsonplugin.NewHttpClient()
+	// 	return cntrhttpjsonplugin.NewDispatcherClient(httpClient, conf)
+	// },
 }
 
-func GetByType(mtype string) (connectors.InflateFunc, error) {
+func GetByType(mtype string) (blockcon.InflateFunc, error) {
 	v, ok := types[mtype]
 	if !ok {
 		keys := slices.Collect(maps.Keys(types))

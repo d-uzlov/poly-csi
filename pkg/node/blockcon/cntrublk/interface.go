@@ -3,7 +3,7 @@ package cntrublk
 import (
 	"context"
 
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/utils/ublk"
 )
 
@@ -13,4 +13,4 @@ type Supervisor interface {
 	Remove(uuid string) error
 }
 
-type InflateFunc func(sv Supervisor, conf connectors.CommonConfig) connectors.Manager
+type InflateFunc func(sv Supervisor, conf blockcon.CommonConfig) blockcon.Manager

@@ -4,39 +4,34 @@ import (
 	"context"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/protocols"
+	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
-	"meoe.io/poly-csi/pkg/node/connectors"
 )
 
 type connector struct {
-	connectors.NoInfo
+	blockcon.NoInfo
 
-	conf connectors.CommonConfig
+	conf blockcon.CommonConfig
 	sv   cntrublk.Supervisor
 }
 
-func New(sv cntrublk.Supervisor, conf connectors.CommonConfig) connectors.Manager {
+func New(sv cntrublk.Supervisor, conf blockcon.CommonConfig) blockcon.Manager {
 	return &connector{
 		sv:   sv,
 		conf: conf,
 	}
 }
 
-func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
-	return connectors.Capabilities{
-		Protocol:    protocols.Nbd,
+func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
+	return blockcon.Capabilities{
+		Protocol:    blockapi.Nbd,
 		HasNodeInfo: false,
-		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
-	if len(req.AddressOptions) != 1 {
-		return nil, fmt.Errorf("nbd connector does not support more than one address")
-	}
-
-	proto, ok := req.Proto.(protocols.NbdShare)
+func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
+	proto, ok := req.Proto.(blockapi.NbdShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}
@@ -46,12 +41,12 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 		sv:        c.sv,
 		devFolder: c.conf.DevFolder,
 		Uuid:      req.Uuid,
-		Address:   req.AddressOptions[0].Address,
+		Address:   proto.ServerAddress,
 		Pc:        proto,
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (blockcon.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

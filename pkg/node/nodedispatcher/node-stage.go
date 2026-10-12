@@ -3,10 +3,7 @@ package nodedispatcher
 import (
 	"context"
 	"fmt"
-	"maps"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -15,12 +12,11 @@ import (
 	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/nodeconfig"
+	"meoe.io/poly-csi/pkg/node/blockcon"
+	"meoe.io/poly-csi/pkg/node/filecon"
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
-	"meoe.io/poly-csi/pkg/utils/blockdevice"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
-	"meoe.io/poly-csi/pkg/utils/volumeinit"
 )
 
 const stageFolderMount = "/fs_mount"
@@ -39,7 +35,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.GetMultipath(tr)
 
 	var vc volumecontext.VolumeContext
 	err = serialmaps.Parse(req.VolumeContext, volumecontext.Prefix, &vc)
@@ -47,68 +42,23 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse volume context: %w", err)
 	}
 
-	fullPreset := map[string]string{}
-	if vc.PresetName != "" {
-		for v := range strings.SplitSeq(vc.PresetName, ",") {
-			preset, ok := n.conf.Presets[v]
-			if !ok {
-				return nil, fmt.Errorf("preset with name '%s' is not found", v)
-			}
-			maps.Copy(fullPreset, preset)
-		}
+	fullPreset, err := conf.AssemblePreset(vc.Presets)
+	if err != nil {
+		return nil, fmt.Errorf("parse preset: %w", err)
 	}
 	logs.FromCtx(ctx).MicroOp("using preset", "fullPreset", fullPreset)
 
-	con := conf.Connectors[vc.ConnectorId]
-	if con == nil {
-		return nil, fmt.Errorf("connector with id '%s' is not found", vc.ConnectorId)
-	}
-
-	caps, err := con.Capabilities(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get connector capabilities: %w", err)
-	}
-
-	pc, err := publishcontext.Parse(req.PublishContext)
+	pc, err := publishcontext.Parse(req.PublishContext, conf.Encrypt.NodeKey)
 	if err != nil {
 		return nil, fmt.Errorf("parse publish context: %w", err)
 	}
-	err = pc.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("validateContext: %w", err)
-	}
-
-	proto, err := pc.GetProtocol(conf.Encrypt.NodeKey)
-	if err != nil {
-		return nil, fmt.Errorf("extract protocol info from publish context: %w", err)
-	}
-
-	// connectorContext := map[string]string{}
-	// for k, v := range req.PublishContext {
-	// 	if strings.HasPrefix(k, caps.ContextPrefix) {
-	// 		connectorContext[k] = v
-	// 	}
+	// err = pc.Validate()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("validateContext: %w", err)
 	// }
 
-	ch, err := con.GetHandle(ctx, connectors.ConnectRequest{
-		Uuid:                    vc.Uuid,
-		AddressOptions:          pc.AddressList,
-		VolumeContext:           req.VolumeContext,
-		Proto:                   proto,
-		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-		Preset:                  fullPreset,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("connector.GetHandle: %w", err)
-	}
-	if ch == nil {
-		return nil, fmt.Errorf("connector.GetHandle: nil result")
-	}
-
-	nvi := newVolumeHandle(req.StagingTargetPath, tr, con, mp, vc.ConnectorId, fullPreset)
-	nvi.conState = ch
+	nvi := newVolumeHandle(req.StagingTargetPath, tr, fullPreset)
 	nvi.FsRootDirMode = vc.FsRootDirMode
-	nvi.JournalVolume = vc.JournalVolume
 	defer func() {
 		saveErr := nvi.writeToDisk()
 		if err == nil {
@@ -132,81 +82,100 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 	}()
 
+	devices := map[string]string{}
+	for k, v := range pc.BlockDevices {
+		con := conf.BlockConnectors[v.ConnectorId]
+		if con == nil {
+			return nil, fmt.Errorf("block connector with id '%s' is not found", v.ConnectorId)
+		}
+
+		handle, err := con.GetHandle(ctx, blockcon.ConnectRequest{
+			Uuid:                    vc.Uuid,
+			Proto:                   v.Data,
+			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
+			Preset:                  fullPreset,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("blockcon.GetHandle: %w", err)
+		}
+		if handle == nil {
+			return nil, fmt.Errorf("blockcon.GetHandle: nil result")
+		}
+
+		err = handle.Connect(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("blockcon.Connect: %w", err)
+		}
+
+		dd, err := handle.GetDevices(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("blockcon.GetDevices: %w", err)
+		}
+
+		// var devicePath string
+		// devicePath = setupMultipath(dd)
+		// devices[k] = devicePath
+		devices[k] = dd[0]
+	}
+
 	mountParams := req.VolumeCapability.GetMount()
 
-	switch caps.ConnectType {
-	case connectors.ConnectTypeBlock:
-		err = nvi.stageBlock(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("stageBlock: %w", err)
-		}
-		switch {
-		case mountParams != nil:
-			nvi.FsType = vc.FsType
-			nvi.fs = volumeinit.GetFromType(vc.FsType)
-			err = nvi.fs.Inflate(vc.FsData)
-			if err != nil {
-				return nil, fmt.Errorf("fs.Inflate: %w", err)
-			}
-			err = nvi.stageBlockMount(ctx, req.StagingTargetPath+stageFolderMount, mountParams.MountFlags)
-			if err != nil {
-				return nil, fmt.Errorf("stageBlockMount: %w", err)
-			}
-			logger.MicroOp("stageBlockMount: success")
-		case req.VolumeCapability.GetBlock() != nil:
-			return nil, fmt.Errorf("block mounting is not implemented")
-		default:
-			return nil, fmt.Errorf("unknown mount mode")
-		}
-		if n.conf.PodCgroupRoot != "" {
-			dev, err := nvi.getMainBlockDevice(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("getMainBlockDevice: %w", err)
-			}
-
-			limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(fullPreset)
-			if err != nil {
-				return nil, fmt.Errorf("ParseCgroupIoLimits: %w", err)
-			}
-			if foundAny {
-				logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)
-				blockPath, err := tr.Cmds().ReadLink(ctx, dev)
-				if err != nil {
-					return nil, fmt.Errorf("readLink(%s): %w", dev, err)
-				}
-				bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
-				// TODO this also affects csi-driver itself
-				err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
-				if err != nil {
-					return nil, fmt.Errorf("SetCgroupsIoLimit: %w", err)
-				}
-			}
-		}
-
-	case connectors.ConnectTypeFolder:
-		if mountParams == nil {
-			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
-		}
-
-		cr := connectors.ConnectFolderRequest{
-			FsMountPath: req.StagingTargetPath + stageFolderMount,
-			MountFlags:  mountParams.MountFlags,
-			// MountGroup:  mountParams.VolumeMountGroup,
-		}
-
-		err = nvi.stageFolderMount(ctx, cr)
-		if err != nil {
-			return nil, fmt.Errorf("stageFolderMount: %w", err)
-		}
-		logs.FromCtx(ctx).MicroOp("stageFolderMount: success")
-	case connectors.ConnectTypePublishFolder:
-		if mountParams == nil {
-			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
-		}
-		// nothing to do at stage
-	default:
-		return nil, fmt.Errorf("unknown capabilities.ConnectType: '%s'", caps.ConnectType)
+	fs, ok := conf.FsConnectors[vc.FsType]
+	if !ok {
+		return nil, fmt.Errorf("filesystem is not found: %s", vc.FsType)
 	}
+	fsHandle, err := fs.GetHandle(ctx, filecon.ConnectRequest{
+		Uuid:                    vc.Uuid,
+		Proto:                   pc.Filesystem,
+		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
+		Preset:                  fullPreset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("filecon.GetHandle: %w", err)
+	}
+	if fsHandle == nil {
+		return nil, fmt.Errorf("filecon.GetHandle: nil result")
+	}
+	fsStagingMount := req.StagingTargetPath + stageFolderMount
+	err = fsHandle.Prepare(ctx, filecon.PrepareRequest{
+		Devices:     devices,
+		StagingPath: fsStagingMount,
+		Flags:       mountParams.MountFlags,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fsHandle.Prepare: %w", err)
+	}
+
+	cmd := []string{"chmod", vc.FsRootDirMode, fsStagingMount}
+	err = transport.CheckedRun(ctx, tr, cmd, transport.WithSudo(true))
+	if err != nil {
+		return nil, fmt.Errorf("chmod: %w", err)
+	}
+
+	// TODO
+	// if n.conf.PodCgroupRoot != "" {
+	// 	dev, err := nvi.getMainBlockDevice(ctx)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("getMainBlockDevice: %w", err)
+	// 	}
+	// 	limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(fullPreset)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("ParseCgroupIoLimits: %w", err)
+	// 	}
+	// 	if foundAny {
+	// 		logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)
+	// 		blockPath, err := tr.Cmds().ReadLink(ctx, dev)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("readLink(%s): %w", dev, err)
+	// 		}
+	// 		bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
+	// 		// TODO this also affects csi-driver itself
+	// 		err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("SetCgroupsIoLimit: %w", err)
+	// 		}
+	// 	}
+	// }
 
 	return &csi.NodeStageVolumeResponse{}, nil
 }
@@ -222,9 +191,8 @@ func (n *Node) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolume
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.GetMultipath(tr)
 
-	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.Connectors)
+	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, conf.DevFolder, conf.BlockConnectors, conf.FsConnectors)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}

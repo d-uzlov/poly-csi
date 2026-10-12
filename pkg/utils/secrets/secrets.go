@@ -50,3 +50,16 @@ func ClearFields[T any](obj T, securityValue string) (T, error) {
 		return result.Interface().(T), nil
 	}
 }
+
+func Split[T any](conf T) (public T, secret T, err error) {
+	var zero T
+	public, err = ClearFields(conf, "")
+	if err != nil {
+		return zero, zero, err
+	}
+	secret, err = ClearFields(conf, "+")
+	if err != nil {
+		return zero, zero, err
+	}
+	return
+}

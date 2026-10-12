@@ -72,6 +72,8 @@ func (s *FsSnippets) WaitForBlockDevice(ctx context.Context, device string, maxD
 	})
 }
 
+// GetBlkid returns current filesystem info as reported by blkid.
+// If there is no filesystem, it returns (nil, nil)
 func (s *FsSnippets) GetBlkid(ctx context.Context, devicePath string) (*FsInfo, error) {
 	// can't use '-o json' here because busybox does not support it
 	// on blkid from util-linux '--probe' disables cache

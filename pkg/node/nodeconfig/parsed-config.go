@@ -1,23 +1,26 @@
 package nodeconfig
 
 import (
+	"crypto/hpke"
+	"fmt"
+	"maps"
 	"net"
 	"strconv"
 	"strings"
 
 	"github.com/dustin/go-humanize"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/blockcon"
+	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/blockdevice"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 type ParsedEncrypt struct {
-	NodeKey encrypt.RsaPrivateKey
+	NodeKey hpke.PrivateKey
 	Conf    NodeEncryptConfig
 }
 
@@ -30,7 +33,8 @@ type ParsedConfig struct {
 	Encrypt                 ParsedEncrypt
 	NodeInfoDb              NodeInfoDbConfig
 	Multipath               mpfactory.ParsedMultipath
-	Connectors              map[string]connectors.Manager
+	BlockConnectors         map[string]blockcon.Manager
+	FsConnectors            map[string]filecon.Manager
 	Presets                 map[string]map[string]string
 	Networks                []ParsedNetworks
 	DevFolder               string
@@ -64,27 +68,39 @@ func ParseCgroupIoLimits(preset map[string]string) (limit blockdevice.IoLimit, f
 		case "writeBw":
 			value, err := humanize.ParseBytes(v)
 			if err != nil {
-				return blockdevice.IoLimit{}, false,err
+				return blockdevice.IoLimit{}, false, err
 			}
 			foundAny = true
 			result.WriteBW = strconv.Itoa(int(value))
 		case "readIops":
 			value, _, err := humanize.ParseSI(v)
 			if err != nil {
-				return blockdevice.IoLimit{}, false,err
+				return blockdevice.IoLimit{}, false, err
 			}
 			foundAny = true
 			result.ReadIops = strconv.Itoa(int(value))
 		case "writeIops":
 			value, _, err := humanize.ParseSI(v)
 			if err != nil {
-				return blockdevice.IoLimit{}, false,err
+				return blockdevice.IoLimit{}, false, err
 			}
 			foundAny = true
 			result.WriteIops = strconv.Itoa(int(value))
 		}
 	}
 	return result, foundAny, nil
+}
+
+func (c *ParsedConfig) AssemblePreset(presets []string) (map[string]string, error) {
+	fullPreset := map[string]string{}
+	for _, v := range presets {
+		preset, ok := c.Presets[v]
+		if !ok {
+			return nil, fmt.Errorf("preset with name '%s' is not found", v)
+		}
+		maps.Copy(fullPreset, preset)
+	}
+	return fullPreset, nil
 }
 
 func (c *ParsedConfig) GetRpcLogConfig(rpcPath string) logs.Config {

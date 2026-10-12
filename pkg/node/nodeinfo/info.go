@@ -1,34 +1,33 @@
 package nodeinfo
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/node_registry"
-	"meoe.io/poly-csi/pkg/api/protocols"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
 type NodeInfo struct {
 	Id         string                   `json:"id"`
-	PublicKey  encrypt.RsaPublicKey     `json:"public_key"`
+	PublicKey  []byte                   `json:"public_key"`
 	Connectors map[string]ConnectorInfo `json:"connectors"`
 	Ips        []string                 `json:"ips"`
 	Presets    []string                 `json:"presets"`
 }
 
 type ConnectorInfo struct {
-	Protocol protocols.Name     `json:"protocol"`
-	Info     protocols.NodeInfo `json:"info"`
+	Protocol blockapi.Name     `json:"protocol"`
+	Info     blockapi.NodeInfo `json:"info"`
 }
 
 func (ni *NodeInfo) Validate() error {
 	if ni.Id == "" {
-		return fmt.Errorf("node id is empty")
+		return fmt.Errorf("missing node id")
 	}
-	err := ni.PublicKey.Validate()
-	if err != nil {
-		return fmt.Errorf("public key: %w", err)
+	if ni.PublicKey == nil {
+		return fmt.Errorf("missing public key")
 	}
 	return nil
 }
@@ -37,7 +36,7 @@ func (ni *NodeInfo) Serialize() (node_registry.NodeInfo, error) {
 	result := node_registry.NodeInfo{
 		IPS:        ni.Ips,
 		Presets:    ni.Presets,
-		PublicKey:  string(ni.PublicKey.SerializePem()),
+		PublicKey:  base64.StdEncoding.EncodeToString(ni.PublicKey),
 		Connectors: map[string]node_registry.ConnectorInfo{},
 	}
 	for k, v := range ni.Connectors {
@@ -61,20 +60,17 @@ func ParseNodeInfo(id string, src node_registry.NodeInfo) (*NodeInfo, error) {
 		Presets:    src.Presets,
 		Connectors: map[string]ConnectorInfo{},
 	}
-	pk, err := encrypt.ParsePublicRsaPem([]byte(src.PublicKey))
+	publicKey, err := base64.StdEncoding.DecodeString(src.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("public key: %w", err)
 	}
-	if pk == nil {
-		return nil, fmt.Errorf("node public key: nil")
-	}
-	result.PublicKey = *pk
+	result.PublicKey = publicKey
 
 	for k, v := range src.Connectors {
 		ci := ConnectorInfo{
-			Protocol: protocols.Name(v.Protocol),
+			Protocol: blockapi.Name(v.Protocol),
 		}
-		err := protocols.ParseNodeInfo(protocols.Name(v.Protocol), v.Data, &ci.Info)
+		err := blockapi.ParseNodeInfo(blockapi.Name(v.Protocol), v.Data, &ci.Info)
 		if err != nil {
 			return nil, fmt.Errorf("parse connector '%s' protocol '%s' info: %w", k, v.Protocol, err)
 		}

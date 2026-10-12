@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/api/protocols"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 )
 
 type connector struct {
-	connectors.NoInfo
+	blockcon.NoInfo
 
-	conf connectors.CommonConfig
+	conf blockcon.CommonConfig
 }
 
 type aoeConfig struct {
@@ -22,7 +22,7 @@ type aoeConfig struct {
 	MaxSectors string   `yaml:"maxSectors"`
 }
 
-func New(conf connectors.CommonConfig) (connectors.Manager, error) {
+func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
 	var cfg aoeConfig
 	err := conf.Cfg.Decode(cfg)
 	if err != nil {
@@ -75,20 +75,15 @@ func (c *connector) setAoeModuleParams(ctx context.Context, conf aoeConfig) erro
 	return nil
 }
 
-func (c *connector) Capabilities(ctx context.Context) (connectors.Capabilities, error) {
-	return connectors.Capabilities{
-		Protocol:    protocols.Aoe,
+func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
+	return blockcon.Capabilities{
+		Protocol:    blockapi.Aoe,
 		HasNodeInfo: false,
-		ConnectType: connectors.ConnectTypeBlock,
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest) (connectors.Handle, error) {
-	if len(req.AddressOptions) != 1 {
-		return nil, fmt.Errorf("aoe connector does not support more than one address")
-	}
-
-	proto, ok := req.Proto.(protocols.AoeShare)
+func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
+	proto, ok := req.Proto.(blockapi.AoeShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}
@@ -100,7 +95,7 @@ func (c *connector) GetHandle(ctx context.Context, req connectors.ConnectRequest
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (connectors.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (blockcon.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

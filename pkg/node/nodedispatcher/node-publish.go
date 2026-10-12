@@ -9,8 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -32,71 +31,35 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	// logger := logs.FromCtx(ctx)
 	conf := FromCtx(ctx)
 	tr := localexec.New(conf.ExecConfig)
-	mp := conf.GetMultipath(tr)
 
-	nvi, err := ParseNodeVolumeInfo(ctx, req.StagingTargetPath, tr, mp, n.conf.DevFolder, conf.Connectors)
+	nvi, err := TryParseMountInfo(ctx, req.StagingTargetPath, tr, conf.DevFolder, conf.BlockConnectors, conf.FsConnectors)
 	if err != nil {
 		return nil, fmt.Errorf("ParseMountInfo: %w", err)
 	}
 
-	caps, err := nvi.connector.Capabilities(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get connector capabilities: %w", err)
+	mountParams := req.VolumeCapability.GetMount()
+	if nvi.fsHandler == nil {
+		return nil, fmt.Errorf("fs handler is not initialized")
 	}
 
-	mountParams := req.VolumeCapability.GetMount()
-
-	switch caps.ConnectType {
-	case connectors.ConnectTypeBlock, connectors.ConnectTypeFolder:
-		switch {
-		case mountParams != nil:
-			if nvi.FsMountPath == "" {
-				return nil, fmt.Errorf("node volume info: FsMountPath is empty")
-			}
-			if mountParams.VolumeMountGroup != "" {
-				if nvi.VolumeGroup != "" && nvi.VolumeGroup != mountParams.VolumeMountGroup {
-					return nil, fmt.Errorf("requested to mount as group '%s' but this volume is already attached with group '%s'", mountParams.VolumeMountGroup, nvi.VolumeGroup)
-				}
-				err = tr.Cmds().Chown(ctx, nvi.FsMountPath, "root", mountParams.VolumeMountGroup, false)
-				if err != nil {
-					return nil, fmt.Errorf("chown fs root: %w", err)
-				}
-			}
-			fsnip := fsutils.New(tr)
-			var bindOpts []fsutils.BindMountOption
-			// if nvi.ManagedOps.AllowIdMap {
-			// 	bindOpts = append(bindOpts, fsutils.WithMapUsersDefault(), fsutils.WithMapGroup("0", "0"), fsutils.WithMapGroup("10000", req.VolumeCapability.GetMount().VolumeMountGroup))
-			// }
-			err = fsnip.EnsureBindMount(ctx, nvi.FsMountPath, req.TargetPath, bindOpts...)
-			if err != nil {
-				return nil, fmt.Errorf("EnsureBindMount: %w", err)
-			}
-			logs.FromCtx(ctx).MicroOp("bind mount success")
-		case req.VolumeCapability.GetBlock() != nil:
-			return nil, fmt.Errorf("block mounting is not implemented")
-		default:
-			return nil, fmt.Errorf("unknown mount mode")
+	err = nvi.fsHandler.Mount(ctx, filecon.MountRequest{
+		StagingPath: nvi.FsStagePath,
+		TargetPath:  req.TargetPath,
+		Flags:       mountParams.MountFlags,
+		FsGroup:     mountParams.VolumeMountGroup,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fsHandler.Mount: %w", err)
+	}
+	// TODO move this inside filesystem?
+	if mountParams.VolumeMountGroup != "" {
+		if nvi.VolumeGroup != "" && nvi.VolumeGroup != mountParams.VolumeMountGroup {
+			return nil, fmt.Errorf("requested to mount as group '%s' but this volume is already attached with group '%s'", mountParams.VolumeMountGroup, nvi.VolumeGroup)
 		}
-
-	case connectors.ConnectTypePublishFolder:
-		if mountParams == nil {
-			return nil, fmt.Errorf("connector provides folder mounts, but mount params are not set")
-		}
-
-		cr := connectors.ConnectFolderRequest{
-			FsMountPath: req.TargetPath,
-			MountFlags:  mountParams.MountFlags,
-			MountGroup:  mountParams.VolumeMountGroup,
-		}
-
-		err = nvi.publishFolderMount(ctx, cr)
+		err = tr.Cmds().Chown(ctx, nvi.FsStagePath, "root", mountParams.VolumeMountGroup, false)
 		if err != nil {
-			return nil, fmt.Errorf("publishFolderMount: %w", err)
+			return nil, fmt.Errorf("chown fs root: %w", err)
 		}
-		logs.FromCtx(ctx).MicroOp("publishFolderMount: success")
-
-	default:
-		return nil, fmt.Errorf("unknown capabilities.ConnectType: '%s'", caps.ConnectType)
 	}
 
 	return &csi.NodePublishVolumeResponse{}, nil

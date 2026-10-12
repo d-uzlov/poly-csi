@@ -4,55 +4,56 @@ import (
 	"context"
 
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/api/protocols"
-	"meoe.io/poly-csi/pkg/api/publishcontext"
+	"meoe.io/poly-csi/pkg/api/fsapi"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type InflateFunc = func(conf CommonConfig) (Manager, error)
+type MetadataInflateFunc = func() Metadata
+
+type Metadata interface {
+	Configure(requestedSize int64, params map[string]string) error
+	RequestBlockDevices() map[string]BlockDeviceRequirement
+	SetVolumeProps(props map[string]StorageProperties) error
+	GetData() fsapi.Data
+}
+
+type StorageProperties struct {
+	Size             int64 `json:"size"`
+	InitialEmpty     bool  `json:"initial_empty"`
+	RMWSize          int64 `json:"rmw_size"`
+	OptimalWriteSize int64 `json:"optimal_size"`
+	AtomicSize       int64 `json:"atomic_size"`
+}
+
+type BlockDeviceRequirement struct {
+	MinSize int64
+}
 
 type Manager interface {
-	// Capabilities returns an object describing capabilities of this type of connector
+	// Capabilities returns an object describing capabilities of this type of Manager
 	Capabilities(ctx context.Context) (Capabilities, error)
-	// GetInfo returns opaque string containing connector-specific info about the node.
-	// Controller can parse this info and use it to publish the volume.
-	GetInfo(ctx context.Context) (protocols.NodeInfo, error)
 	// GetHandle creates a handle to manage a connection.
-	// Connector must parse params and create a handle, without making any changes in OS.
+	// Manager must parse params and create a handle, without making any changes in OS.
 	GetHandle(ctx context.Context, req ConnectRequest) (Handle, error)
-	// ParseHandle recreates state object from State.Serialize result
+	// ParseHandle recreates handle object from [Handle.Serialize] result
 	ParseHandle(serializedData string) (Handle, error)
 }
 
-type NoInfo struct{}
-
-func (i *NoInfo) GetInfo(ctx context.Context) (protocols.NodeInfo, error) {
-	return nil, nil
-}
-
-type Handle interface {
-	ConnectFolder(ctx context.Context, req MountRequest) error
-
-	// Disconnect must ensure that volume is disconnected.
-	// If system does not have volume info, disconnect is a no-op without errors.
-	Disconnect(ctx context.Context) error
-	// Expand ensures that local state synchronizes with remote state.
-	Expand(ctx context.Context) error
-
-	CheckHealth(ctx context.Context) ([]HealthMessage, error)
-
-	// Serialize creates an opaque string that can be used in [Manager].ParseState
-	Serialize() (string, error)
-	Validate() error
+type ConnectRequest struct {
+	Uuid                    string            `json:"uuid"`
+	Proto                   fsapi.Data        `json:"proto"`
+	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
+	Preset                  map[string]string `json:"preset"`
 }
 
 type CommonConfig struct {
-	Tr        transport.Transport
-	Cfg       yaml.Node
+	Tr  transport.Transport
+	Cfg yaml.Node
 }
 
 type Capabilities struct {
-	Protocol protocols.Name
+	FsType fsapi.Name
 
 	// HasNodeInfo indicates if GetInfo of this connector provides essential info needed to create shares
 	HasNodeInfo bool `json:"has_node_info"`
@@ -63,10 +64,7 @@ type Capabilities struct {
 
 	// ManagedUnmount requests the caller to call unmount on connected folder before Disconnect.
 	// This is ignored when ConnectType is ConnectTypeBlock.
-	ManagedUnmount bool `json:"managed_unmount"`
-
-	// ContextPrefix indicated which keys in CSI publish context are part of the connector config.
-	// ContextPrefix string `json:"context_prefix"`
+	SpecialMount bool `json:"special_mount"`
 }
 
 // constants for Capabilities.ConnectType
@@ -78,19 +76,49 @@ const (
 	ConnectTypePublishFolder = "__connect_type_publish_folder"
 )
 
-type ConnectRequest struct {
-	Uuid                    string                         `json:"uuid"`
-	AddressOptions          []publishcontext.AddressOption `json:"addressOptions"`
-	VolumeContext           map[string]string              `json:"volumeContext"`
-	Proto                   protocols.Config
-	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
-	Preset                  map[string]string `json:"preset"`
+type Handle interface {
+	// Prepare runs global volume setup.
+	// This can include block device format, fetching configs, etc.
+	// If ([Capabilities.SpecialMount] == false) Prepare MUST ensure
+	// that filesystem is mounted at [PrepareRequest.TargetPath].
+	Prepare(ctx context.Context, req PrepareRequest) error
+
+	// Mount must ensure that filesystem is mounted at [MountRequest.TargetPath].
+	// If already mounted, this is a no-op.
+	Mount(ctx context.Context, req MountRequest) error
+	Unmount(ctx context.Context, path string) error
+
+	// Disconnect must ensure that volume is disconnected.
+	// If system does not have volume info, disconnect is a no-op without errors.
+	Disconnect(ctx context.Context) error
+
+	// Expand ensures that filesystem size grows to maximum size available to the volume.
+	Expand(ctx context.Context) error
+
+	CheckHealth(ctx context.Context) ([]HealthMessage, error)
+
+	// Serialize creates an opaque string that can be used in [Manager.ParseHandle]
+	Serialize() (string, error)
+	Validate() error
+}
+
+type PrepareRequest struct {
+	Devices     map[string]string `json:"devices"`
+	StagingPath string            `json:"stagingPath"`
+	Flags       []string          `json:"mountFlags"`
+}
+
+type NoPrepare struct{}
+
+func (i *NoPrepare) Prepare(ctx context.Context, req PrepareRequest) error {
+	return nil
 }
 
 type MountRequest struct {
-	FsMountPath string   `json:"fsMountPath"`
-	MountFlags  []string `json:"mountFlags"`
-	MountGroup  string   `json:"mountGroup"`
+	StagingPath string   `json:"stagingPath"`
+	TargetPath  string   `json:"targetPath"`
+	Flags       []string `json:"mountFlags"`
+	FsGroup     string   `json:"mountGroup"`
 }
 
 const (

@@ -2,20 +2,19 @@ package nodeinfo
 
 import (
 	"context"
+	"crypto/hpke"
 	"fmt"
 	"net"
 
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/node/connectors"
+	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
-	"meoe.io/poly-csi/pkg/utils/encrypt"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, pk encrypt.RsaPrivateKey, connectorList map[string]connectors.Manager, networks []nodeconfig.ParsedNetworks, presets []string) (*NodeInfo, error) {
-	nodePublicKey := pk.GetPublicKey()
+func GatherNodeInfo(ctx context.Context, nodeId string, privateKey hpke.PrivateKey, connectorList map[string]blockcon.Manager, networks []nodeconfig.ParsedNetworks, presets []string) (*NodeInfo, error) {
 	info := NodeInfo{
 		Id:         nodeId,
-		PublicKey:  nodePublicKey,
+		PublicKey:  privateKey.PublicKey().Bytes(),
 		Connectors: map[string]ConnectorInfo{},
 		Presets:    presets,
 	}
