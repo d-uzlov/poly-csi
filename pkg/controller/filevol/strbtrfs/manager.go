@@ -2,6 +2,7 @@ package strbtrfs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/filevol"
@@ -44,11 +45,11 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 	return fsInfo.Available, nil
 }
 
-func (m *manager) ParseVolume(serialized string) (filevol.Volume, error) {
+func (m *manager) ParseVolume(serialized json.RawMessage) (filevol.Volume, error) {
 	return parseVolume(serialized, m.snip)
 }
 
-func (m *manager) ParseSnapshot(serialized string) (filevol.Snapshot, error) {
+func (m *manager) ParseSnapshot(serialized json.RawMessage) (filevol.Snapshot, error) {
 	return parseSnapshot(serialized, m.snip)
 }
 

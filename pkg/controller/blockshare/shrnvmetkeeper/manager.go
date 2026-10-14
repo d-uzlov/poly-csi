@@ -1,6 +1,7 @@
 package shrnvmetkeeper
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
@@ -51,7 +52,7 @@ func (m *manager) CreateShare(req blockshare.CreateShareRequest) (blockshare.Sha
 	}, nil
 }
 
-func (m *manager) ParseShare(shareData string) (blockshare.Share, error) {
+func (m *manager) ParseShare(shareData json.RawMessage) (blockshare.Share, error) {
 	result, err := parseShare(shareData)
 	if result != nil {
 		result.tr = m.tr

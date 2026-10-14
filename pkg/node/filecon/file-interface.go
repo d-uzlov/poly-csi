@@ -2,6 +2,7 @@ package filecon
 
 import (
 	"context"
+	"encoding/json"
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/api/fsapi"
@@ -16,6 +17,8 @@ type Metadata interface {
 	RequestBlockDevices() map[string]BlockDeviceRequirement
 	SetVolumeProps(props map[string]StorageProperties) error
 	GetData() fsapi.Data
+	Serialize() (json.RawMessage, error)
+	Restore(serialized json.RawMessage) error
 }
 
 type StorageProperties struct {

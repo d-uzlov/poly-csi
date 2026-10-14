@@ -26,7 +26,7 @@ func newSnapshot(vgName string, lvName string, snip lvm.Snippets) *Snapshot {
 	}
 }
 
-func parseSnapshot(serialized string, snip lvm.Snippets) (*Snapshot, error) {
+func parseSnapshot(serialized json.RawMessage, snip lvm.Snippets) (*Snapshot, error) {
 	var result Snapshot
 	err := json.Unmarshal([]byte(serialized), &result)
 	if err != nil {
@@ -43,12 +43,8 @@ func parseSnapshot(serialized string, snip lvm.Snippets) (*Snapshot, error) {
 	return &result, nil
 }
 
-func (s *Snapshot) Serialize() (string, error) {
-	bytes, err := json.Marshal(s)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
+func (s *Snapshot) Serialize() (json.RawMessage, error) {
+	return json.Marshal(s)
 }
 
 func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {

@@ -24,7 +24,7 @@ func newVolume(path string, snip zfs.Snippets) *Volume {
 	}
 }
 
-func parseVolume(encoded string, snip zfs.Snippets) (*Volume, error) {
+func parseVolume(encoded json.RawMessage, snip zfs.Snippets) (*Volume, error) {
 	var result Volume
 	err := json.Unmarshal([]byte(encoded), &result)
 	if err != nil {
@@ -37,12 +37,8 @@ func parseVolume(encoded string, snip zfs.Snippets) (*Volume, error) {
 	return &result, nil
 }
 
-func (v *Volume) Serialize() (string, error) {
-	encoded, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return string(encoded), nil
+func (v *Volume) Serialize() (json.RawMessage, error) {
+	return json.Marshal(v)
 }
 
 func (v *Volume) CreateState(ctx context.Context, size int64) error {

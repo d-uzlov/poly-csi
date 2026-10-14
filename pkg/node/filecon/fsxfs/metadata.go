@@ -1,6 +1,7 @@
 package fsxfs
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/fsapi"
@@ -9,9 +10,9 @@ import (
 )
 
 type metadata struct {
-	User     fsapi.XfsUserParams
-	Format   fsapi.XfsFormat
-	mainSize int64
+	User     fsapi.XfsUserParams `json:"user"`
+	Format   fsapi.XfsFormat     `json:"format"`
+	MainSize int64               `json:"mainSize"`
 }
 
 const prefix = "xfs"
@@ -21,9 +22,9 @@ func NewMetadata() filecon.Metadata {
 }
 
 func (s *metadata) Configure(requestedSize int64, params map[string]string) error {
-	s.mainSize = requestedSize
+	s.MainSize = requestedSize
 	const minFsSize = 1024 * 1024 * 1024
-	if s.mainSize < minFsSize {
+	if s.MainSize < minFsSize {
 		return fmt.Errorf("xfs size can not smaller than 1GiB")
 	}
 	err := serialmaps.Parse(params, prefix, &s.User, serialmaps.WithRemove(true))
@@ -40,10 +41,10 @@ const journalVolumeKey = "journal"
 
 func (s *metadata) RequestBlockDevices() map[string]filecon.BlockDeviceRequirement {
 	result := map[string]filecon.BlockDeviceRequirement{
-		mainVolumeKey: {MinSize: s.mainSize},
+		mainVolumeKey: {MinSize: s.MainSize},
 	}
 	if s.User.SeparateJournal {
-		result[journalVolumeKey] = filecon.BlockDeviceRequirement{MinSize: s.calcPreferredJournalSize(s.mainSize)}
+		result[journalVolumeKey] = filecon.BlockDeviceRequirement{MinSize: s.calcPreferredJournalSize(s.MainSize)}
 	}
 	return result
 }
@@ -51,7 +52,7 @@ func (s *metadata) RequestBlockDevices() map[string]filecon.BlockDeviceRequireme
 func (s *metadata) SetVolumeProps(props map[string]filecon.StorageProperties) error {
 	if s.User.SeparateJournal {
 		journal := props[journalVolumeKey]
-		wantSize := s.calcPreferredJournalSize(s.mainSize)
+		wantSize := s.calcPreferredJournalSize(s.MainSize)
 		if journal.Size < wantSize {
 			return fmt.Errorf("journal is too small: %d < %d", journal.Size, wantSize)
 		}
@@ -107,4 +108,12 @@ func (s *metadata) calcPreferredJournalSize(dataSize int64) int64 {
 	}
 	bs := s.Format.BlockSize
 	return ((size + bs - 1) / bs) * bs
+}
+
+func (s *metadata) Serialize() (json.RawMessage, error) {
+	return json.Marshal(s)
+}
+
+func (s *metadata) Restore(serialized json.RawMessage) error {
+	return json.Unmarshal([]byte(serialized), s)
 }

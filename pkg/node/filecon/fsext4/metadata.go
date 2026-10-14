@@ -1,6 +1,7 @@
 package fsext4
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/fsapi"
@@ -9,9 +10,9 @@ import (
 )
 
 type metadata struct {
-	User     fsapi.Ext4UserParams
-	Format   fsapi.Ext4Format
-	mainSize int64
+	User     fsapi.Ext4UserParams `json:"user"`
+	Format   fsapi.Ext4Format     `json:"format"`
+	MainSize int64                `json:"mainSize"`
 }
 
 const prefix = "ext4"
@@ -21,7 +22,7 @@ func NewMetadata() filecon.Metadata {
 }
 
 func (s *metadata) Configure(requestedSize int64, params map[string]string) error {
-	s.mainSize = requestedSize
+	s.MainSize = requestedSize
 
 	s.User = fsapi.Ext4UserParams{
 		BytesPerInode:    "65536",
@@ -52,10 +53,10 @@ const journalVolumeKey = "journal"
 
 func (s *metadata) RequestBlockDevices() map[string]filecon.BlockDeviceRequirement {
 	result := map[string]filecon.BlockDeviceRequirement{
-		mainVolumeKey: {MinSize: s.mainSize},
+		mainVolumeKey: {MinSize: s.MainSize},
 	}
 	if s.User.SeparateJournal {
-		result[journalVolumeKey] = filecon.BlockDeviceRequirement{MinSize: s.calcPreferredJournalSize(s.mainSize)}
+		result[journalVolumeKey] = filecon.BlockDeviceRequirement{MinSize: s.calcPreferredJournalSize(s.MainSize)}
 	}
 	return result
 }
@@ -63,7 +64,7 @@ func (s *metadata) RequestBlockDevices() map[string]filecon.BlockDeviceRequireme
 func (s *metadata) SetVolumeProps(props map[string]filecon.StorageProperties) error {
 	if s.User.SeparateJournal {
 		journal := props[journalVolumeKey]
-		wantSize := s.calcPreferredJournalSize(s.mainSize)
+		wantSize := s.calcPreferredJournalSize(s.MainSize)
 		if journal.Size < wantSize {
 			return fmt.Errorf("journal is too small: %d < %d", journal.Size, wantSize)
 		}
@@ -96,4 +97,12 @@ func (s *metadata) calcPreferredJournalSize(dataSize int64) int64 {
 		return max
 	}
 	return ((size + bs - 1) / bs) * bs
+}
+
+func (s *metadata) Serialize() (json.RawMessage, error) {
+	return json.Marshal(s)
+}
+
+func (s *metadata) Restore(serialized json.RawMessage) error {
+	return json.Unmarshal([]byte(serialized), s)
 }

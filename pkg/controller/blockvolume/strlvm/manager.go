@@ -2,6 +2,7 @@ package strlvm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/blockvolume"
@@ -44,11 +45,11 @@ func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[str
 	return fsInfo.Available, nil
 }
 
-func (m *manager) ParseVolume(serialized string) (blockvolume.Volume, error) {
+func (m *manager) ParseVolume(serialized json.RawMessage) (blockvolume.Volume, error) {
 	return parseVolume(serialized, m.snip)
 }
 
-func (m *manager) ParseSnapshot(serialized string) (blockvolume.Snapshot, error) {
+func (m *manager) ParseSnapshot(serialized json.RawMessage) (blockvolume.Snapshot, error) {
 	return parseSnapshot(serialized, m.snip)
 }
 

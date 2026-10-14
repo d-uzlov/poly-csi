@@ -1,6 +1,7 @@
 package shrnfs
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/fsapi"
@@ -45,7 +46,7 @@ func (m *manager) CreateShare(req fileshare.CreateShareRequest) (fileshare.Share
 	}, nil
 }
 
-func (m *manager) ParseShare(shareData string) (fileshare.Share, error) {
+func (m *manager) ParseShare(shareData json.RawMessage) (fileshare.Share, error) {
 	result, err := parseShare(shareData)
 	if result != nil {
 		result.tr = m.tr

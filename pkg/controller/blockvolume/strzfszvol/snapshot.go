@@ -35,12 +35,8 @@ func newSnapshot(fullName string, snip zfs.Snippets) *Snapshot {
 	}
 }
 
-func (s *Snapshot) Serialize() (string, error) {
-	bytes, err := json.Marshal(s)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
+func (s *Snapshot) Serialize() (json.RawMessage, error) {
+	return json.Marshal(s)
 }
 
 func (s *Snapshot) GetLocalPath(ctx context.Context) (path string, release func(), err error) {

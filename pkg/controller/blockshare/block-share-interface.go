@@ -2,6 +2,7 @@ package blockshare
 
 import (
 	"context"
+	"encoding/json"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/controller/blockvolume"
@@ -12,7 +13,7 @@ type Manager interface {
 	// CreateShare parses request parameters and creates a handle that can be used to actually manage the share.
 	CreateShare(req CreateShareRequest) (Share, error)
 	// ParseShare recreates share handle from result of Share.Serialize
-	ParseShare(shareData string) (Share, error)
+	ParseShare(shareData json.RawMessage) (Share, error)
 }
 
 type Share interface {
@@ -29,7 +30,7 @@ type Share interface {
 	Unpublish(ctx context.Context, serializedLocalData string) error
 	UnpublishAll(ctx context.Context) error
 	DeleteShare(ctx context.Context) error
-	Serialize() (string, error)
+	Serialize() (json.RawMessage, error)
 }
 
 type Capabilities struct {

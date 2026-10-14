@@ -24,7 +24,7 @@ type share struct {
 
 var _ blockshare.Share = &share{}
 
-func parseShare(data string) (*share, error) {
+func parseShare(data json.RawMessage) (*share, error) {
 	var result share
 	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
@@ -33,12 +33,8 @@ func parseShare(data string) (*share, error) {
 	return &result, nil
 }
 
-func (s *share) Serialize() (string, error) {
-	encoded, err := json.Marshal(s)
-	if err != nil {
-		return "", err
-	}
-	return string(encoded), nil
+func (sh *share) Serialize() (json.RawMessage, error) {
+	return json.Marshal(sh)
 }
 
 func (s *share) Validate() error {

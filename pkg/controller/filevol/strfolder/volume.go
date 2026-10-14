@@ -25,7 +25,7 @@ func newVolume(tr transport.Transport, path string) *Volume {
 	}
 }
 
-func parseVolume(tr transport.Transport, encoded string) (*Volume, error) {
+func parseVolume(tr transport.Transport, encoded json.RawMessage) (*Volume, error) {
 	var result Volume
 	err := json.Unmarshal([]byte(encoded), &result)
 	if err != nil {
@@ -38,12 +38,8 @@ func parseVolume(tr transport.Transport, encoded string) (*Volume, error) {
 	return &result, nil
 }
 
-func (v *Volume) Serialize() (string, error) {
-	encoded, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return string(encoded), nil
+func (v *Volume) Serialize() (json.RawMessage, error) {
+	return json.Marshal(v)
 }
 
 func (v *Volume) CreateState(ctx context.Context, size int64) error {

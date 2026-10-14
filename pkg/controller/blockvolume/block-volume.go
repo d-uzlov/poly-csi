@@ -2,6 +2,7 @@ package blockvolume
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -12,14 +13,14 @@ type Manager interface {
 	// It does not check or change underlying storage.
 	CreateVolume(req CreateRequest) (Volume, error)
 	// ParseVolume recreates volume handle from result of Volume.Serialize
-	ParseVolume(serialized string) (Volume, error)
+	ParseVolume(serialized json.RawMessage) (Volume, error)
 	// ParseSnapshot recreates snapshot handle from result of Snapshot.Serialize
-	ParseSnapshot(serialized string) (Snapshot, error)
+	ParseSnapshot(serialized json.RawMessage) (Snapshot, error)
 }
 
 type Volume interface {
 	// Serialize returns a string that can be used in StorageManager.ParseVolume to recreate this volume handle
-	Serialize() (string, error)
+	Serialize() (json.RawMessage, error)
 
 	// CreateState configures underlying storage
 	// It may return an error if matching volume already exists,
@@ -47,7 +48,7 @@ type Volume interface {
 }
 
 type Snapshot interface {
-	Serialize() (string, error)
+	Serialize() (json.RawMessage, error)
 
 	// GetLocalPath returns path in local filesystem containing snapshot content
 	// The path should be read-only if possible.

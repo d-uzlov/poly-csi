@@ -26,7 +26,7 @@ func newVolume(vgName string, lvName string, snip lvm.Snippets) *Volume {
 	}
 }
 
-func parseVolume(serialized string, snip lvm.Snippets) (*Volume, error) {
+func parseVolume(serialized json.RawMessage, snip lvm.Snippets) (*Volume, error) {
 	var result Volume
 	err := json.Unmarshal([]byte(serialized), &result)
 	if err != nil {
@@ -43,12 +43,8 @@ func parseVolume(serialized string, snip lvm.Snippets) (*Volume, error) {
 	return &result, nil
 }
 
-func (v *Volume) Serialize() (string, error) {
-	bytes, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
+func (v *Volume) Serialize() (json.RawMessage, error) {
+	return json.Marshal(v)
 }
 
 func (v *Volume) CreateState(ctx context.Context, size int64) error {

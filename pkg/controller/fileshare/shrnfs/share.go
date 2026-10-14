@@ -20,15 +20,11 @@ type share struct {
 
 var _ fileshare.Share = &share{}
 
-func (sh *share) Serialize() (string, error) {
-	encoded, err := json.Marshal(sh)
-	if err != nil {
-		return "", err
-	}
-	return string(encoded), nil
+func (sh *share) Serialize() (json.RawMessage, error) {
+	return json.Marshal(sh)
 }
 
-func parseShare(shareData string) (*share, error) {
+func parseShare(shareData json.RawMessage) (*share, error) {
 	var result share
 	err := json.Unmarshal([]byte(shareData), &result)
 	if err != nil {
