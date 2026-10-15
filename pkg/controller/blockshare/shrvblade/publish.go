@@ -2,6 +2,7 @@ package shrvblade
 
 import (
 	"context"
+	"encoding/json"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
@@ -16,7 +17,7 @@ func (s *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*bl
 	}, nil
 }
 
-func (s *share) Unpublish(ctx context.Context, serialized string) error {
+func (s *share) Unpublish(ctx context.Context, serialized json.RawMessage) error {
 	return nil
 }
 

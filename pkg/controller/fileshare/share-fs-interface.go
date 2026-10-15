@@ -8,7 +8,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/filevol"
 )
 
-type ShareManager interface {
+type Manager interface {
 	GetCapabilities() Capabilities
 	// CreateShare parses request parameters and creates a handle that can be used to actually manage the share.
 	CreateShare(req CreateShareRequest) (Share, error)
@@ -21,7 +21,6 @@ type Share interface {
 	// PrepareShare configures a skeleton for a share.
 	PrepareShare(ctx context.Context) error
 	// AttachPath configures sharing of an object in the filesystem.
-	// If Capabilities.MultiShare is enabled, can be called multiple times, but the first call MUST be with index=0
 	AttachPath(ctx context.Context, fsPath string) error
 	// AttachVolume configures sharing of a volume, when some storage-specific info is required.
 	// Implementation can cast the volume object to expected type to extract info from it.
@@ -56,7 +55,8 @@ type CreateShareRequest struct {
 }
 
 type PublishRequest struct {
-	NodeName string
+	NodeName    string
+	AddressList []string
 }
 
 type PublishContext struct {

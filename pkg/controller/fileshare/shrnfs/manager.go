@@ -14,7 +14,7 @@ type manager struct {
 	gp globalParams
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (fileshare.ShareManager, error) {
+func New(tr transport.Transport, globalParams map[string]string) (fileshare.Manager, error) {
 	gp, err := parseGlobalParams(globalParams)
 	if err != nil {
 		return nil, fmt.Errorf("parse global params: %w", err)

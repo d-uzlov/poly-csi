@@ -13,7 +13,7 @@ type manager struct {
 	tr transport.Transport
 }
 
-func New(tr transport.Transport, globalParams map[string]string) (fileshare.ShareManager, error) {
+func New(tr transport.Transport, globalParams map[string]string) (fileshare.Manager, error) {
 	return &manager{
 		tr: tr,
 	}, nil

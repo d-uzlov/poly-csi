@@ -2,6 +2,7 @@ package shrnbd
 
 import (
 	"context"
+	"encoding/json"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
@@ -16,7 +17,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized json.RawMessage) error {
 	return nil
 }
 

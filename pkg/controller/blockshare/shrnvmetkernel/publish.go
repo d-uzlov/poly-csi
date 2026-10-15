@@ -35,7 +35,7 @@ func (d publishData) validate() error {
 	return nil
 }
 
-func parsePublishData(serialized string) (publishData, error) {
+func parsePublishData(serialized json.RawMessage) (publishData, error) {
 	var result publishData
 	err := json.Unmarshal([]byte(serialized), &result)
 	if err != nil {
@@ -91,7 +91,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized json.RawMessage) error {
 	if !testReady(ctx, sh.tr) {
 		return fmt.Errorf("nvmet is not ready")
 	}

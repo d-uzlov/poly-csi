@@ -37,7 +37,7 @@ func (d publishData) validate() error {
 	return nil
 }
 
-func parsePublishData(serialized string) (publishData, error) {
+func parsePublishData(serialized json.RawMessage) (publishData, error) {
 	var result publishData
 	err := json.Unmarshal([]byte(serialized), &result)
 	if err != nil {
@@ -139,7 +139,7 @@ func (sh *share) createSecureHost(ctx context.Context, hostNqn string) (*nvmet.H
 	return &hostInfo, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized json.RawMessage) error {
 	pd, err := parsePublishData(serialized)
 	if err != nil {
 		return fmt.Errorf("parse publish data: %w", err)
