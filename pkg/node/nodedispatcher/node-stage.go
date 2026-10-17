@@ -52,6 +52,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("parse publish context: %w", err)
 	}
+	logger.MicroOp("parsed publish context", "publish-context", pc)
 	// err = pc.Validate()
 	// if err != nil {
 	// 	return nil, fmt.Errorf("validateContext: %w", err)
@@ -60,6 +61,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	nvi := newVolumeHandle(req.StagingTargetPath, tr, fullPreset)
 	nvi.FsRootDirMode = vc.FsRootDirMode
 	defer func() {
+		logger.Error("writing volume info to disk", "info", nvi)
 		saveErr := nvi.writeToDisk()
 		if err == nil {
 			err = saveErr
@@ -116,13 +118,17 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		// devicePath = setupMultipath(dd)
 		// devices[k] = devicePath
 		devices[k] = dd[0]
+		nvi.Blocks[k] = Block{
+			ConnectorId: v.ConnectorId,
+			handler:     handle,
+		}
 	}
 
 	mountParams := req.VolumeCapability.GetMount()
 
 	fs, ok := conf.FsConnectors[vc.FsType]
 	if !ok {
-		return nil, fmt.Errorf("filesystem is not found: %s", vc.FsType)
+		return nil, fmt.Errorf("filesystem is not found: '%s'", vc.FsType)
 	}
 	fsHandle, err := fs.GetHandle(ctx, filecon.ConnectRequest{
 		Uuid:                    vc.Uuid,
@@ -136,17 +142,21 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if fsHandle == nil {
 		return nil, fmt.Errorf("filecon.GetHandle: nil result")
 	}
-	fsStagingMount := req.StagingTargetPath + stageFolderMount
+	nvi.FsType = vc.FsType
+	nvi.fsHandler = fsHandle
+
+	nvi.FsStagePath = req.StagingTargetPath + stageFolderMount
+
 	err = fsHandle.Prepare(ctx, filecon.PrepareRequest{
 		Devices:     devices,
-		StagingPath: fsStagingMount,
+		StagingPath: nvi.FsStagePath,
 		Flags:       mountParams.MountFlags,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fsHandle.Prepare: %w", err)
 	}
 
-	cmd := []string{"chmod", vc.FsRootDirMode, fsStagingMount}
+	cmd := []string{"chmod", vc.FsRootDirMode, nvi.FsStagePath}
 	err = transport.CheckedRun(ctx, tr, cmd, transport.WithSudo(true))
 	if err != nil {
 		return nil, fmt.Errorf("chmod: %w", err)

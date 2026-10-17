@@ -53,6 +53,7 @@ func newVolumeHandle(parentFolder string, tr transport.Transport, preset map[str
 		parentFolder: parentFolder,
 		Preset:       preset,
 		tr:           tr,
+		Blocks:       map[string]Block{},
 	}
 }
 

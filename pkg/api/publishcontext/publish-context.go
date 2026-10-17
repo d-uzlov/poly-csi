@@ -4,6 +4,7 @@ import (
 	"crypto/hpke"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/fsapi"
@@ -35,15 +36,15 @@ type Serialized struct {
 }
 
 type SerializedBlock struct {
-	ConnectorId string        `map:"connectorId"`
-	Name        string        `map:"name"`
-	Public      blockapi.Data `map:"public"`
-	Secret      []byte        `map:"secret"`
+	ConnectorId string        `map:":connectorId"`
+	Name        string        `map:":name"`
+	Public      blockapi.Data `map:":"`
+	Secret      []byte        `map:":secret"`
 }
 
 type SerializedFilesystem struct {
-	Public fsapi.Data `map:"public"`
-	Secret []byte     `map:"secret"`
+	Public fsapi.Data `map:":"`
+	Secret []byte     `map:":secret"`
 }
 
 var Registry = typeregistry.NewPrepopulated([]typeregistry.Sample{
@@ -60,7 +61,7 @@ var Registry = typeregistry.NewPrepopulated([]typeregistry.Sample{
 func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.PublicKey) error {
 	enc, sender, err := hpke.NewSender(publicKey, hpke.HKDFSHA256(), hpke.AES256GCM(), nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("hpke.NewSender: %w", err)
 	}
 
 	s := Serialized{
@@ -70,7 +71,7 @@ func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.Public
 	for k, b := range pc.BlockDevices {
 		public, secret, err := secrets.Split(b.Data)
 		if err != nil {
-			return fmt.Errorf("split protocol info: %w", err)
+			return fmt.Errorf("block '%s': split protocol info: %w", k, err)
 		}
 
 		plaintext, err := json.Marshal(secret)
@@ -80,7 +81,7 @@ func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.Public
 		tag := []byte("block")
 		ciphertext, err := sender.Seal(tag, plaintext)
 		if err != nil {
-			return err
+			return fmt.Errorf("block '%s': sender.Seal: %w", k, err)
 		}
 
 		s.Block = append(s.Block, SerializedBlock{
@@ -94,17 +95,17 @@ func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.Public
 	if pc.Filesystem != nil {
 		public, secret, err := secrets.Split(pc.Filesystem)
 		if err != nil {
-			return fmt.Errorf("split protocol info: %w", err)
+			return fmt.Errorf("fs: split protocol info: %w", err)
 		}
 
 		plaintext, err := json.Marshal(secret)
 		if err != nil {
-			return err
+			return fmt.Errorf("fs: marshal: %w", err)
 		}
 		tag := []byte("filesystem")
 		ciphertext, err := sender.Seal(tag, plaintext)
 		if err != nil {
-			return err
+			return fmt.Errorf("fs: sender.Seal: %w", err)
 		}
 
 		s.Fs = SerializedFilesystem{
@@ -118,28 +119,30 @@ func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.Public
 }
 
 func Parse(src map[string]string, privateKey hpke.PrivateKey) (PublishContext, error) {
-	result := PublishContext{}
+	result := PublishContext{
+		BlockDevices: map[string]Block{},
+	}
 	var s Serialized
 
 	err := serialmaps.Parse(src, volumecontext.Prefix, &s, serialmaps.WithRegistry(Registry))
 	if err != nil {
-		return PublishContext{}, err
+		return PublishContext{}, fmt.Errorf("serialmaps.Parse: %w", err)
 	}
 
 	receiver, err := hpke.NewRecipient(s.Enc, privateKey, hpke.HKDFSHA256(), hpke.AES256GCM(), nil)
 	if err != nil {
-		return PublishContext{}, err
+		return PublishContext{}, fmt.Errorf("hpke.NewRecipient: %w", err)
 	}
 
-	for _, v := range s.Block {
+	for i, v := range s.Block {
 		tag := []byte("block")
 		plaintext, err := receiver.Open(tag, v.Secret)
 		if err != nil {
-			return PublishContext{}, err
+			return PublishContext{}, fmt.Errorf("block i=%d: open secret: %w", i, err)
 		}
-		err = json.Unmarshal(plaintext, &v.Public)
+		err = InterfaceUnmarshal(plaintext, &v.Public)
 		if err != nil {
-			return PublishContext{}, err
+			return PublishContext{}, fmt.Errorf("block i=%d: unmarshal: %w", i, err)
 		}
 		result.BlockDevices[v.Name] = Block{
 			ConnectorId: v.ConnectorId,
@@ -151,14 +154,30 @@ func Parse(src map[string]string, privateKey hpke.PrivateKey) (PublishContext, e
 		tag := []byte("filesystem")
 		plaintext, err := receiver.Open(tag, s.Fs.Secret)
 		if err != nil {
-			return PublishContext{}, err
+			return PublishContext{}, fmt.Errorf("fs: open secret: %w", err)
 		}
-		err = json.Unmarshal(plaintext, &s.Fs.Public)
+		err = InterfaceUnmarshal(plaintext, &s.Fs.Public)
 		if err != nil {
-			return PublishContext{}, err
+			return PublishContext{}, fmt.Errorf("fs: unmarshal: %w", err)
 		}
 		result.Filesystem = s.Fs.Public
 	}
 
 	return result, nil
+}
+
+func InterfaceUnmarshal(source []byte, field any) error {
+	val := reflect.ValueOf(field).Elem().Elem()
+	if val.Kind() == reflect.Pointer {
+		return json.Unmarshal(source, val.Interface())
+	}
+
+	ptr := reflect.New(val.Type())
+	ptr.Elem().Set(val)
+	err := json.Unmarshal(source, ptr.Interface())
+	if err != nil {
+		return fmt.Errorf("fs: unmarshal: %w", err)
+	}
+	reflect.ValueOf(field).Elem().Set(ptr.Elem())
+	return nil
 }

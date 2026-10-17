@@ -71,11 +71,12 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 		chap = blockapi.IscsiAuthChap
 	}
 	pc := blockapi.IscsiShare{
-		Initiator: iscsiInfo.InitiatorIqn,
-		Iqn:       sh.Iqn,
-		Port:      sh.Port,
-		Transport: sh.Transport,
-		AuthType:  chap,
+		Initiator:     iscsiInfo.InitiatorIqn,
+		Iqn:           sh.Iqn,
+		Port:          sh.Port,
+		Transport:     sh.Transport,
+		AuthType:      chap,
+		ServerAddress: req.AddressList,
 	}
 	pd := publishData{
 		HostIqn: iscsiInfo.InitiatorIqn,

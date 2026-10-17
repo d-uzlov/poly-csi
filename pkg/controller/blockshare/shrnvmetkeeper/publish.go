@@ -2,9 +2,13 @@ package shrnvmetkeeper
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"hash/crc32"
 
 	"github.com/google/uuid"
 	"meoe.io/poly-csi/pkg/api/blockapi"
@@ -60,6 +64,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 		HostId:        hostId,
 		ConnectPort:   sh.TcpPort,
 		TransportType: sh.Transport,
+		ServerAddress: req.AddressList,
 	}
 
 	switch sh.AuthType {
@@ -101,26 +106,25 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 	}, nil
 }
 
-func (sh *share) createSecureHost(ctx context.Context, hostNqn string) (*nvmet.Host, error) {
-	cmd := []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
-	hostKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("host create: %w", err)
+func (sh *share) generateKey(source string) string {
+	if sh.Secret == nil {
+		panic("sh.Secret == nil")
 	}
-	hostKey = strings.TrimSpace(hostKey)
-	if hostKey == "" {
-		return nil, fmt.Errorf("failed to generate host dh-chap key via nvme gen-dhchap-key: empty output")
-	}
+	h := hmac.New(sha256.New, sh.Secret)
+	h.Write([]byte(source))
+	rawBytes := h.Sum(nil)
 
-	cmd = []string{"nvme", "gen-dhchap-key", "--key-length=32", "--hmac=0"}
-	controllerKey, err := transport.CheckedRunStdout(ctx, sh.tr, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("host create: %w", err)
-	}
-	controllerKey = strings.TrimSpace(controllerKey)
-	if controllerKey == "" {
-		return nil, fmt.Errorf("failed to generate controller dh-chap key via nvme gen-dhchap-key: empty output")
-	}
+	checksum := crc32.ChecksumIEEE(rawBytes)
+	checksumBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(checksumBytes, checksum)
+
+	b64 := base64.RawStdEncoding.EncodeToString(append(rawBytes, checksumBytes...))
+	return fmt.Sprintf("DHHC-1:01:%s:", b64)
+}
+
+func (sh *share) createSecureHost(ctx context.Context, hostNqn string) (*nvmet.Host, error) {
+	hostKey := sh.generateKey(hostNqn + ":host_key")
+	controllerKey := sh.generateKey(hostNqn + ":controller_key")
 
 	hostInfo := nvmet.Host{
 		Nqn:           hostNqn,
@@ -130,8 +134,8 @@ func (sh *share) createSecureHost(ctx context.Context, hostNqn string) (*nvmet.H
 		HashType:      nvmet.HashTypeHmacSha256,
 		DhGroup:       nvmet.DhGroup2048,
 	}
-	cmd = append(nvmetKeeperCmd, "host", "create", hostInfo.Json())
-	err = transport.CheckedRun(ctx, sh.tr, cmd)
+	cmd := append(nvmetKeeperCmd, "host", "create", hostInfo.Json())
+	err := transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("host create: %w", err)
 	}

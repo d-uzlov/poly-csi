@@ -3,16 +3,21 @@ package shrnbd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 )
 
 func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*blockshare.PublishContext, error) {
+	if len(req.AddressList) != 1 {
+		return nil, fmt.Errorf("nbd needs exactly one server address")
+	}
 	return &blockshare.PublishContext{
 		Protocol: blockapi.NbdShare{
-			ExportName: sh.ExportName,
-			Port:       sh.ConnectPort,
+			ExportName:    sh.ExportName,
+			Port:          sh.ConnectPort,
+			ServerAddress: req.AddressList[0],
 		},
 	}, nil
 }

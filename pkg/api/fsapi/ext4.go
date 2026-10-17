@@ -3,21 +3,21 @@ package fsapi
 const Ext4 = Name("ext4")
 
 type Ext4UserParams struct {
-	SeparateJournal  bool    `map:"separateJournal" json:"separateJournal"`
-	BytesPerInode    string  `map:"bytesPerInode" json:"bytesPerInode"`
-	JournalSizeDenom float64 `map:"journalSizeDenom" json:"journalSizeDenom"`
-	ReservedPercent  float64 `map:"reservedPercent" json:"reservedPercent"`
+	SeparateJournal  bool    `map:"separateJournal,omitempty" json:"separateJournal,omitempty"`
+	BytesPerInode    string  `map:"bytesPerInode,omitempty" json:"bytesPerInode,omitempty"`
+	JournalSizeDenom float64 `map:"journalSizeDenom,omitempty" json:"journalSizeDenom,omitempty"`
+	ReservedPercent  float64 `map:"reservedPercent,omitempty" json:"reservedPercent,omitempty"`
 }
 
 type Ext4Format struct {
-	SkipDiscard bool  `map:"skipDiscard" json:"skipDiscard"`
-	BlockSize   int64 `map:"blockSize" json:"blockSize"`
+	SkipDiscard bool  `map:"skipDiscard,omitempty" json:"skipDiscard,omitempty"`
+	BlockSize   int64 `map:"blockSize,omitempty" json:"blockSize,omitempty"`
 }
 
 type Ext4Data struct {
 	// public
-	User   Ext4UserParams `map:"user" json:"user"`
-	Format Ext4Format     `map:"fmt" json:"format"`
+	User   Ext4UserParams `map:"user,omitempty" json:"user,omitempty"`
+	Format Ext4Format     `map:"fmt,omitempty" json:"format,omitempty"`
 
 	// secret
 }

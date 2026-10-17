@@ -3,25 +3,25 @@ package fsapi
 const Xfs = Name("xfs")
 
 type XfsUserParams struct {
-	SeparateJournal  bool    `map:"separateJournal" json:"separateJournal"`
-	BytesPerInode    string  `map:"bytesPerInode" json:"bytes_per_inode"`
-	JournalSizeDenom float64 `map:"journalSizeDenom" json:"journal_size_denom"`
-	ReservedPercent  string  `map:"reservedPercent" json:"reservedPercent"`
+	SeparateJournal  bool    `map:"separateJournal,omitempty" json:"separateJournal,omitempty"`
+	BytesPerInode    string  `map:"bytesPerInode,omitempty" json:"bytes_per_inode,omitempty"`
+	JournalSizeDenom float64 `map:"journalSizeDenom,omitempty" json:"journal_size_denom,omitempty"`
+	ReservedPercent  string  `map:"reservedPercent,omitempty" json:"reservedPercent,omitempty"`
 }
 
 type XfsFormat struct {
-	BlockSize              int64 `json:"blockSize" map:"blockSize"`
-	SectorSize             int64 `json:"sectorSize" map:"sectorSize"`
-	SkipDiscard            bool  `json:"skipDiscard" map:"skipDiscard"`
-	StripeUnitBytes        int64 `json:"stripeUnitBytes" map:"stripeUnitBytes"`
-	StripeWidth            int64 `json:"stripeWidth" map:"stripeWidth"`
-	JournalStripeUnitBytes int64 `json:"journalStripeUnitBytes" map:"journalStripeUnitBytes"`
+	BlockSize              int64 `json:"blockSize,omitempty" map:"blockSize,omitempty"`
+	SectorSize             int64 `json:"sectorSize,omitempty" map:"sectorSize,omitempty"`
+	SkipDiscard            bool  `json:"skipDiscard,omitempty" map:"skipDiscard,omitempty"`
+	StripeUnitBytes        int64 `json:"stripeUnitBytes,omitempty" map:"stripeUnitBytes,omitempty"`
+	StripeWidth            int64 `json:"stripeWidth,omitempty" map:"stripeWidth,omitempty"`
+	JournalStripeUnitBytes int64 `json:"journalStripeUnitBytes,omitempty" map:"journalStripeUnitBytes,omitempty"`
 }
 
 type XfsData struct {
 	// public
-	User   XfsUserParams `map:"user" json:"userParams"`
-	Format XfsFormat     `map:"fmt" json:"format"`
+	User   XfsUserParams `map:"user,omitempty" json:"userParams,omitempty"`
+	Format XfsFormat     `map:"fmt,omitempty" json:"format,omitempty"`
 
 	// secret
 }

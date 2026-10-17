@@ -15,6 +15,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/blockvolume/blkvolfactory"
 	"meoe.io/poly-csi/pkg/controller/voldb"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/node/filecon/fsfactory"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -124,12 +125,11 @@ func (df *DispatchBlockFs) initHandles() error {
 		}
 		tr := srv.trInstance
 
-		var addrOpt []AddressOption
 		for name := range strings.SplitSeq(v.p.AddressNames, ",") {
 			found := false
-			for _, v := range srv.Conf.AddressList {
-				if v.Name == name {
-					addrOpt = append(addrOpt, v)
+			for _, a := range srv.Conf.AddressList {
+				if a.Name == name {
+					v.addrOpt = append(v.addrOpt, a)
 					found = true
 					break
 				}
@@ -143,11 +143,13 @@ func (df *DispatchBlockFs) initHandles() error {
 		if err != nil {
 			return fmt.Errorf("block '%s': find storage: %w", k, err)
 		}
+		v.storageManager = str
 
 		shr, err := blkshrfactory.ShareFromType(tr, v.p.ShareType, srv.Conf.GlobalParams)
 		if err != nil {
 			return fmt.Errorf("block '%s': find share: %w", k, err)
 		}
+		v.shareManager = shr
 
 		strCaps := str.GetCapabilities()
 		shrCaps := shr.GetCapabilities()
@@ -172,7 +174,6 @@ func (df *DispatchBlockFs) initHandles() error {
 		if err != nil {
 			return fmt.Errorf("block '%s': CreateVolume: %w", k, err)
 		}
-
 		v.storageHandle = vol
 
 		shareId := df.rawName + "-" + k
@@ -192,15 +193,9 @@ func (df *DispatchBlockFs) initHandles() error {
 		if err != nil {
 			return fmt.Errorf("block '%s': CreateShare: %w", k, err)
 		}
+		v.shareHandle = shareHandle
 
-		df.Block[k] = BlockInfo{
-			storageManager: str,
-			storageHandle:  vol,
-			shareManager:   shr,
-			shareHandle:    shareHandle,
-			p:              v.p,
-			Req:            v.Req,
-		}
+		df.Block[k] = v
 	}
 
 	return nil
@@ -280,6 +275,7 @@ func (df *DispatchBlockFs) getVolumeContext() volumecontext.VolumeContext {
 		StorageType: df.p.StorageType,
 		ShareType:   df.p.ShareType,
 		Presets:     presets,
+		FsType:      df.FsType,
 		// TODO customize
 		FsRootDirMode: "2777",
 	}
@@ -324,10 +320,12 @@ func (df *DispatchBlockFs) publish(ctx context.Context, req blockshare.PublishRe
 			addrOpt = append(addrOpt, a.Address)
 		}
 		req.AddressList = addrOpt
+		logs.FromCtx(ctx).MicroOp("publish block", "name", k, "request", req)
 		sharePc, err := v.shareHandle.Publish(ctx, req)
 		if err != nil {
 			return result, fmt.Errorf("block '%s': shareHandle.Publish: %w", k, err)
 		}
+		logs.FromCtx(ctx).MicroOp("publish block (result)", "name", k, "result", sharePc)
 		result.BlockDevices[k] = publishcontext.Block{
 			ConnectorId: v.p.ConnectorId,
 			Data:        sharePc.Protocol,

@@ -73,11 +73,12 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 
 	return &blockshare.PublishContext{
 		Protocol: blockapi.IscsiShare{
-			Initiator: iscsiInfo.InitiatorIqn,
-			Iqn:       sh.Iqn,
-			Port:      3260,
-			Transport: "tcp",
-			AuthType:  blockapi.IscsiAuthNone,
+			Initiator:     iscsiInfo.InitiatorIqn,
+			Iqn:           sh.Iqn,
+			Port:          3260,
+			Transport:     "tcp",
+			AuthType:      blockapi.IscsiAuthNone,
+			ServerAddress: req.AddressList,
 		},
 		LocalData: pd,
 	}, nil

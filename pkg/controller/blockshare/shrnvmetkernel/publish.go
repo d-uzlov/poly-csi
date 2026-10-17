@@ -81,6 +81,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 		AuthType:      blockapi.NvmeAuthNqn,
 		ConnectPort:   sh.Port,
 		TransportType: sh.Transport,
+		ServerAddress: req.AddressList,
 	}
 
 	return &blockshare.PublishContext{

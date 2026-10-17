@@ -2,6 +2,7 @@ package shrnvmetkeeper
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 
@@ -11,13 +12,14 @@ import (
 )
 
 type share struct {
-	tr transport.Transport
+	tr transport.Transport `json:"-"`
 
 	Nqn          string `json:"nqn"`
 	TcpPort      int    `json:"tcp_port"`
 	NvmePortName string `json:"nvme_port_name"`
 	Transport    string `json:"transport"`
 	AuthType     string `json:"auth_type"`
+	Secret       []byte `json:"secret"`
 }
 
 var _ blockshare.Share = &share{}
@@ -57,11 +59,17 @@ func (sh *share) PrepareShare(ctx context.Context) error {
 		allowAnyHost = true
 	}
 
+	sh.Secret = make([]byte, 32)
+	_, err := rand.Read(sh.Secret)
+	if err != nil {
+		return err
+	}
+
 	cmd := append(nvmetKeeperCmd, "subsys", "create", nvmet.Subsys{
 		Nqn:          sh.Nqn,
 		AllowAnyHost: allowAnyHost,
 	}.Json())
-	err := transport.CheckedRun(ctx, sh.tr, cmd)
+	err = transport.CheckedRun(ctx, sh.tr, cmd)
 	if err != nil {
 		return fmt.Errorf("subsys create: %w", err)
 	}
