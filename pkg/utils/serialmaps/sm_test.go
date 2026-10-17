@@ -178,18 +178,20 @@ type VerySimple struct {
 }
 
 type WithNestedStructs struct {
-	Nested VerySimple            `map:"s"`
-	Ptr    *VerySimple           `map:"ptr"`
-	Mapped map[string]VerySimple `map:"mapped"`
-	Sliced []VerySimple          `map:"sliced"`
+	Nested      VerySimple            `map:"s"`
+	NestedColon VerySimple            `map:":"`
+	Ptr         *VerySimple           `map:"ptr"`
+	Mapped      map[string]VerySimple `map:"mapped"`
+	Sliced      []VerySimple          `map:"sliced"`
 }
 
 func TestWithNested(t *testing.T) {
 	input := WithNestedStructs{
-		Nested: VerySimple{Val: "val"},
-		Ptr:    &VerySimple{Val: "val_in_ptr"},
-		Mapped: map[string]VerySimple{"key": {Val: "mapped_val"}},
-		Sliced: []VerySimple{{Val: "sliced_0"}, {"sliced_1"}},
+		Nested:      VerySimple{Val: "val"},
+		NestedColon: VerySimple{Val: "colon"},
+		Ptr:         &VerySimple{Val: "val_in_ptr"},
+		Mapped:      map[string]VerySimple{"key": {Val: "mapped_val"}},
+		Sliced:      []VerySimple{{Val: "sliced_0"}, {"sliced_1"}},
 	}
 
 	serialized, err := Serialize(input, "zzz")
@@ -200,6 +202,7 @@ func TestWithNested(t *testing.T) {
 
 	expected := map[string]string{
 		"zzz.s.val":        "val",
+		"zzz.val":          "colon",
 		"zzz.ptr.val":      "val_in_ptr",
 		"zzz.mapped.keys":  "key",
 		"zzz.mapped.0.val": "mapped_val",
@@ -250,6 +253,7 @@ type WithInterface struct {
 	Int1  TestInterface `map:"i1"`
 	Int2  TestInterface `map:"i2"`
 	Empty TestInterface `map:"empty"`
+	Embed TestInterface `map:":"`
 }
 
 var testRegistry = typeregistry.NewPrepopulated([]typeregistry.Sample{
@@ -262,6 +266,7 @@ func TestWithInterface(t *testing.T) {
 		Int1:  Impl1{Qwe: "1"},
 		Int2:  &Impl2{Asd: "2"},
 		Empty: nil,
+		Embed: Impl1{Qwe: "embed"},
 	}
 
 	serialized, err := Serialize(input, "zzz", WithRegistry(testRegistry))
@@ -276,6 +281,8 @@ func TestWithInterface(t *testing.T) {
 		"zzz.i2.t":     "impl2",
 		"zzz.i2.v.asd": "2",
 		"zzz.empty.t":  "nil",
+		"zzz.t":        "impl1",
+		"zzz.v.qwe":    "embed",
 	}
 
 	if !maps.Equal(serialized, expected) {

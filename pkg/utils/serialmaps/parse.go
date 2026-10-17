@@ -54,7 +54,9 @@ func (p *parser) parseDispatch(v reflect.Value, prefix string, tagValue string) 
 	key := tagFields[0]
 	mapKey := key
 	if prefix != "" {
-		if strings.HasSuffix(prefix, "/") {
+		if key == ":" {
+			mapKey = prefix
+		} else if strings.HasSuffix(prefix, "/") {
 			mapKey = prefix + key
 		} else {
 			mapKey = prefix + "." + key
