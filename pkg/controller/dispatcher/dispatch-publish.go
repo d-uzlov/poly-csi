@@ -2,54 +2,26 @@ package dispatcher
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/ecdh"
+	"crypto/hpke"
 	"fmt"
-	"slices"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/go-playground/validator/v10"
-	"meoe.io/poly-csi/pkg/api/protocols"
-	"meoe.io/poly-csi/pkg/api/publishcontext"
-	"meoe.io/poly-csi/pkg/api/volumecontext"
-	"meoe.io/poly-csi/pkg/controller/shares"
-	"meoe.io/poly-csi/pkg/controller/shares/sharefactory"
-	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/controller/blockshare"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
-	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	logger := logs.FromCtx(ctx)
+	// logger := logs.FromCtx(ctx)
+	conf := FromCtx(ctx)
 
-	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId, conf)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
-	defer mh.release()
-	if mh.vi == nil {
+	if mh == nil {
 		return nil, fmt.Errorf("volume not found")
-	}
-
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
-	if err != nil {
-		return nil, fmt.Errorf("find share config: %w", err)
-	}
-
-	var addressOptions []AddressOption
-	for _, id := range mh.vi.AddressIds {
-		found := false
-		for _, v := range mh.srv.Conf.AddressList {
-			if v.StableId == id {
-				addressOptions = append(addressOptions, v)
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("address 'id=%s' is not found", id)
-		}
 	}
 
 	nodeReg := noderegclient.New(d.conf.NodeInfoDb.Address)
@@ -67,176 +39,71 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("node_info: validation failed: %w", err)
 	}
 
-	if mh.vi.VolumeContext.PresetName != "" {
-		for v := range strings.SplitSeq(mh.vi.VolumeContext.PresetName, ",") {
-			if !slices.Contains(ni.Presets, v) {
-				return nil, fmt.Errorf("node does not have preset '%s' required by volume (available %v)", v, ni.Presets)
-			}
-		}
-	}
+	// if mh.vi.VolumeContext.PresetName != "" {
+	// 	for v := range strings.SplitSeq(mh.vi.VolumeContext.PresetName, ",") {
+	// 		if !slices.Contains(ni.Presets, v) {
+	// 			return nil, fmt.Errorf("node does not have preset '%s' required by volume (available %v)", v, ni.Presets)
+	// 		}
+	// 	}
+	// }
 
-	conInfo, ok := ni.Connectors[mh.vi.ConnectorId]
-	if !ok {
-		return nil, fmt.Errorf("node info does not list connector %s", mh.vi.ConnectorId)
-	}
+	// conInfo, ok := ni.Connectors[mh.vi.ConnectorId]
+	// if !ok {
+	// 	return nil, fmt.Errorf("node info does not list connector %s", mh.vi.ConnectorId)
+	// }
 
-	shareHandle, err := shrInstance.ParseShare(mh.vi.ShareData)
+	kem := hpke.DHKEM(ecdh.X25519())
+	nodeKey, err := kem.NewPublicKey(ni.PublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
-	}
-	if shareHandle == nil {
-		return nil, fmt.Errorf("parse share data: nil result")
-	}
-	err = shareHandle.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("validate share: %w", err)
+		return nil, fmt.Errorf("load node public key: %w", err)
 	}
 
-	pc, err := shareHandle.Publish(ctx, shares.PublishRequest{
+	pc, err := mh.publish(ctx, blockshare.PublishRequest{
 		NodeName: req.NodeId,
-		ConInfo:  conInfo.Info,
+		// ConInfo:  conInfo.Info,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("shareHandle.Publish to %s/%s: %w", req.NodeId, mh.vi.ConnectorId, err)
+		return nil, fmt.Errorf("shareHandle.Publish to %s: %w", req.NodeId, err)
 	}
-	logger.Info("share.Publish: success")
-	if pc.Protocol == nil {
-		return nil, fmt.Errorf("share did not set publish context")
-	}
+	// validate := validator.New(validator.WithRequiredStructEnabled())
+	// err = validate.Struct(pc.Protocol)
+	// if err != nil {
+	// 	err = protocols.FormatValidationError(err)
+	// 	return nil, fmt.Errorf("validate share protocol data: %w", err)
+	// }
 
-	if pc == nil {
-		return nil, fmt.Errorf("share did not set publish context data")
-	}
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	err = validate.Struct(pc.Protocol)
+	result := map[string]string{}
+	err = pc.Serialize(result, nodeKey)
 	if err != nil {
-		err = protocols.FormatValidationError(err)
-		return nil, fmt.Errorf("validate share protocol data: %w", err)
-	}
-
-	pcObj := publishcontext.PublishContext{}
-	for _, v := range addressOptions {
-		pcObj.AddressList = append(pcObj.AddressList, publishcontext.AddressOption{
-			Name:    v.Name,
-			Address: v.Address,
-		})
-	}
-	pcObj.SetProtocol(shrInstance.GetCapabilities().ProtocolName, pc.Protocol, ni.PublicKey)
-
-	pcMap, err := serialmaps.Serialize(pcObj, volumecontext.Prefix)
-	if err != nil {
-		return nil, fmt.Errorf("serialize publish context object: %w", err)
-	}
-
-	if pc.LocalData != nil {
-		serialized, err := json.Marshal(pc.LocalData)
-		if err != nil {
-			return nil, fmt.Errorf("serialize local data: %w", err)
-		}
-		err = mh.wrapper.SetPublishCtx(ctx, req.NodeId, string(serialized))
-		if err != nil {
-			return nil, fmt.Errorf("publish_context: save to db: %w", err)
-		}
+		return nil, fmt.Errorf("serialize publish context: %w", err)
 	}
 
 	return &csi.ControllerPublishVolumeResponse{
-		PublishContext: pcMap,
+		PublishContext: result,
 	}, nil
 }
 
 func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId)
+	conf := FromCtx(ctx)
+
+	mh, err := d.getExistingVolumeHandle(ctx, req.VolumeId, conf)
 	if err != nil {
 		return nil, fmt.Errorf("get volume info: %w", err)
 	}
-	defer mh.release()
-	if mh.vi == nil {
+	if mh == nil {
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	return d.unpublishVolume(ctx, mh, req.NodeId)
-}
-
-func (d *Dispatcher) unpublishVolume(ctx context.Context, mh *volumeManagementHandle, nodeId string) (*csi.ControllerUnpublishVolumeResponse, error) {
-	logger := logs.FromCtx(ctx)
-
-	shrInstance, err := sharefactory.ShareFromType(mh.srv.trInstance, mh.vi.ShareType, mh.srv.Conf.GlobalParams)
-	if err != nil {
-		return nil, fmt.Errorf("find share config: %w", err)
-	}
-
-	shareHandle, err := shrInstance.ParseShare(mh.vi.ShareData)
-	if err != nil {
-		return nil, fmt.Errorf("parse share data: %w", err)
-	}
-	if shareHandle == nil {
-		return nil, fmt.Errorf("parse share data: nil result")
-	}
-	err = shareHandle.Validate()
-	if err != nil {
-		return nil, fmt.Errorf("validate share: %w", err)
-	}
-
-	if nodeId != "" {
-		pds, err := mh.wrapper.GetPublishData(ctx, nodeId)
+	if req.NodeId == "" {
+		err = mh.unpublishAll(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("publish data: get from db: %w", err)
+			return nil, fmt.Errorf("unpublishAll: %w", err)
 		}
-
-		// nothing to do if publish data is empty
-		if pds == "" {
-			return &csi.ControllerUnpublishVolumeResponse{}, nil
-		}
-
-		err = shareHandle.Unpublish(ctx, pds)
+	} else {
+		err = mh.unpublish(ctx, req.NodeId)
 		if err != nil {
-			return nil, fmt.Errorf("shareHandle.Unpublish: %w", err)
+			return nil, fmt.Errorf("unpublish: %w", err)
 		}
-		logger.Info("share.Unpublish: success")
-
-		err = mh.wrapper.DeletePublishData(ctx, nodeId)
-		if err != nil {
-			return nil, fmt.Errorf("db: delete publish context: %w", err)
-		}
-		return &csi.ControllerUnpublishVolumeResponse{}, nil
-	}
-
-	caps := shrInstance.GetCapabilities()
-	if caps.UnpublishAll {
-		err = shareHandle.UnpublishAll(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("shareHandle.UnpublishAll: %w", err)
-		}
-		logger.Info("share.UnpublishAll: success")
-		err = mh.wrapper.ClearPublishData(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("ClearPublishData: %w", err)
-		}
-		return &csi.ControllerUnpublishVolumeResponse{}, nil
-	}
-
-	fullPublishData, err := mh.wrapper.GetFullPublishData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("GetFullPublishCtxList: %w", err)
-	}
-
-	for _, v := range fullPublishData {
-		if v == "" {
-			// nothing to do if publish data is empty
-			continue
-		}
-
-		err = shareHandle.Unpublish(ctx, v)
-		if err != nil {
-			return nil, fmt.Errorf("shareHandle.Unpublish: %w", err)
-		}
-	}
-
-	logger.Info("share.Unpublish: success for all entries")
-
-	err = mh.wrapper.ClearPublishData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("ClearPublishData: %w", err)
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil

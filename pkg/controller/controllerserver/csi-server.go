@@ -11,7 +11,10 @@ import (
 	"github.com/google/uuid"
 	slogctx "github.com/veqryn/slog-context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"meoe.io/poly-csi/pkg/controller"
+	"meoe.io/poly-csi/pkg/controller/dispatcher"
 	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/logs"
 )
@@ -97,7 +100,16 @@ func (s *Server) ListenAndServe(ctx context.Context, address string, doneCallbac
 }
 
 func (s *Server) logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	logConfig := s.controller.GetRpcLogConfig(info.FullMethod)
+	conf := s.controller.GetConfig()
+	release := conf.Lock()
+	defer release()
+	if !conf.IsAlive() {
+		return nil, status.Error(codes.Aborted, "config was reloaded")
+	}
+
+	ctx = dispatcher.NewCtx(ctx, conf)
+
+	logConfig := conf.GetRpcLogConfig(info.FullMethod)
 
 	callUuid := uuid.NewString()
 	logConfig.ExtraFields["uuid"] = callUuid

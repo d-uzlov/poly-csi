@@ -10,11 +10,9 @@ type VolumeContext struct {
 	ShareType     string   `map:"share_type"`
 	Presets       []string `map:"preset"`
 	FsRootDirMode string   `map:"fs_root_dir_mode"`
-	FsGroupMethod string   `map:"fs_group_method"`
 	Uuid          string   `map:"uuid"`
 	FsType        string   `map:"fs_type"`
 	FsData        string   `map:"fs_data"`
-	JournalVolume string   `map:"journal_volume"`
 }
 
 func (v *VolumeContext) Validate() error {

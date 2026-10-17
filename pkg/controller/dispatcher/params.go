@@ -8,19 +8,16 @@ import (
 )
 
 type DispatchParams struct {
-	// TODO use ?
-	OnFailPolicy      string `map:"on_fail_policy"`
 	StorageType       string `map:"storageType"`
 	StorageIdTemplate string `map:"storageIdTemplate"`
 	ShareType         string `map:"shareType"`
 	ShareIdTemplate   string `map:"shareIdTemplate"`
 	ConnectorId       string `map:"connectorId"`
-	NodePreset        string `map:"nodePreset"`
+	NodePresets       string `map:"nodePresets"`
 	AddressNames      string `map:"addressNames"`
 	ServerName        string `map:"serverName"`
-	FsGroupPolicy     string `map:"fsGroupPolicy"`
-	FsFormatSide      string `map:"fsFormatSide"`
-	JournalVolume     string `map:"journalVolume"`
+	// FsGroupPolicy     string `map:"fsGroupPolicy"`
+	FsFormatSide string `map:"fsFormatSide"`
 }
 
 const (
@@ -81,14 +78,8 @@ func parseDispatchParams(prefix string, global map[string]string, static map[str
 	if result.ServerName == "" {
 		return DispatchParams{}, fmt.Errorf("missing %s", keyServerName)
 	}
-	if result.OnFailPolicy == "" {
-		result.OnFailPolicy = "cleanup"
-	}
 	if result.FsFormatSide == "" {
 		result.FsFormatSide = FsFormatController
-	}
-	if result.JournalVolume == "" {
-		result.JournalVolume = "none"
 	}
 
 	return result, nil

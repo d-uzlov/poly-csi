@@ -7,7 +7,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/logs"
 )
 
 type Dispatcher struct {
@@ -28,31 +27,18 @@ func NewDispatcher(ctx context.Context) *Dispatcher {
 }
 
 func (d *Dispatcher) Cleanup() {
-	var servers []*parsedServer
+	var conf *DispatcherConf
 	func() {
 		d.confMutex.Lock()
 		defer d.confMutex.Unlock()
 
-		servers = d.conf.Servers
-		d.conf.Servers = nil
+		conf = d.conf
+		d.conf = nil
 	}()
+	conf.mutex.Lock()
+	defer conf.mutex.Unlock()
 
-	for _, v := range servers {
-		func() {
-			v.mutex.Lock()
-			defer v.mutex.Unlock()
-
-			if v.trInstance != nil {
-				v.trInstance.Cleanup()
-			}
-			v.trInstance = nil
-
-			if v.dbInstance != nil {
-				v.dbInstance.Cleanup()
-			}
-			v.dbInstance = nil
-		}()
-	}
+	conf.Cleanup()
 }
 
 func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) {
@@ -60,8 +46,22 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 
 	logger.Info("starting to reload config", "new-config", newConf)
 
-	var oldConf *DispatcherConf
+	for _, v := range newConf.Servers {
+		logPrefix := fmt.Sprintf("server[name=%s].", v.Conf.Name)
+		err := v.InitTransport(ctx, logPrefix)
+		if err != nil {
+			logger.Error("failed to init server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId, "error", fmt.Errorf("init exec transport: %w", err))
+			return
+		}
 
+		err = v.InitDatabase(ctx, logPrefix)
+		if err != nil {
+			logger.Error("failed to init server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId, "error", fmt.Errorf("init database: %w", err))
+			return
+		}
+	}
+
+	var oldConf *DispatcherConf
 	func() {
 		d.confMutex.Lock()
 		defer d.confMutex.Unlock()
@@ -70,95 +70,15 @@ func (d *Dispatcher) ReloadConfig(ctx context.Context, newConf *DispatcherConf) 
 		d.conf = newConf
 	}()
 
-	defer func() {
-		for _, v := range oldConf.Servers {
-			func() {
-				v.mutex.Lock()
-				defer v.mutex.Unlock()
+	oldConf.mutex.Lock()
+	defer oldConf.mutex.Unlock()
 
-				v.Cleanup()
-			}()
-		}
-	}()
-
-	d.confMutex.RLock()
-	defer d.confMutex.RUnlock()
-
-	for _, v := range d.conf.Servers {
-		func() {
-			v.mutex.Lock()
-			defer v.mutex.Unlock()
-
-			oldSrv := oldConf.FindServerById(v.Conf.StableId)
-			if oldSrv != nil {
-				oldSrv.mutex.Lock()
-				defer oldSrv.mutex.Unlock()
-
-				v.Reuse(oldSrv)
-			}
-
-			logPrefix := fmt.Sprintf("server[name=%s].", v.Conf.Name)
-
-			err := v.InitTransport(ctx, logPrefix)
-			if err != nil {
-				logger.Error("failed to init server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId, "error", fmt.Errorf("init exec transport: %w", err))
-				return
-			}
-
-			err = v.InitDatabase(ctx, logPrefix)
-			if err != nil {
-				logger.Error("failed to init server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId, "error", fmt.Errorf("init database: %w", err))
-				return
-			}
-
-			logger.Info("successfully initialized server", "server-name", v.Conf.Name, "server-id", v.Conf.StableId)
-		}()
-	}
+	oldConf.Cleanup()
 }
 
-func (d *Dispatcher) FindServerByName(name string) (result *parsedServer, err error) {
+func (d *Dispatcher) GetConfig() *DispatcherConf {
 	d.confMutex.RLock()
 	defer d.confMutex.RUnlock()
 
-	result = d.conf.FindServerByName(name)
-	if result == nil {
-		return nil, fmt.Errorf("server[name=%s] is not found", name)
-	}
-
-	return result, nil
-}
-
-func (d *Dispatcher) FindServerById(id string) (result *parsedServer, err error) {
-	d.confMutex.RLock()
-	defer d.confMutex.RUnlock()
-
-	result = d.conf.FindServerById(id)
-	if result == nil {
-		return nil, fmt.Errorf("server[id=%s] is not found", id)
-	}
-
-	return result, nil
-}
-
-func (d *Dispatcher) GetRpcLogConfig(rpcPath string) logs.Config {
-	d.confMutex.RLock()
-	defer d.confMutex.RUnlock()
-
-	result := logs.Config{
-		LogLevel:     "info",
-		EchoCommands: false,
-		ExtraFields: map[string]string{
-			"method": rpcPath,
-		},
-	}
-	const defaultLogConfigKey = "default"
-	config, ok := d.conf.Logs.Rpc[defaultLogConfigKey]
-	if ok {
-		result = result.Combine(config)
-	}
-	config, ok = d.conf.Logs.Rpc[rpcPath]
-	if ok {
-		result = result.Combine(config)
-	}
-	return result
+	return d.conf
 }

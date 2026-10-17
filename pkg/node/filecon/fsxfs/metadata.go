@@ -93,6 +93,10 @@ func (s *metadata) GetData() fsapi.Data {
 	}
 }
 
+func (s *metadata) GetSize() int64 {
+	return s.MainSize
+}
+
 func (s *metadata) calcPreferredJournalSize(dataSize int64) int64 {
 	// 64 MiB
 	min := int64(64 * 1024 * 1024)

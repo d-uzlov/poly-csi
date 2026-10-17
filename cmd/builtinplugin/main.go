@@ -14,11 +14,6 @@ import (
 	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
 	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/supervisor"
-	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/ublkfactory"
-	"meoe.io/poly-csi/pkg/node/connectors"
-	"meoe.io/poly-csi/pkg/node/connectors/cntrhttpjsonplugin"
-	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -61,6 +56,7 @@ func main() {
 	}
 
 	tr := localexec.New(localexec.Config{})
+	_ = tr
 	// TODO use this more
 	logsLogger := config.Logs.MakeInstance()
 	logsLogger.Info("parsed config", "config", config)
@@ -71,36 +67,36 @@ func main() {
 	var handler http.Handler
 
 	switch argConfig.PluginType {
-	case "connector":
-		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, connectorfactory.GetByType)
-		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
-		handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
+	// case "connector":
+	// 	cons := nodeconfig.ParseBlockList(logsLogger, tr, config.DevFolder, config.Connectors)
+	// 	dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
+	// 	handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
 
-	case "ublk":
-		err = os.MkdirAll(config.Supervisor.ConfigDir, 0777)
-		if err != nil {
-			panic(err)
-		}
-		supervisor := supervisor.New(ctx, tr, config.Supervisor.ConfigDir, config.Supervisor.MinId, config.Supervisor.MaxId)
-		logsLogger.Info("running supervisor.StartupRestore")
-		err := supervisor.StartupRestore()
-		if err != nil {
-			panic(err)
-		}
-		logsLogger.Info("finished supervisor.StartupRestore")
+	// case "ublk":
+	// 	err = os.MkdirAll(config.Supervisor.ConfigDir, 0777)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	supervisor := supervisor.New(ctx, tr, config.Supervisor.ConfigDir, config.Supervisor.MinId, config.Supervisor.MaxId)
+	// 	logsLogger.Info("running supervisor.StartupRestore")
+	// 	err := supervisor.StartupRestore()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	logsLogger.Info("finished supervisor.StartupRestore")
 
-		cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, func(mtype string) (connectors.InflateFunc, error) {
-			inflate, err := ublkfactory.GetByType(mtype)
-			if err != nil {
-				return nil, err
-			}
-			return func(conf connectors.CommonConfig) (connectors.Manager, error) {
-				return inflate(supervisor, conf), nil
-			}, nil
-		})
+	// 	cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, func(mtype string) (connectors.InflateFunc, error) {
+	// 		inflate, err := ublkfactory.GetByType(mtype)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		return func(conf connectors.CommonConfig) (connectors.Manager, error) {
+	// 			return inflate(supervisor, conf), nil
+	// 		}, nil
+	// 	})
 
-		dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
-		handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
+	// 	dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
+	// 	handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
 	default:
 		panic("unknown plugin type: " + argConfig.PluginType)
 	}
@@ -148,7 +144,8 @@ func NewServer(callCtx context.Context, socket string, hs http.Handler) *Server 
 
 func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, doneCallback func(error)) {
 	mux := http.NewServeMux()
-	mux.Handle(cntrhttpjsonplugin.ConnectorHttpPath, s.hs)
+	// mux.Handle(cntrhttpjsonplugin.ConnectorHttpPath, s.hs)
+	mux.Handle("/", s.hs)
 
 	srv := &http.Server{
 		Addr:    ":8080",

@@ -17,6 +17,7 @@ type Metadata interface {
 	RequestBlockDevices() map[string]BlockDeviceRequirement
 	SetVolumeProps(props map[string]StorageProperties) error
 	GetData() fsapi.Data
+	GetSize() int64
 	Serialize() (json.RawMessage, error)
 	Restore(serialized json.RawMessage) error
 }

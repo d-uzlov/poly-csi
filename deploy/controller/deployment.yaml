@@ -26,7 +26,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.4.127
+        image: harbor.k8s.lan/local-test/poly-csi-controller:v0.5.17
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///csi-data/csi.sock
@@ -58,7 +58,7 @@ spec:
         - --worker-threads=10
         - --extra-create-metadata
         - --csi-address=/csi-data/csi.sock
-        - --enable-capacity=true
+        # - --enable-capacity=true
         - --capacity-ownerref-level=2
         - --capacity-for-immediate-binding=true
         - --automaxprocs=true
@@ -144,33 +144,33 @@ spec:
               apiVersion: v1
               fieldPath: metadata.namespace
       # https://github.com/kubernetes-csi/external-snapshotter
-      - name: external-snapshotter
-        image: registry.k8s.io/sig-storage/csi-snapshotter:v8.6.0
-        args:
-        - --v=5
-        - --leader-election
-        - --leader-election-namespace=$(NAMESPACE)
-        - --timeout=15s
-        - --retry-interval-start=1s
-        - --retry-interval-max=1m
-        - --worker-threads=10
-        - --csi-address=/csi-data/csi.sock
-        - --automaxprocs=true
-        - --logging-format=json
-        resources:
-          limits:
-            memory: 50Mi
-          requests:
-            memory: 25Mi
-        volumeMounts:
-        - mountPath: /csi-data
-          name: socket-dir
-        env:
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
+      # - name: external-snapshotter
+      #   image: registry.k8s.io/sig-storage/csi-snapshotter:v8.6.0
+      #   args:
+      #   - --v=5
+      #   - --leader-election
+      #   - --leader-election-namespace=$(NAMESPACE)
+      #   - --timeout=15s
+      #   - --retry-interval-start=1s
+      #   - --retry-interval-max=1m
+      #   - --worker-threads=10
+      #   - --csi-address=/csi-data/csi.sock
+      #   - --automaxprocs=true
+      #   - --logging-format=json
+      #   resources:
+      #     limits:
+      #       memory: 50Mi
+      #     requests:
+      #       memory: 25Mi
+      #   volumeMounts:
+      #   - mountPath: /csi-data
+      #     name: socket-dir
+      #   env:
+      #   - name: NAMESPACE
+      #     valueFrom:
+      #       fieldRef:
+      #         apiVersion: v1
+      #         fieldPath: metadata.namespace
       # # https://github.com/kubernetes-csi/external-health-monitor
       # - name: external-health-monitor
       #   image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.19.0

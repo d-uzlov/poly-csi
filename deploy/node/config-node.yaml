@@ -4,7 +4,7 @@ nodeInfoDb:
 
 encrypt:
   nodeKey:
-    path: /var/lib/kubelet/plugins/io.meoe.poly-csi/node_key.pem
+    path: /var/lib/kubelet/plugins/io.meoe.poly-csi/node_key_hpke.pem
 
 devFolder: /host/dev
 podCgroupRoot: /sys/fs/cgroup/kubepods

@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"meoe.io/poly-csi/pkg/controller/dispatcher"
-	"meoe.io/poly-csi/pkg/logs"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
@@ -91,8 +90,8 @@ func (c *Controller) ControllerGetCapabilities(ctx context.Context, req *csi.Con
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		// csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-		csi.ControllerServiceCapability_RPC_GET_CAPACITY,
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		// csi.ControllerServiceCapability_RPC_GET_CAPACITY,
+		// csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
 		// csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 		// csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
@@ -271,6 +270,6 @@ func (c *Controller) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshot
 	return c.dispatcher.DeleteSnapshot(ctx, req)
 }
 
-func (c *Controller) GetRpcLogConfig(rpcPath string) logs.Config {
-	return c.dispatcher.GetRpcLogConfig(rpcPath)
+func (c *Controller) GetConfig() *dispatcher.DispatcherConf {
+	return c.dispatcher.GetConfig()
 }

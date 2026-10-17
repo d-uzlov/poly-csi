@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
@@ -14,34 +15,17 @@ type volumeManagementHandle struct {
 	wrapper    voldbwrapper.Wrapper
 }
 
-func (h *volumeManagementHandle) release() {
-	if h.srv == nil {
-		return
-	}
-	h.srv.mutex.RUnlock()
-}
-
 // getExistingVolumeHandle takes volumeId, parses it,
 // finds the appropriate server and reads volume info from the database
-func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId string) (*volumeManagementHandle, error) {
+func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId string, conf *DispatcherConf) (*DispatchBlockFs, error) {
 	srvId, volumeName, err := parseVolumeId(volumeId)
 	if err != nil {
 		return nil, fmt.Errorf("invalid volume id: %w", err)
 	}
-	srv, err := d.FindServerById(srvId)
-	if err != nil {
+	srv := conf.FindServerById(srvId)
+	if srv == nil {
 		return nil, fmt.Errorf("server[id=%s]: not found", srvId)
 	}
-
-	srv.mutex.RLock()
-	release := srv.mutex.RUnlock
-	success := false
-	defer func() {
-		if success {
-			return
-		}
-		release()
-	}()
 
 	err = srv.Check()
 	if err != nil {
@@ -53,7 +37,7 @@ func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId strin
 		return nil, fmt.Errorf("server[id=%s].db: get entry: %w", srvId, err)
 	}
 	if dbEntry == nil {
-		return &volumeManagementHandle{}, nil
+		return nil, nil
 	}
 	wrapper := voldbwrapper.New(dbEntry)
 	vi, err := wrapper.GetVolumeInfo(ctx)
@@ -61,11 +45,20 @@ func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId strin
 		return nil, fmt.Errorf("server[id=%s].db.entry: get volume info %w", srvId, err)
 	}
 
-	success = true
-	return &volumeManagementHandle{
-		volumeName: volumeName,
-		srv:        srv,
-		vi:         vi,
-		wrapper:    wrapper,
-	}, nil
+	if vi.VolumeType != "block-fs" {
+		return nil, fmt.Errorf("volume type is not block-fs")
+	}
+
+	var s SerializedDispatchBlockFs
+	err = json.Unmarshal(vi.Data, &s)
+	if err != nil {
+		return nil, fmt.Errorf("json.Unmarshal: %w", err)
+	}
+
+	result, err := s.parse(ctx, conf)
+	if err != nil {
+		return nil, fmt.Errorf("parse SerializedDispatchBlockFs: %w", err)
+	}
+
+	return &result, nil
 }

@@ -1,5 +1,7 @@
 package node_registry
 
+import "encoding/json"
+
 type RegisterRequest struct {
 	ID   string   `json:"id"`
 	Info NodeInfo `json:"info"`
@@ -9,12 +11,12 @@ type NodeInfo struct {
 	Connectors map[string]ConnectorInfo `json:"connectors"`
 	IPS        []string                 `json:"ips"`
 	Presets    []string                 `json:"presets"`
-	PublicKey  string                   `json:"publicKey"`
+	PublicKey  []byte                   `json:"publicKey"`
 }
 
 type ConnectorInfo struct {
-	Data     string `json:"data"`
-	Protocol string `json:"protocol"`
+	Protocol string          `json:"protocol"`
+	Data     json.RawMessage `json:"data"`
 }
 
 type RegisterResponse struct {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"reflect"
 	"slices"
 	"sync"
 
@@ -13,14 +12,26 @@ import (
 	"meoe.io/poly-csi/pkg/config"
 	"meoe.io/poly-csi/pkg/controller/voldb"
 	"meoe.io/poly-csi/pkg/controller/voldb/voldbfactory"
+	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/transportfactory"
 )
 
 type DispatcherConf struct {
+	mutex      sync.RWMutex
+	alive      bool
 	NodeInfoDb NodeInfoStorageConfig
 	Servers    []*parsedServer
 	Logs       Logs
+}
+
+func (c *DispatcherConf) Lock() (release func()) {
+	c.mutex.Lock()
+	return c.mutex.Unlock
+}
+
+func (c *DispatcherConf) IsAlive() bool {
+	return c.alive
 }
 
 func (c *DispatcherConf) Validate() (errorList []string, warningList []string) {
@@ -57,8 +68,33 @@ func (c *DispatcherConf) FindServerById(id string) *parsedServer {
 	return nil
 }
 
+func (c *DispatcherConf) GetRpcLogConfig(rpcPath string) logs.Config {
+	result := logs.Config{
+		LogLevel:     "info",
+		EchoCommands: false,
+		ExtraFields: map[string]string{
+			"method": rpcPath,
+		},
+	}
+	const defaultLogConfigKey = "default"
+	config, ok := c.Logs.Rpc[defaultLogConfigKey]
+	if ok {
+		result = result.Combine(config)
+	}
+	config, ok = c.Logs.Rpc[rpcPath]
+	if ok {
+		result = result.Combine(config)
+	}
+	return result
+}
+
+func (c *DispatcherConf) Cleanup() {
+	for _, v := range c.Servers {
+		v.Cleanup()
+	}
+}
+
 type parsedServer struct {
-	mutex sync.RWMutex
 	valid bool
 	Conf  *ServerConfig
 
@@ -98,21 +134,21 @@ func (c *parsedServer) Check() error {
 }
 
 // try to transfer objects without reinitialization
-func (c *parsedServer) Reuse(old *parsedServer) {
-	if old.trInstance != nil {
-		if old.Conf.ExecType == c.Conf.ExecType && reflect.DeepEqual(c.Conf.ExecConfig, old.Conf.ExecConfig) {
-			c.trInstance = old.trInstance
-			old.trInstance = nil
-			c.trInstance.SetCommands(&c.ExecReplacements)
-		}
-	}
-	if old.dbInstance != nil {
-		if old.Conf.DbType == c.Conf.DbType && reflect.DeepEqual(c.Conf.DbConfig, old.Conf.DbConfig) {
-			c.dbInstance = old.dbInstance
-			old.dbInstance = nil
-		}
-	}
-}
+// func (c *parsedServer) Reuse(old *parsedServer) {
+// 	if old.trInstance != nil {
+// 		if old.Conf.ExecType == c.Conf.ExecType && reflect.DeepEqual(c.Conf.ExecConfig, old.Conf.ExecConfig) {
+// 			c.trInstance = old.trInstance
+// 			old.trInstance = nil
+// 			c.trInstance.SetCommands(&c.ExecReplacements)
+// 		}
+// 	}
+// 	if old.dbInstance != nil {
+// 		if old.Conf.DbType == c.Conf.DbType && reflect.DeepEqual(c.Conf.DbConfig, old.Conf.DbConfig) {
+// 			c.dbInstance = old.dbInstance
+// 			old.dbInstance = nil
+// 		}
+// 	}
+// }
 
 func (c *parsedServer) Cleanup() {
 	if c.trInstance != nil {
@@ -219,8 +255,8 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 	for _, v := range config.Servers {
 		srv := parsedServer{
 			// TODO remove valid?
-			valid: true,
-			Conf:  v,
+			valid:            true,
+			Conf:             v,
 			ExecReplacements: *transport.NewExecReplacement(v.Commands),
 		}
 
@@ -246,6 +282,7 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 	}
 
 	return &DispatcherConf{
+		alive:      true,
 		NodeInfoDb: config.NodeInfoDb,
 		Servers:    sl,
 		Logs:       config.Logs,

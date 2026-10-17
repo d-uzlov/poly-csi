@@ -165,7 +165,7 @@ func (s *serializer) serializeStruct(v reflect.Value, prefix string) error {
 
 		tagValue := sf.Tag.Get(structMapTagName)
 		if tagValue == "" {
-			return fmt.Errorf("missing '%s' tag", structMapTagName)
+			return fmt.Errorf("missing '%s' tag on field '%s' of type '%s'", structMapTagName, sf.Name, t.Name())
 		}
 		if tagValue == "-" {
 			continue

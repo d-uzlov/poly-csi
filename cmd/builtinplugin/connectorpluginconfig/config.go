@@ -2,15 +2,15 @@ package connectorpluginconfig
 
 import (
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/connectors/connectorfactory"
+	"meoe.io/poly-csi/pkg/node/nodeconfig"
 )
 
 type Config struct {
-	Socket     string                            `yaml:"socket"`
-	Connectors []*connectorfactory.ConnectorSpec `yaml:"connector"`
-	DevFolder  string                            `yaml:"devFolder"`
-	Logs       logs.Config                       `yaml:"logs"`
-	Supervisor SupervisorConfig                  `yaml:"supervisor"`
+	Socket     string                  `yaml:"socket"`
+	Connectors []nodeconfig.BlockSpec `yaml:"connector"`
+	DevFolder  string                  `yaml:"devFolder"`
+	Logs       logs.Config             `yaml:"logs"`
+	Supervisor SupervisorConfig        `yaml:"supervisor"`
 }
 
 type SupervisorConfig struct {

@@ -10,6 +10,7 @@ import (
 
 	"meoe.io/poly-csi/cmd/node/argconfig"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/node/nodedispatcher"
 	"meoe.io/poly-csi/pkg/node/nodeserver"
 	"meoe.io/poly-csi/pkg/utils/configwatcher"
@@ -53,7 +54,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	initialNodeConfig, err := nodedispatcher.ParseConfig(ctx, configContent)
+	initialNodeConfig, err := nodeconfig.ParseConfig(ctx, configContent)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -75,7 +76,7 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
-		nodeConfig, err := nodedispatcher.ParseConfig(ctx, configContent)
+		nodeConfig, err := nodeconfig.ParseConfig(ctx, configContent)
 		if err != nil {
 			panic(err.Error())
 		}

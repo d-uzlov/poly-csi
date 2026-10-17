@@ -9,35 +9,33 @@ allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
 parameters:
+  dispatch.mode: block-fs
   dispatch.serverName: rose
   dispatch.storageType: zfs-zvol
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.shareType: nvmet-keeper
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nvme
-  dispatch.nodePreset: nvmeCon,nvmeIoq4
+  dispatch.nodePresets: nvmeCon,nvmeIoq4
   dispatch.addressNames: storage,k8s
   dispatch.fsFormatSide: node
-
-  # none, sameShare, sameServer, separate
-  dispatch.journalVolume: sameShare
 
   zfs.parentDataset: rose/test
   zfs.reservedPercent: 0%
   zfs.volblocksize: 32k
 
   # journal.serverName: rose
-  journal.storageType: zfs-zvol
-  journal.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}-journal'
+  # journal.storageType: zfs-zvol
+  # journal.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}-journal'
   # journal.shareType: nvmet-keeper
   # journal.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   # journal.connectorId: nvme
   # journal.nodePreset: nvmeCon,nvmeIoq4
   # journal.addressNames: storage,k8s
 
-  journal.zfs.parentDataset: rose/test
-  journal.zfs.reservedPercent: 105%
-  journal.zfs.volblocksize: 4k
+  # journal.zfs.parentDataset: rose/test
+  # journal.zfs.reservedPercent: 105%
+  # journal.zfs.volblocksize: 4k
 
   nvmet.nvmetPortName: '4420'
   nvmet.connectPort: '4420'

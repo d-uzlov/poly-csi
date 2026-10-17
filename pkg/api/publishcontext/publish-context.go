@@ -19,8 +19,8 @@ type PublishContext struct {
 }
 
 type Block struct {
-	ConnectorId string
-	Data        blockapi.Data
+	ConnectorId string        `map:"connectorId"`
+	Data        blockapi.Data `map:"data"`
 }
 
 // type AddressOption struct {
@@ -29,21 +29,21 @@ type Block struct {
 // }
 
 type Serialized struct {
-	Enc   []byte
-	Block []SerializedBlock
-	Fs    SerializedFilesystem
+	Enc   []byte               `map:"enc"`
+	Block []SerializedBlock    `map:"block"`
+	Fs    SerializedFilesystem `map:"fs"`
 }
 
 type SerializedBlock struct {
-	ConnectorId string
-	Name        string
-	Public      blockapi.Data
-	Secret      []byte
+	ConnectorId string        `map:"connectorId"`
+	Name        string        `map:"name"`
+	Public      blockapi.Data `map:"public"`
+	Secret      []byte        `map:"secret"`
 }
 
 type SerializedFilesystem struct {
-	Public fsapi.Data
-	Secret []byte
+	Public fsapi.Data `map:"public"`
+	Secret []byte     `map:"secret"`
 }
 
 var Registry = typeregistry.NewPrepopulated([]typeregistry.Sample{
@@ -143,12 +143,12 @@ func Parse(src map[string]string, privateKey hpke.PrivateKey) (PublishContext, e
 		}
 		result.BlockDevices[v.Name] = Block{
 			ConnectorId: v.ConnectorId,
-			Data: v.Public,
+			Data:        v.Public,
 		}
 	}
 
 	if s.Fs.Public != nil {
-		tag := []byte("block")
+		tag := []byte("filesystem")
 		plaintext, err := receiver.Open(tag, s.Fs.Secret)
 		if err != nil {
 			return PublishContext{}, err
