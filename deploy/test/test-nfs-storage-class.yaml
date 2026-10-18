@@ -9,6 +9,7 @@ allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
 parameters:
+  dispatch.mode: native-fs
   dispatch.serverName: tulip
   dispatch.storageType: zfs-dataset
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
@@ -21,9 +22,10 @@ parameters:
 
   nfs.shareOptions: rw,no_subtree_check,no_root_squash
 
-  # fsType: nfs4
+  fsType: nfs
 
 mountOptions:
+- vers=4.2
 - soft
 - noatime
 - nodiratime

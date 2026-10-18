@@ -75,14 +75,18 @@ func (sh *share) DeleteShare(ctx context.Context) error {
 }
 
 func (sh *share) Publish(ctx context.Context, req fileshare.PublishRequest) (*fileshare.PublishContext, error) {
+	if len(req.AddressList) != 1 {
+		return nil, fmt.Errorf("nfs needs exactly one server address")
+	}
 	return &fileshare.PublishContext{
 		Protocol: fsapi.NfsShare{
-			Path: sh.FsPath,
+			Path:          sh.FsPath,
+			ServerAddress: req.AddressList[0],
 		},
 	}, nil
 }
 
-func (sh *share) Unpublish(ctx context.Context, serialized string) error {
+func (sh *share) Unpublish(ctx context.Context, serialized json.RawMessage) error {
 	return nil
 }
 

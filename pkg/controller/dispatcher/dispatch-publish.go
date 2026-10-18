@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"meoe.io/poly-csi/pkg/controller/blockshare"
 	"meoe.io/poly-csi/pkg/node/nodeinfo"
 	"meoe.io/poly-csi/pkg/noderegistry/noderegclient"
 )
@@ -58,10 +57,7 @@ func (d *Dispatcher) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 		return nil, fmt.Errorf("load node public key: %w", err)
 	}
 
-	pc, err := mh.publish(ctx, blockshare.PublishRequest{
-		NodeName: req.NodeId,
-		// ConInfo:  conInfo.Info,
-	})
+	pc, err := mh.Publish(ctx, req.NodeId)
 	if err != nil {
 		return nil, fmt.Errorf("shareHandle.Publish to %s: %w", req.NodeId, err)
 	}
@@ -95,12 +91,12 @@ func (d *Dispatcher) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 	}
 
 	if req.NodeId == "" {
-		err = mh.unpublishAll(ctx)
+		err = mh.UnpublishAll(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unpublishAll: %w", err)
 		}
 	} else {
-		err = mh.unpublish(ctx, req.NodeId)
+		err = mh.Unpublish(ctx, req.NodeId)
 		if err != nil {
 			return nil, fmt.Errorf("unpublish: %w", err)
 		}

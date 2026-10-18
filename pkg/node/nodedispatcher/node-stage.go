@@ -14,7 +14,6 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/filecon"
-	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
@@ -61,14 +60,15 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	nvi := newVolumeHandle(req.StagingTargetPath, tr, fullPreset)
 	nvi.FsRootDirMode = vc.FsRootDirMode
 	defer func() {
-		logger.Error("writing volume info to disk", "info", nvi)
 		saveErr := nvi.writeToDisk()
+		if saveErr != nil {
+			logger.Error("failed to write volume metadata to disk", "info", nvi, "error", saveErr.Error())
+		} else {
+			logger.MicroOp("written volume info to disk", "info", nvi)
+		}
 		if err == nil {
 			err = saveErr
 			saveErr = nil
-		}
-		if saveErr != nil {
-			logger.Error("failed to write volume metadata to disk", "error", saveErr.Error())
 		}
 		if err != nil {
 			if conf.DisableCleanupOnFailure {
@@ -154,12 +154,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fsHandle.Prepare: %w", err)
-	}
-
-	cmd := []string{"chmod", vc.FsRootDirMode, nvi.FsStagePath}
-	err = transport.CheckedRun(ctx, tr, cmd, transport.WithSudo(true))
-	if err != nil {
-		return nil, fmt.Errorf("chmod: %w", err)
 	}
 
 	// TODO

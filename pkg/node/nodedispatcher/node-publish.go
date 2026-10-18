@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"meoe.io/poly-csi/pkg/node/filecon"
+	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
 )
@@ -51,12 +52,22 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 	if err != nil {
 		return nil, fmt.Errorf("fsHandler.Mount: %w", err)
 	}
+
+	// TODO move this to stage?
+	// But how to handle network filesystems that don't do stage?
+	// Or move into filesystem?
+	cmd := []string{"chmod", nvi.FsRootDirMode, req.TargetPath}
+	err = transport.CheckedRun(ctx, tr, cmd, transport.WithSudo(true))
+	if err != nil {
+		return nil, fmt.Errorf("chmod: %w", err)
+	}
+
 	// TODO move this inside filesystem?
 	if mountParams.VolumeMountGroup != "" {
 		if nvi.VolumeGroup != "" && nvi.VolumeGroup != mountParams.VolumeMountGroup {
 			return nil, fmt.Errorf("requested to mount as group '%s' but this volume is already attached with group '%s'", mountParams.VolumeMountGroup, nvi.VolumeGroup)
 		}
-		err = tr.Cmds().Chown(ctx, nvi.FsStagePath, "root", mountParams.VolumeMountGroup, false)
+		err = tr.Cmds().Chown(ctx, req.TargetPath, "root", mountParams.VolumeMountGroup, false)
 		if err != nil {
 			return nil, fmt.Errorf("chown fs root: %w", err)
 		}

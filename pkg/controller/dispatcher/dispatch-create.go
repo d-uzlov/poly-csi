@@ -108,69 +108,50 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 
 	dispatchMode := req.Parameters["dispatch.mode"]
 	delete(req.Parameters, "dispatch.mode")
+	var helper VolumeDriver
 	switch dispatchMode {
 	case "block-fs":
-		helper := NewDispatchBlockFs(conf, callUuid)
-		err := helper.parseRequest(req)
-		if err != nil {
-			return nil, fmt.Errorf("helper.parseRequest: %w", err)
-		}
-		err = helper.initHandles()
-		if err != nil {
-			return nil, fmt.Errorf("helper.initHandles: %w", err)
-		}
-		err = helper.create(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("helper.create: %w", err)
-		}
-
-		volumeContext := helper.getVolumeContext()
-
-		err = volumeContext.Validate()
-		if err != nil {
-			return nil, fmt.Errorf("validate volume context: %w", err)
-		}
-		vcMap, err := serialmaps.Serialize(volumeContext, volumecontext.Prefix)
-		if err != nil {
-			return nil, fmt.Errorf("serialize volume context: %w", err)
-		}
-
-		volumeId := createVolumeId(helper.srv.Conf.StableId, helper.rawName)
-
-		return &csi.CreateVolumeResponse{
-			Volume: &csi.Volume{
-				VolumeId:      volumeId,
-				CapacityBytes: helper.getSize(),
-				VolumeContext: vcMap,
-				ContentSource: req.VolumeContentSource,
-			},
-		}, nil
-
-	// case "native-fs":
-	// 	helper := NewDispatchNativeFs(conf, callUuid)
-	// 	err := helper.parseRequest(req)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("helper.parseRequest: %w", err)
-	// 	}
-	// 	err = helper.initHandles()
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("helper.initHandles: %w", err)
-	// 	}
-	// 	err = helper.save(ctx)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("save after helper.initHandles: %w", err)
-	// 	}
-	// 	err = helper.create(ctx)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("helper.create: %w", err)
-	// 	}
-	// 	err = helper.save(ctx)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("save after helper.create: %w", err)
-	// 	}
+		helper = NewDispatchBlockFs(conf, callUuid)
+	case "native-fs":
+		helper = NewDispatchNativeFs(conf, callUuid)
 	default:
 		return nil, fmt.Errorf("dispatch.mode: '%s'", dispatchMode)
 	}
+
+	err := helper.ParseRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("helper.parseRequest: %w", err)
+	}
+	err = helper.InitHandles()
+	if err != nil {
+		return nil, fmt.Errorf("helper.initHandles: %w", err)
+	}
+	err = helper.Create(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("helper.create: %w", err)
+	}
+
+	volumeContext := helper.GetVolumeContext()
+
+	err = volumeContext.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("validate volume context: %w", err)
+	}
+	vcMap, err := serialmaps.Serialize(volumeContext, volumecontext.Prefix)
+	if err != nil {
+		return nil, fmt.Errorf("serialize volume context: %w", err)
+	}
+
+	volumeId := helper.MakeVolumeId()
+
+	return &csi.CreateVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      volumeId,
+			CapacityBytes: helper.GetSize(),
+			VolumeContext: vcMap,
+			ContentSource: req.VolumeContentSource,
+		},
+	}, nil
 
 	// if vi.Storage.DataSource == "" {
 	// 	if req.VolumeContentSource != nil {
@@ -237,7 +218,7 @@ func (d *Dispatcher) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 		return &csi.DeleteVolumeResponse{}, nil
 	}
 
-	err = mh.destroy(ctx)
+	err = mh.Destroy(ctx)
 	if err != nil {
 		return nil, err
 	}

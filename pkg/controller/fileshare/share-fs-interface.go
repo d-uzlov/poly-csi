@@ -26,7 +26,7 @@ type Share interface {
 	// Implementation can cast the volume object to expected type to extract info from it.
 	AttachVolume(ctx context.Context, volume any) error
 	Publish(ctx context.Context, req PublishRequest) (*PublishContext, error)
-	Unpublish(ctx context.Context, serializedLocalData string) error
+	Unpublish(ctx context.Context, serialized json.RawMessage) error
 	UnpublishAll(ctx context.Context) error
 	DeleteShare(ctx context.Context) error
 	Serialize() (json.RawMessage, error)

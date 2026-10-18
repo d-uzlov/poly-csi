@@ -8,16 +8,9 @@ import (
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
 )
 
-type volumeManagementHandle struct {
-	volumeName string
-	srv        *parsedServer
-	vi         *voldbwrapper.VolumeInfo
-	wrapper    voldbwrapper.Wrapper
-}
-
 // getExistingVolumeHandle takes volumeId, parses it,
 // finds the appropriate server and reads volume info from the database
-func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId string, conf *DispatcherConf) (*DispatchBlockFs, error) {
+func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId string, conf *DispatcherConf) (VolumeDriver, error) {
 	srvId, volumeName, err := parseVolumeId(volumeId)
 	if err != nil {
 		return nil, fmt.Errorf("invalid volume id: %w", err)
@@ -45,20 +38,34 @@ func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId strin
 		return nil, fmt.Errorf("server[id=%s].db.entry: get volume info %w", srvId, err)
 	}
 
-	if vi.VolumeType != "block-fs" {
-		return nil, fmt.Errorf("volume type is not block-fs")
-	}
+	switch vi.VolumeType {
+	case "block-fs":
+		var s SerializedDispatchBlockFs
+		err = json.Unmarshal(vi.Data, &s)
+		if err != nil {
+			return nil, fmt.Errorf("json.Unmarshal: %w", err)
+		}
 
-	var s SerializedDispatchBlockFs
-	err = json.Unmarshal(vi.Data, &s)
-	if err != nil {
-		return nil, fmt.Errorf("json.Unmarshal: %w", err)
-	}
+		result, err := s.parse(ctx, conf)
+		if err != nil {
+			return nil, fmt.Errorf("parse SerializedDispatchBlockFs: %w", err)
+		}
 
-	result, err := s.parse(ctx, conf)
-	if err != nil {
-		return nil, fmt.Errorf("parse SerializedDispatchBlockFs: %w", err)
-	}
+		return &result, nil
+	case "native-fs":
+		var s SerializedDispatchNativeFs
+		err = json.Unmarshal(vi.Data, &s)
+		if err != nil {
+			return nil, fmt.Errorf("json.Unmarshal: %w", err)
+		}
 
-	return &result, nil
+		result, err := s.parse(ctx, conf)
+		if err != nil {
+			return nil, fmt.Errorf("parse SerializedDispatchNativeFs: %w", err)
+		}
+
+		return &result, nil
+	default:
+		return nil, fmt.Errorf("unknown volume type: '%s'", vi.VolumeType)
+	}
 }

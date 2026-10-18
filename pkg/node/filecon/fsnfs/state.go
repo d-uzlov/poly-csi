@@ -33,7 +33,7 @@ func (s *state) Prepare(ctx context.Context, req filecon.PrepareRequest) error {
 }
 
 func (s *state) Mount(ctx context.Context, req filecon.MountRequest) error {
-	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.StagingPath, "nfs", req.Flags)
+	mi, err := fsutils.New(s.tr).EnsureMounted(ctx, s.NfsPath, req.TargetPath, "nfs", req.Flags)
 	if err != nil {
 		return err
 	}

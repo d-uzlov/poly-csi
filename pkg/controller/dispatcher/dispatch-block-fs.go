@@ -42,6 +42,8 @@ type DispatchBlockFs struct {
 	Block map[string]BlockInfo
 }
 
+var _ VolumeDriver = &DispatchBlockFs{}
+
 type BlockInfo struct {
 	Req            filecon.BlockDeviceRequirement
 	storageManager blockvolume.Manager
@@ -53,15 +55,19 @@ type BlockInfo struct {
 	addrOpt        []AddressOption
 }
 
-func NewDispatchBlockFs(conf *DispatcherConf, uuid string) DispatchBlockFs {
-	return DispatchBlockFs{
+func NewDispatchBlockFs(conf *DispatcherConf, uuid string) VolumeDriver {
+	return &DispatchBlockFs{
 		conf:  conf,
 		uuid:  uuid,
 		Block: map[string]BlockInfo{},
 	}
 }
 
-func (df *DispatchBlockFs) parseRequest(req *csi.CreateVolumeRequest) error {
+func (df *DispatchBlockFs) MakeVolumeId() string {
+	return createVolumeId(df.srv.Conf.StableId, df.rawName)
+}
+
+func (df *DispatchBlockFs) ParseRequest(req *csi.CreateVolumeRequest) error {
 	df.rawName = req.Name
 
 	fsCaps := req.VolumeCapabilities[0].GetMount()
@@ -112,7 +118,7 @@ func (df *DispatchBlockFs) parseRequest(req *csi.CreateVolumeRequest) error {
 	return nil
 }
 
-func (df *DispatchBlockFs) initHandles() error {
+func (df *DispatchBlockFs) InitHandles() error {
 	df.srv = df.conf.FindServerByName(df.p.ServerName)
 	if df.srv == nil {
 		return fmt.Errorf("server not found: '%s'", df.p.ServerName)
@@ -201,7 +207,7 @@ func (df *DispatchBlockFs) initHandles() error {
 	return nil
 }
 
-func (df *DispatchBlockFs) create(ctx context.Context) error {
+func (df *DispatchBlockFs) Create(ctx context.Context) error {
 	dbEntry, err := df.srv.dbInstance.CreateEntry(ctx, df.rawName, df.uuid)
 	if err != nil {
 		return fmt.Errorf("create db entry: %w", err)
@@ -215,7 +221,7 @@ func (df *DispatchBlockFs) create(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("block '%s': storageHandle.CreateState: %w", k, err)
 		}
-		err = df.save(ctx)
+		err = df.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("save after storageHandle.CreateState: %w", err)
 		}
@@ -243,7 +249,7 @@ func (df *DispatchBlockFs) create(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("block '%s': shareHandle.AttachPath: %w", k, err)
 		}
-		err = df.save(ctx)
+		err = df.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("save after shareHandle.AttachPath: %w", err)
 		}
@@ -253,7 +259,7 @@ func (df *DispatchBlockFs) create(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("FsMeta.SetVolumeProps: %w", err)
 	}
-	err = df.save(ctx)
+	err = df.Save(ctx)
 	if err != nil {
 		return fmt.Errorf("save after FsMeta.SetVolumeProps: %w", err)
 	}
@@ -261,7 +267,7 @@ func (df *DispatchBlockFs) create(ctx context.Context) error {
 	return nil
 }
 
-func (df *DispatchBlockFs) getVolumeContext() volumecontext.VolumeContext {
+func (df *DispatchBlockFs) GetVolumeContext() volumecontext.VolumeContext {
 	var presets []string
 	if df.p.NodePresets != "" {
 		for v := range strings.SplitSeq(df.p.NodePresets, ",") {
@@ -281,11 +287,11 @@ func (df *DispatchBlockFs) getVolumeContext() volumecontext.VolumeContext {
 	}
 }
 
-func (df *DispatchBlockFs) getSize() int64 {
+func (df *DispatchBlockFs) GetSize() int64 {
 	return df.FsMeta.GetSize()
 }
 
-func (df *DispatchBlockFs) setSize(ctx context.Context, newSize int64) error {
+func (df *DispatchBlockFs) SetSize(ctx context.Context, newSize int64) error {
 	err := df.FsMeta.Configure(newSize, df.rawStaticParams)
 	if err != nil {
 		return fmt.Errorf("configure fs: %w", err)
@@ -301,7 +307,7 @@ func (df *DispatchBlockFs) setSize(ctx context.Context, newSize int64) error {
 		if err != nil {
 			return fmt.Errorf("block '%s': resize: %w", k, err)
 		}
-		err = df.save(ctx)
+		err = df.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("save after storageHandle.SetSize: %w", err)
 		}
@@ -309,7 +315,10 @@ func (df *DispatchBlockFs) setSize(ctx context.Context, newSize int64) error {
 	return nil
 }
 
-func (df *DispatchBlockFs) publish(ctx context.Context, req blockshare.PublishRequest) (publishcontext.PublishContext, error) {
+func (df *DispatchBlockFs) Publish(ctx context.Context, nodeName string) (publishcontext.PublishContext, error) {
+	req := blockshare.PublishRequest{
+		NodeName: nodeName,
+	}
 	result := publishcontext.PublishContext{
 		BlockDevices: map[string]publishcontext.Block{},
 		Filesystem:   df.FsMeta.GetData(),
@@ -336,7 +345,7 @@ func (df *DispatchBlockFs) publish(ctx context.Context, req blockshare.PublishRe
 				return result, fmt.Errorf("block '%s': serialize local data: %w", k, err)
 			}
 			v.publishData[req.NodeName] = serializedData
-			err = df.save(ctx)
+			err = df.Save(ctx)
 			if err != nil {
 				return result, fmt.Errorf("save after shareHandle.Publish: %w", err)
 			}
@@ -345,7 +354,7 @@ func (df *DispatchBlockFs) publish(ctx context.Context, req blockshare.PublishRe
 	return result, nil
 }
 
-func (df *DispatchBlockFs) unpublish(ctx context.Context, nodeId string) error {
+func (df *DispatchBlockFs) Unpublish(ctx context.Context, nodeId string) error {
 	for k, v := range df.Block {
 		data, ok := v.publishData[nodeId]
 		if !ok || data == nil {
@@ -355,7 +364,7 @@ func (df *DispatchBlockFs) unpublish(ctx context.Context, nodeId string) error {
 		if err != nil {
 			return fmt.Errorf("block '%s': shareHandle.Unpublish: %w", k, err)
 		}
-		err = df.save(ctx)
+		err = df.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("save: %w", err)
 		}
@@ -363,7 +372,7 @@ func (df *DispatchBlockFs) unpublish(ctx context.Context, nodeId string) error {
 	return nil
 }
 
-func (df *DispatchBlockFs) unpublishAll(ctx context.Context) error {
+func (df *DispatchBlockFs) UnpublishAll(ctx context.Context) error {
 	for k, v := range df.Block {
 		caps := v.shareManager.GetCapabilities()
 		if caps.UnpublishAll {
@@ -371,7 +380,7 @@ func (df *DispatchBlockFs) unpublishAll(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("block '%s': shareHandle.UnpublishAll: %w", k, err)
 			}
-			err = df.save(ctx)
+			err = df.Save(ctx)
 			if err != nil {
 				return fmt.Errorf("save: %w", err)
 			}
@@ -385,7 +394,7 @@ func (df *DispatchBlockFs) unpublishAll(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("block '%s': shareHandle.Unpublish: %w", k, err)
 			}
-			err = df.save(ctx)
+			err = df.Save(ctx)
 			if err != nil {
 				return fmt.Errorf("save: %w", err)
 			}
@@ -394,8 +403,8 @@ func (df *DispatchBlockFs) unpublishAll(ctx context.Context) error {
 	return nil
 }
 
-func (df *DispatchBlockFs) destroy(ctx context.Context) error {
-	err := df.unpublishAll(ctx)
+func (df *DispatchBlockFs) Destroy(ctx context.Context) error {
+	err := df.UnpublishAll(ctx)
 	if err != nil {
 		return fmt.Errorf("unpublishAll")
 	}
@@ -406,7 +415,7 @@ func (df *DispatchBlockFs) destroy(ctx context.Context) error {
 				return fmt.Errorf("block '%s': shareHandle.DeleteShare: %w", k, err)
 			}
 			v.shareHandle = nil
-			err = df.save(ctx)
+			err = df.Save(ctx)
 			if err != nil {
 				return fmt.Errorf("save: %w", err)
 			}
@@ -417,7 +426,7 @@ func (df *DispatchBlockFs) destroy(ctx context.Context) error {
 				return fmt.Errorf("block '%s': storageHandle.DeleteState: %w", k, err)
 			}
 			v.storageHandle = nil
-			err = df.save(ctx)
+			err = df.Save(ctx)
 			if err != nil {
 				return fmt.Errorf("save: %w", err)
 			}
@@ -451,7 +460,7 @@ type SerializedBlockInfo struct {
 	AddrOpt     []string                       `json:"addrOpt"`
 }
 
-func (df *DispatchBlockFs) save(ctx context.Context) error {
+func (df *DispatchBlockFs) Save(ctx context.Context) error {
 	result := SerializedDispatchBlockFs{
 		RawName:          df.rawName,
 		Uuid:             df.uuid,
@@ -507,24 +516,24 @@ func (df *DispatchBlockFs) save(ctx context.Context) error {
 	return nil
 }
 
-func (df *SerializedDispatchBlockFs) parse(ctx context.Context, conf *DispatcherConf) (DispatchBlockFs, error) {
+func (ds *SerializedDispatchBlockFs) parse(ctx context.Context, conf *DispatcherConf) (DispatchBlockFs, error) {
 	result := DispatchBlockFs{
 		conf:             conf,
-		rawName:          df.RawName,
-		uuid:             df.Uuid,
-		rawStaticParams:  df.RawStaticParams,
-		rawMutableParams: df.RawMutableParams,
-		FsType:           df.FsType,
-		p:                df.P,
+		rawName:          ds.RawName,
+		uuid:             ds.Uuid,
+		rawStaticParams:  ds.RawStaticParams,
+		rawMutableParams: ds.RawMutableParams,
+		FsType:           ds.FsType,
+		p:                ds.P,
 		Block:            map[string]BlockInfo{},
 	}
 
-	result.srv = conf.FindServerByName(df.P.ServerName)
+	result.srv = conf.FindServerByName(ds.P.ServerName)
 	if result.srv == nil {
-		return result, fmt.Errorf("server not found: '%s'", df.P.ServerName)
+		return result, fmt.Errorf("server not found: '%s'", ds.P.ServerName)
 	}
 
-	dbEntry, err := result.srv.dbInstance.CreateEntry(ctx, df.RawName, df.Uuid)
+	dbEntry, err := result.srv.dbInstance.CreateEntry(ctx, ds.RawName, ds.Uuid)
 	if err != nil {
 		return result, fmt.Errorf("find db entry: %w", err)
 	}
@@ -541,12 +550,12 @@ func (df *SerializedDispatchBlockFs) parse(ctx context.Context, conf *Dispatcher
 	if result.FsMeta == nil {
 		return result, fmt.Errorf("fs: nil metadata")
 	}
-	err = result.FsMeta.Restore(df.FsMeta)
+	err = result.FsMeta.Restore(ds.FsMeta)
 	if err != nil {
 		return result, fmt.Errorf("fs: restore: %w", err)
 	}
 
-	for k, v := range df.Block {
+	for k, v := range ds.Block {
 		srv := conf.FindServerByName(v.P.ServerName)
 		if srv == nil {
 			return result, fmt.Errorf("block '%s': server is missing: '%s'", k, v.P.ServerName)

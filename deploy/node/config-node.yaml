@@ -50,6 +50,8 @@ filesystems:
   type: nfs
 - id: smb
   type: cifs
+- id: cifs
+  type: cifs
 
 presets:
 - name: nvmeCon

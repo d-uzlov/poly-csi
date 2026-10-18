@@ -71,7 +71,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 		return nil, fmt.Errorf("volume not found")
 	}
 
-	vc := mh.getVolumeContext()
+	vc := mh.GetVolumeContext()
 
 	vcMap, err := serialmaps.Serialize(vc, volumecontext.Prefix)
 	if err != nil {
@@ -81,7 +81,7 @@ func (d *Dispatcher) ControllerGetVolume(ctx context.Context, req *csi.Controlle
 	return &csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      req.VolumeId,
-			CapacityBytes: mh.getSize(),
+			CapacityBytes: mh.GetSize(),
 			VolumeContext: vcMap,
 			// ContentSource: , // TODO restore matching content source
 		},
@@ -125,13 +125,13 @@ func (d *Dispatcher) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 
 	newSize := req.CapacityRange.RequiredBytes
 
-	err = mh.setSize(ctx, newSize)
+	err = mh.SetSize(ctx, newSize)
 	if err != nil {
 		return nil, fmt.Errorf("setSize: %w", err)
 	}
 
 	return &csi.ControllerExpandVolumeResponse{
-		CapacityBytes:         mh.getSize(),
+		CapacityBytes:         mh.GetSize(),
 		NodeExpansionRequired: true,
 	}, nil
 }

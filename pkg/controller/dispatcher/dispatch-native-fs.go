@@ -8,10 +8,13 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/api/publishcontext"
+	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/controller/fileshare"
 	"meoe.io/poly-csi/pkg/controller/fileshare/filesharefactory"
 	"meoe.io/poly-csi/pkg/controller/filevol"
 	"meoe.io/poly-csi/pkg/controller/filevol/filevolfactory"
+	"meoe.io/poly-csi/pkg/controller/voldb"
+	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
 )
 
 type DispatchNativeFs struct {
@@ -25,6 +28,8 @@ type DispatchNativeFs struct {
 
 	rawStaticParams  map[string]string
 	rawMutableParams map[string]string
+
+	dbEntry voldb.Entry
 
 	FsType string
 
@@ -40,14 +45,20 @@ type DispatchNativeFs struct {
 	publishData map[string]json.RawMessage
 }
 
-func NewDispatchNativeFs(conf *DispatcherConf, uuid string) DispatchNativeFs {
-	return DispatchNativeFs{
+var _ VolumeDriver = &DispatchNativeFs{}
+
+func NewDispatchNativeFs(conf *DispatcherConf, uuid string) VolumeDriver {
+	return &DispatchNativeFs{
 		conf: conf,
 		uuid: uuid,
 	}
 }
 
-func (df *DispatchNativeFs) parseRequest(req *csi.CreateVolumeRequest) error {
+func (df *DispatchNativeFs) MakeVolumeId() string {
+	return createVolumeId(df.srv.Conf.StableId, df.rawName)
+}
+
+func (df *DispatchNativeFs) ParseRequest(req *csi.CreateVolumeRequest) error {
 	df.rawName = req.Name
 
 	fsCaps := req.VolumeCapabilities[0].GetMount()
@@ -69,7 +80,7 @@ func (df *DispatchNativeFs) parseRequest(req *csi.CreateVolumeRequest) error {
 	return nil
 }
 
-func (df *DispatchNativeFs) initHandles() error {
+func (df *DispatchNativeFs) InitHandles() error {
 	df.srv = df.conf.FindServerByName(df.p.ServerName)
 	if df.srv == nil {
 		return fmt.Errorf("server not found: '%s'", df.p.ServerName)
@@ -102,7 +113,7 @@ func (df *DispatchNativeFs) initHandles() error {
 	}
 	df.str = str
 
-	shr, err := filesharefactory.ShareFromType(tr, df.p.StorageType, srv.Conf.GlobalParams)
+	shr, err := filesharefactory.ShareFromType(tr, df.p.ShareType, srv.Conf.GlobalParams)
 	if err != nil {
 		return fmt.Errorf("find share: %w", err)
 	}
@@ -156,12 +167,18 @@ func (df *DispatchNativeFs) initHandles() error {
 	return nil
 }
 
-func (df *DispatchNativeFs) create(ctx context.Context) error {
-	err := df.vol.CreateState(ctx, df.size)
+func (df *DispatchNativeFs) Create(ctx context.Context) error {
+	dbEntry, err := df.srv.dbInstance.CreateEntry(ctx, df.rawName, df.uuid)
+	if err != nil {
+		return fmt.Errorf("create db entry: %w", err)
+	}
+	df.dbEntry = dbEntry
+
+	err = df.vol.CreateState(ctx, df.size)
 	if err != nil {
 		return fmt.Errorf("storageHandle.CreateState: %w", err)
 	}
-	err = df.save(ctx)
+	err = df.Save(ctx)
 	if err != nil {
 		return fmt.Errorf("save after storageHandle.CreateState: %w", err)
 	}
@@ -178,7 +195,7 @@ func (df *DispatchNativeFs) create(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("shareHandle.AttachPath: %w", err)
 	}
-	err = df.save(ctx)
+	err = df.Save(ctx)
 	if err != nil {
 		return fmt.Errorf("save after shareHandle.AttachPath: %w", err)
 	}
@@ -186,7 +203,35 @@ func (df *DispatchNativeFs) create(ctx context.Context) error {
 	return nil
 }
 
-func (df *DispatchNativeFs) publish(ctx context.Context, req fileshare.PublishRequest) (publishcontext.PublishContext, error) {
+func (df *DispatchNativeFs) GetVolumeContext() volumecontext.VolumeContext {
+	var presets []string
+	if df.p.NodePresets != "" {
+		for v := range strings.SplitSeq(df.p.NodePresets, ",") {
+			presets = append(presets, v)
+		}
+	}
+
+	return volumecontext.VolumeContext{
+		Uuid:        df.uuid,
+		ServerName:  df.p.ServerName,
+		StorageType: df.p.StorageType,
+		ShareType:   df.p.ShareType,
+		Presets:     presets,
+		FsType:      df.FsType,
+		// TODO customize
+		FsRootDirMode: "2777",
+	}
+}
+
+func (df *DispatchNativeFs) GetSize() int64 {
+	return df.size
+}
+
+func (df *DispatchNativeFs) SetSize(ctx context.Context, newSize int64) error {
+	return df.vol.SetSize(ctx, newSize)
+}
+
+func (df *DispatchNativeFs) Publish(ctx context.Context, nodeName string) (publishcontext.PublishContext, error) {
 	result := publishcontext.PublishContext{
 		BlockDevices: nil,
 	}
@@ -195,7 +240,10 @@ func (df *DispatchNativeFs) publish(ctx context.Context, req fileshare.PublishRe
 	for _, a := range df.addrOpt {
 		addrOpt = append(addrOpt, a.Address)
 	}
-	req.AddressList = addrOpt
+	req := fileshare.PublishRequest{
+		NodeName:    nodeName,
+		AddressList: addrOpt,
+	}
 	sharePc, err := df.shareHandle.Publish(ctx, req)
 	if err != nil {
 		return result, fmt.Errorf("shareHandle.Publish: %w", err)
@@ -211,7 +259,52 @@ func (df *DispatchNativeFs) publish(ctx context.Context, req fileshare.PublishRe
 	return result, nil
 }
 
-func (df *DispatchNativeFs) destroy(ctx context.Context) error {
+func (df *DispatchNativeFs) Unpublish(ctx context.Context, nodeId string) error {
+	data, ok := df.publishData[nodeId]
+	if !ok || data == nil {
+		return nil
+	}
+	err := df.shareHandle.Unpublish(ctx, data)
+	if err != nil {
+		return fmt.Errorf("shareHandle.Unpublish: %w", err)
+	}
+	err = df.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("save: %w", err)
+	}
+	return nil
+}
+
+func (df *DispatchNativeFs) UnpublishAll(ctx context.Context) error {
+	caps := df.shareManager.GetCapabilities()
+	if caps.UnpublishAll {
+		err := df.shareHandle.UnpublishAll(ctx)
+		if err != nil {
+			return fmt.Errorf("shareHandle.UnpublishAll: %w", err)
+		}
+		err = df.Save(ctx)
+		if err != nil {
+			return fmt.Errorf("save: %w", err)
+		}
+		return nil
+	}
+	for _, pd := range df.publishData {
+		if pd == nil {
+			continue
+		}
+		err := df.shareHandle.Unpublish(ctx, pd)
+		if err != nil {
+			return fmt.Errorf("shareHandle.Unpublish: %w", err)
+		}
+		err = df.Save(ctx)
+		if err != nil {
+			return fmt.Errorf("save: %w", err)
+		}
+	}
+	return nil
+}
+
+func (df *DispatchNativeFs) Destroy(ctx context.Context) error {
 	if df.shareHandle != nil {
 		err := df.shareHandle.DeleteShare(ctx)
 		if err != nil {
@@ -232,6 +325,7 @@ func (df *DispatchNativeFs) destroy(ctx context.Context) error {
 type SerializedDispatchNativeFs struct {
 	RawName string `json:"rawName"`
 	Uuid    string `json:"uuid"`
+	Size    int64  `json:"size"`
 
 	RawStaticParams  map[string]string `json:"rawStaticParams"`
 	RawMutableParams map[string]string `json:"rawMutableParams"`
@@ -244,7 +338,7 @@ type SerializedDispatchNativeFs struct {
 	AddrOpt     []string                   `json:"addrOpt"`
 }
 
-func (df *DispatchNativeFs) save(ctx context.Context) error {
+func (df *DispatchNativeFs) Save(ctx context.Context) error {
 	storageData, err := df.vol.Serialize()
 	if err != nil {
 		return fmt.Errorf("serialize storage: %w", err)
@@ -262,6 +356,7 @@ func (df *DispatchNativeFs) save(ctx context.Context) error {
 	result := SerializedDispatchNativeFs{
 		RawName:          df.rawName,
 		Uuid:             df.uuid,
+		Size:             df.size,
 		RawStaticParams:  df.rawStaticParams,
 		RawMutableParams: df.rawMutableParams,
 		P:                df.p,
@@ -272,53 +367,74 @@ func (df *DispatchNativeFs) save(ctx context.Context) error {
 	}
 	_ = result
 
-	// TODO write to file
+	data, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+
+	w := voldbwrapper.New(df.dbEntry)
+	err = w.SetVolumeInfo(ctx, voldbwrapper.VolumeInfo{
+		VolumeType: "native-fs",
+		Data:       data,
+	})
+	if err != nil {
+		return fmt.Errorf("SetVolumeInfo: %w", err)
+	}
 
 	return nil
 }
 
-func (df *SerializedDispatchNativeFs) parse(ctx context.Context, conf *DispatcherConf) error {
+func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *DispatcherConf) (DispatchNativeFs, error) {
 	result := DispatchNativeFs{
 		conf:             conf,
-		rawName:          df.RawName,
-		uuid:             df.Uuid,
-		rawStaticParams:  df.RawStaticParams,
-		rawMutableParams: df.RawMutableParams,
-		p:                df.P,
+		rawName:          ds.RawName,
+		uuid:             ds.Uuid,
+		size:             ds.Size,
+		rawStaticParams:  ds.RawStaticParams,
+		rawMutableParams: ds.RawMutableParams,
+		p:                ds.P,
 	}
-	srv := conf.FindServerByName(df.P.ServerName)
-	if srv == nil {
-		return fmt.Errorf("server is missing: '%s'", df.P.ServerName)
-	}
-	tr := srv.trInstance
 
-	str, err := filevolfactory.StorageFromType(tr, df.P.StorageType, srv.Conf.GlobalParams)
+	result.srv = conf.FindServerByName(ds.P.ServerName)
+	if result.srv == nil {
+		return result, fmt.Errorf("server not found: '%s'", ds.P.ServerName)
+	}
+
+	dbEntry, err := result.srv.dbInstance.CreateEntry(ctx, ds.RawName, ds.Uuid)
 	if err != nil {
-		return fmt.Errorf("find storage: %w", err)
+		return result, fmt.Errorf("find db entry: %w", err)
+	}
+	result.dbEntry = dbEntry
+
+	tr := result.srv.trInstance
+
+	str, err := filevolfactory.StorageFromType(tr, ds.P.StorageType, result.srv.Conf.GlobalParams)
+	if err != nil {
+		return result, fmt.Errorf("find storage: %w", err)
 	}
 	result.str = str
 
-	vol, err := str.ParseVolume(df.StorageData)
+	vol, err := str.ParseVolume(ds.StorageData)
 	if err != nil {
-		return fmt.Errorf("ParseVolume: %w", err)
+		return result, fmt.Errorf("ParseVolume: %w", err)
 	}
 	result.vol = vol
 
-	shr, err := filesharefactory.ShareFromType(tr, df.P.StorageType, srv.Conf.GlobalParams)
+	shr, err := filesharefactory.ShareFromType(tr, ds.P.ShareType, result.srv.Conf.GlobalParams)
 	if err != nil {
-		return fmt.Errorf("find share: %w", err)
+		return result, fmt.Errorf("find share: %w", err)
 	}
 	result.shareManager = shr
 
-	shareHandle, err := shr.ParseShare(df.ShareData)
+	shareHandle, err := shr.ParseShare(ds.ShareData)
 	if err != nil {
-		return fmt.Errorf("ParseShare: %w", err)
+		return result, fmt.Errorf("ParseShare: %w", err)
 	}
 	result.shareHandle = shareHandle
 
-	for _, a := range df.AddrOpt {
+	for _, a := range ds.AddrOpt {
 		found := false
-		for _, v := range srv.Conf.AddressList {
+		for _, v := range result.srv.Conf.AddressList {
 			if v.StableId == a {
 				result.addrOpt = append(result.addrOpt, v)
 				found = true
@@ -326,9 +442,9 @@ func (df *SerializedDispatchNativeFs) parse(ctx context.Context, conf *Dispatche
 			}
 		}
 		if !found {
-			return fmt.Errorf("address with id '%s' is not found", a)
+			return result, fmt.Errorf("address with id '%s' is not found", a)
 		}
 	}
 
-	return nil
+	return result, nil
 }
