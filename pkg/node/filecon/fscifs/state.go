@@ -36,7 +36,12 @@ func (s *state) Prepare(ctx context.Context, req filecon.PrepareRequest) error {
 func (s *state) Mount(ctx context.Context, req filecon.MountRequest) error {
 	flags := req.Flags
 	if req.FsGroup != "" {
-		flags = append(flags, fmt.Sprintf("gid=%s", req.FsGroup))
+		// unlike local filesystems, SMB does not preserve uid when creating files.
+		// This breaks things that need owner permissions, like chmod or touch commands.
+		// We don't know uid of the process that will use this share,
+		// so as a best effort to support at least something let's set uid=fsGroup.
+		flags = append(flags, fmt.Sprintf("uid=%s", req.FsGroup), "forceuid")
+		flags = append(flags, fmt.Sprintf("gid=%s", req.FsGroup), "forcegid")
 	}
 	flags = append(flags, fmt.Sprintf("username=%s", s.Username), fmt.Sprintf("password=%s", s.Password))
 

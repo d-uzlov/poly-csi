@@ -11,18 +11,20 @@ import (
 
 const shareTemplate = `
 [{{ .ShareName }}]
-  comment = poly-csi share {{ .ShareName }}
-  path = {{ .Path }}
-  read only = no
-  browsable = no
-  guest ok = no
-  guest only = no
-  valid users = {{ .User }}
-  create mask = 0640
-  directory mask = 0750
-  force create mode = 0
-  force directory mode = 0
-  smb encrypt = required
+comment = poly-csi share {{ .ShareName }}
+path = {{ .Path }}
+read only = no
+browsable = no
+guest ok = no
+guest only = no
+valid users = {{ .User }}
+create mask = 0666
+directory mask = 0777
+inherit permissions = yes
+force create mode = 0
+force directory mode = 0
+smb encrypt = required
+smb3 unix extensions = yes
 `
 
 type ShareParameters struct {

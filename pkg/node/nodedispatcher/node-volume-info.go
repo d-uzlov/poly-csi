@@ -24,7 +24,6 @@ type NodeVolumeInfo struct {
 	// MultipathJournalData string            `json:"multipathJournalData"`
 	ConnectorData string            `json:"connectorData"`
 	Preset        map[string]string `json:"preset"`
-	VolumeGroup   string            `json:"volumeGroup"`
 
 	Blocks map[string]Block
 

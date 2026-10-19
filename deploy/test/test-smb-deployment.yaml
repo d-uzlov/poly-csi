@@ -17,7 +17,8 @@ spec:
       securityContext:
         runAsUser: 1000
         runAsGroup: 2000
-        fsGroup: 3000
+        # for smb we need to match user and fsGroup
+        fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
       containers:
       - name: alpine
@@ -50,8 +51,9 @@ spec:
         app: test-sc-poly-csi-smb-4000
     spec:
       securityContext:
-        runAsUser: 1000
+        runAsUser: 4000
         runAsGroup: 2000
+        # for smb we need to match user and fsGroup
         fsGroup: 4000
         fsGroupChangePolicy: OnRootMismatch
       containers:

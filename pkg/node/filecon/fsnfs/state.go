@@ -47,6 +47,13 @@ func (s *state) Mount(ctx context.Context, req filecon.MountRequest) error {
 		return fmt.Errorf("already mounted from different source: %s != %s: mounted at %s", mi.Source, s.NfsPath, mi.MountPoint)
 	}
 
+	if req.FsGroup != "" {
+		err = s.tr.Cmds().Chown(ctx, req.TargetPath, "root", req.FsGroup, false)
+		if err != nil {
+			return fmt.Errorf("chown fs root: %w", err)
+		}
+	}
+
 	return nil
 }
 

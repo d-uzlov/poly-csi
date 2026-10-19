@@ -62,17 +62,6 @@ func (n *Node) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolume
 		return nil, fmt.Errorf("chmod: %w", err)
 	}
 
-	// TODO move this inside filesystem?
-	if mountParams.VolumeMountGroup != "" {
-		if nvi.VolumeGroup != "" && nvi.VolumeGroup != mountParams.VolumeMountGroup {
-			return nil, fmt.Errorf("requested to mount as group '%s' but this volume is already attached with group '%s'", mountParams.VolumeMountGroup, nvi.VolumeGroup)
-		}
-		err = tr.Cmds().Chown(ctx, req.TargetPath, "root", mountParams.VolumeMountGroup, false)
-		if err != nil {
-			return nil, fmt.Errorf("chown fs root: %w", err)
-		}
-	}
-
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 

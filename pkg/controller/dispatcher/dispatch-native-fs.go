@@ -186,6 +186,14 @@ func (df *DispatchNativeFs) Create(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("storageHandle.ReadState: %w", err)
 	}
+	err = df.shareHandle.PrepareShare(ctx)
+	if err != nil {
+		return fmt.Errorf("shareHandle.PrepareShare: %w", err)
+	}
+	err = df.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("save after shareHandle.PrepareShare: %w", err)
+	}
 	shrCaps := df.shareManager.GetCapabilities()
 	if shrCaps.OpaqueVolume != "" {
 		err = df.shareHandle.AttachVolume(ctx, df.vol)

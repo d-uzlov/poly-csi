@@ -53,7 +53,18 @@ func (s *state) Prepare(ctx context.Context, req filecon.PrepareRequest) error {
 }
 
 func (s *state) Mount(ctx context.Context, req filecon.MountRequest) error {
-	return fsutils.New(s.tr).EnsureBindMount(ctx, req.StagingPath, req.TargetPath)
+	err := fsutils.New(s.tr).EnsureBindMount(ctx, req.StagingPath, req.TargetPath)
+	if err != nil {
+		return err
+	}
+
+	if req.FsGroup != "" {
+		err = s.tr.Cmds().Chown(ctx, req.TargetPath, "root", req.FsGroup, false)
+		if err != nil {
+			return fmt.Errorf("chown fs root: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *state) Unmount(ctx context.Context, path string) error {
