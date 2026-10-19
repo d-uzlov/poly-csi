@@ -15,7 +15,7 @@ type connector struct {
 	conf blockcon.CommonConfig
 }
 
-type aoeConfig struct {
+type AoeConfig struct {
 	Interfaces []string `yaml:"interfaces"`
 	DeadSecs   string   `yaml:"deadSecs"`
 	MaxOut     string   `yaml:"maxOut"`
@@ -23,8 +23,8 @@ type aoeConfig struct {
 }
 
 func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
-	var cfg aoeConfig
-	err := conf.Cfg.Decode(cfg)
+	var cfg AoeConfig
+	err := conf.Cfg.Decode(&cfg)
 	if err != nil {
 		return nil, fmt.Errorf("parse aoe config: %w", err)
 	}
@@ -39,7 +39,7 @@ func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
 	return result, nil
 }
 
-func (c *connector) setAoeModuleParams(ctx context.Context, conf aoeConfig) error {
+func (c *connector) setAoeModuleParams(ctx context.Context, conf AoeConfig) error {
 	const folder = "/sys/module/aoe/parameters/"
 	err := c.conf.Tr.Cmds().Write(ctx, folder+"/aoe_iflist", []byte(strings.Join(conf.Interfaces, " ")))
 	if err != nil {
