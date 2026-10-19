@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -366,10 +368,82 @@ func (s *nativeCommands) CreateLock(ctx context.Context, lockFile string, maxDur
 	return executils.New(s.tr, false).CreateLock(ctx, lockFile, maxDuration)
 }
 
-func (s *nativeCommands) Chown(ctx context.Context, path string, user string, group string, recursive bool) error {
+func (s *nativeCommands) Chown(ctx context.Context, path string, user_ string, group string, recursive bool) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	// TODO add optimized implementation
-	return executils.New(s.tr, false).Chown(ctx, path, user, group, recursive)
+	uid := -1
+	gid := -1
+	var err error
+
+	if user_ != "" {
+		uid, err = lookupUid(user_)
+		if err != nil {
+			return fmt.Errorf("resolve user '%s': %w", user_, err)
+		}
+	}
+
+	if group != "" {
+		gid, err = lookupGid(group)
+		if err != nil {
+			return fmt.Errorf("resolve group '%s': %w", group, err)
+		}
+	}
+
+	logs.FromCtx(ctx).Command("local exec: os.Chown", "path", path, "uid", uid, "gid", gid, "recursive", recursive)
+
+	if !recursive {
+		return os.Chown(path, uid, gid)
+	}
+
+	return filepath.WalkDir(path, func(curPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chown(curPath, uid, gid)
+	})
+}
+
+func lookupUid(str string) (int, error) {
+	if val, err := strconv.Atoi(str); err == nil {
+		return val, nil
+	}
+	u, err := user.Lookup(str)
+	if err != nil {
+		return -1, err
+	}
+	return strconv.Atoi(u.Uid)
+}
+func lookupGid(str string) (int, error) {
+	if val, err := strconv.Atoi(str); err == nil {
+		return val, nil
+	}
+	g, err := user.LookupGroup(str)
+	if err != nil {
+		return -1, err
+	}
+	return strconv.Atoi(g.Gid)
+}
+
+func (s *nativeCommands) Chmod(ctx context.Context, path string, mode string, recursive bool) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	modeBits, err := strconv.ParseUint(mode, 8, 32)
+	if err != nil {
+		return fmt.Errorf("parse mode: %w", err)
+	}
+	mode32 := os.FileMode(modeBits)
+
+	logs.FromCtx(ctx).Command("local exec: os.Chmod", "path", path, "mode", strconv.FormatUint(uint64(mode32), 8), "recursive", recursive)
+
+	if !recursive {
+		return os.Chmod(path, mode32)
+	}
+	return filepath.WalkDir(path, func(curPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chmod(path, mode32)
+	})
 }

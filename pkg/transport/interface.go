@@ -28,7 +28,7 @@ type RunResult struct {
 	Stderr   []byte
 	ExitCode int
 	// Cancelled is set if command was cancelled for any reason.
-	Cancelled  bool
+	Cancelled bool
 	// Timeout is set if command exceeded timeout.
 	Timeout bool
 }
@@ -56,6 +56,7 @@ type Commands interface {
 	EnsureSymlink(ctx context.Context, link string, target string) error
 	MkFifo(ctx context.Context, path string) (alreadyExists bool, err error)
 	Chown(ctx context.Context, path string, user string, group string, recursive bool) error
+	Chmod(ctx context.Context, path string, mode string, recursive bool) error
 
 	// Creates and/or capture a lock file in specified location.
 	// When it returns, lock file will contain lease info, which must be released via a provided callback.

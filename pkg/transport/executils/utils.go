@@ -401,3 +401,18 @@ func (ec *ExecCommands) Chown(ctx context.Context, path string, user string, gro
 	}
 	return transport.CheckedRun(ctx, ec.tr, cmd, transport.WithSudo(ec.sudo))
 }
+
+func (ec *ExecCommands) Chmod(ctx context.Context, path string, mode string, recursive bool) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if mode == "" {
+		return fmt.Errorf("mode is empty")
+	}
+
+	cmd := []string{"chmod", mode, path}
+	if recursive {
+		cmd = slices.Insert(cmd, 1, "-R")
+	}
+	return transport.CheckedRun(ctx, ec.tr, cmd, transport.WithSudo(ec.sudo))
+}
