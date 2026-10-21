@@ -25,6 +25,7 @@ force create mode = 0
 force directory mode = 0
 smb encrypt = required
 smb3 unix extensions = yes
+server smb encrypt = required
 `
 
 type ShareParameters struct {

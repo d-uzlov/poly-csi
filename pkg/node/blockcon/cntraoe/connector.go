@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 )
 
@@ -77,13 +77,13 @@ func (c *connector) setAoeModuleParams(ctx context.Context, conf AoeConfig) erro
 
 func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
 	return blockcon.Capabilities{
-		Protocol:    blockapi.Aoe,
+		Protocol:    blockspec.Aoe,
 		HasNodeInfo: false,
 	}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
-	proto, ok := req.Proto.(blockapi.AoeShare)
+	proto, ok := req.Proto.(blockspec.AoeShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 )
 
@@ -47,10 +47,10 @@ func parsePublishData(serialized json.RawMessage) (publishData, error) {
 }
 
 func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*blockshare.PublishContext, error) {
-	var iscsiInfo blockapi.IscsiNodeInfo
+	var iscsiInfo blockspec.IscsiNodeInfo
 	if req.ConInfo != nil {
 		ok := false
-		iscsiInfo, ok = req.ConInfo.(blockapi.IscsiNodeInfo)
+		iscsiInfo, ok = req.ConInfo.(blockspec.IscsiNodeInfo)
 		if !ok {
 			return nil, fmt.Errorf("node info is not iscsi")
 		}
@@ -72,12 +72,12 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 	}
 
 	return &blockshare.PublishContext{
-		Protocol: blockapi.IscsiShare{
+		Protocol: blockspec.IscsiShare{
 			Initiator:     iscsiInfo.InitiatorIqn,
 			Iqn:           sh.Iqn,
 			Port:          3260,
 			Transport:     "tcp",
-			AuthType:      blockapi.IscsiAuthNone,
+			AuthType:      blockspec.IscsiAuthNone,
 			ServerAddress: req.AddressList,
 		},
 		LocalData: pd,

@@ -11,7 +11,7 @@ import (
 	"hash/crc32"
 
 	"github.com/google/uuid"
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
@@ -58,7 +58,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 	hostNqn := sh.Nqn + ":" + req.NodeName
 	hostId := uuid.NewSHA1(uuid.Max, []byte(hostNqn)).String()
 
-	pc := blockapi.NvmeShare{
+	pc := blockspec.NvmeShare{
 		TargetNqn:     sh.Nqn,
 		HostNqn:       hostNqn,
 		HostId:        hostId,
@@ -71,7 +71,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 	case authTypeNone:
 		pc.AuthType = ""
 	case authTypeNqn:
-		pc.AuthType = blockapi.NvmeAuthNqn
+		pc.AuthType = blockspec.NvmeAuthNqn
 
 		cmd := append(nvmetKeeperCmd, "host", "create", nvmet.Host{
 			Nqn:      hostNqn,
@@ -82,7 +82,7 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 			return nil, fmt.Errorf("host create: %w", err)
 		}
 	case authTypeChapProvision:
-		pc.AuthType = blockapi.NvmeAuthDhChap
+		pc.AuthType = blockspec.NvmeAuthDhChap
 
 		host, err := sh.createSecureHost(ctx, hostNqn)
 		if err != nil {

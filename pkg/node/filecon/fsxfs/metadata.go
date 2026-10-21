@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type metadata struct {
-	User     fsapi.XfsUserParams `json:"user"`
-	Format   fsapi.XfsFormat     `json:"format"`
-	MainSize int64               `json:"mainSize"`
+	User     fsspec.XfsUserParams `json:"user"`
+	Format   fsspec.XfsFormat     `json:"format"`
+	MainSize int64                `json:"mainSize"`
 }
 
 const prefix = "xfs"
@@ -86,8 +86,8 @@ func (s *metadata) SetVolumeProps(props map[string]filecon.StorageProperties) er
 	return nil
 }
 
-func (s *metadata) GetData() fsapi.Data {
-	return &fsapi.XfsData{
+func (s *metadata) GetData() fsspec.Data {
+	return &fsspec.XfsData{
 		User:   s.User,
 		Format: s.Format,
 	}

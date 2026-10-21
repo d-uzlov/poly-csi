@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
 )
@@ -25,13 +25,13 @@ func New(sv cntrublk.Supervisor, conf blockcon.CommonConfig) blockcon.Manager {
 
 func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
 	return blockcon.Capabilities{
-		Protocol:    blockapi.Nbd,
+		Protocol:    blockspec.Nbd,
 		HasNodeInfo: false,
 	}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
-	proto, ok := req.Proto.(blockapi.NbdShare)
+	proto, ok := req.Proto.(blockspec.NbdShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}

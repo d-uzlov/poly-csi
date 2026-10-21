@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/thanhpk/randstr"
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 	"meoe.io/poly-csi/pkg/logs"
 )
@@ -53,10 +53,10 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 		return nil, fmt.Errorf("targetcli is not ready")
 	}
 
-	var iscsiInfo blockapi.IscsiNodeInfo
+	var iscsiInfo blockspec.IscsiNodeInfo
 	if req.ConInfo != nil {
 		ok := false
-		iscsiInfo, ok = req.ConInfo.(blockapi.IscsiNodeInfo)
+		iscsiInfo, ok = req.ConInfo.(blockspec.IscsiNodeInfo)
 		if !ok {
 			return nil, fmt.Errorf("node info is not iscsi")
 		}
@@ -66,11 +66,11 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 		iscsiInfo.InitiatorIqn = fmt.Sprintf("%s:host:%s", sh.gp.iqnBase, req.NodeName)
 	}
 
-	chap := blockapi.IscsiAuthNone
+	chap := blockspec.IscsiAuthNone
 	if sh.AuthType == authTypeChapProvision {
-		chap = blockapi.IscsiAuthChap
+		chap = blockspec.IscsiAuthChap
 	}
-	pc := blockapi.IscsiShare{
+	pc := blockspec.IscsiShare{
 		Initiator:     iscsiInfo.InitiatorIqn,
 		Iqn:           sh.Iqn,
 		Port:          sh.Port,

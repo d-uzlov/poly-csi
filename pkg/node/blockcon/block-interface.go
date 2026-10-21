@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -15,7 +15,7 @@ type Manager interface {
 	Capabilities(ctx context.Context) (Capabilities, error)
 	// GetInfo returns opaque string containing connector-specific info about the node.
 	// Controller can parse this info and use it to publish the volume.
-	GetInfo(ctx context.Context) (blockapi.NodeInfo, error)
+	GetInfo(ctx context.Context) (blockspec.NodeInfo, error)
 	// GetHandle creates a handle to manage a connection.
 	// Manager must parse params and create a handle, without making any changes in OS.
 	GetHandle(ctx context.Context, req ConnectRequest) (Handle, error)
@@ -25,7 +25,7 @@ type Manager interface {
 
 type NoInfo struct{}
 
-func (i *NoInfo) GetInfo(ctx context.Context) (blockapi.NodeInfo, error) {
+func (i *NoInfo) GetInfo(ctx context.Context) (blockspec.NodeInfo, error) {
 	return nil, nil
 }
 
@@ -55,17 +55,17 @@ type CommonConfig struct {
 }
 
 type Capabilities struct {
-	Protocol blockapi.Name
+	Protocol blockspec.Name
 
 	// HasNodeInfo indicates if GetInfo of this connector provides essential info needed to create shares
 	HasNodeInfo bool `json:"has_node_info"`
 }
 
 type ConnectRequest struct {
-	Uuid                    string                         `json:"uuid"`
-	Proto                   blockapi.Data                  `json:"proto"`
-	DisableCleanupOnFailure bool                           `json:"disableCleanupOnFailure"`
-	Preset                  map[string]string              `json:"preset"`
+	Uuid                    string            `json:"uuid"`
+	Proto                   blockspec.Data    `json:"proto"`
+	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
+	Preset                  map[string]string `json:"preset"`
 }
 
 const (

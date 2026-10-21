@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 )
 
@@ -33,13 +33,13 @@ func (c *connector) Configure() error {
 
 func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
 	return blockcon.Capabilities{
-		Protocol:    blockapi.Iscsi,
+		Protocol:    blockspec.Iscsi,
 		HasNodeInfo: true,
 	}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
-	proto, ok := req.Proto.(blockapi.IscsiShare)
+	proto, ok := req.Proto.(blockspec.IscsiShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}
@@ -49,9 +49,9 @@ func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) 
 	attributes := map[string]string{}
 
 	switch proto.AuthType {
-	case blockapi.IscsiAuthNone:
+	case blockspec.IscsiAuthNone:
 		attributes["node.session.auth.authmethod"] = "None"
-	case blockapi.IscsiAuthChap:
+	case blockspec.IscsiAuthChap:
 		attributes["node.session.auth.authmethod"] = "CHAP"
 		attributes["node.session.auth.username"] = proto.ClientUser
 		attributes["node.session.auth.password"] = proto.ClientPass

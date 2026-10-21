@@ -1,4 +1,4 @@
-package fsapi
+package fsspec
 
 const Ext4 = Name("ext4")
 

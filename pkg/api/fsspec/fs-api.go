@@ -1,4 +1,4 @@
-package fsapi
+package fsspec
 
 type Data interface {
 	Validate() error

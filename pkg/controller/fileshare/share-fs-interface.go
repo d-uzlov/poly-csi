@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/controller/filevol"
 )
 
@@ -33,7 +33,7 @@ type Share interface {
 }
 
 type Capabilities struct {
-	ProtocolName fsapi.Name
+	ProtocolName fsspec.Name
 	// UnpublishAll indicates whether this ShareManager implements an optimized UnpublishAll method.
 	// When false, dispatcher will call Unpublish for each published node instead of attempting to use UnpublishAll.
 	UnpublishAll bool
@@ -61,7 +61,7 @@ type PublishRequest struct {
 
 type PublishContext struct {
 	// Protocol data is passed to node connector
-	Protocol fsapi.Data
+	Protocol fsspec.Data
 	// LocalData is serialized into JSON and then used on [Share.Unpublish]
 	LocalData any
 }

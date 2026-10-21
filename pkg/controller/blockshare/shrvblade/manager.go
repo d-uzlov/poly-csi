@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -27,7 +27,7 @@ func New(tr transport.Transport, globalParams map[string]string) (blockshare.Man
 
 func (m *manager) GetCapabilities() blockshare.Capabilities {
 	return blockshare.Capabilities{
-		ProtocolName: blockapi.Aoe,
+		ProtocolName: blockspec.Aoe,
 		UnpublishAll: true,
 		OpaqueVolume: "",
 		MultiShare:   false,

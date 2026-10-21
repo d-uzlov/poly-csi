@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/node/filecon"
 )
 
@@ -20,14 +20,14 @@ func New(conf filecon.CommonConfig) (filecon.Manager, error) {
 
 func (c *connector) Capabilities(ctx context.Context) (filecon.Capabilities, error) {
 	return filecon.Capabilities{
-		FsType:         fsapi.Ext4,
-		HasNodeInfo:    false,
-		ConnectType:    filecon.ConnectTypeFolder,
+		FsType:      fsspec.Ext4,
+		HasNodeInfo: false,
+		ConnectType: filecon.ConnectTypeFolder,
 	}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req filecon.ConnectRequest) (filecon.Handle, error) {
-	proto, ok := req.Proto.(fsapi.Ext4Data)
+	proto, ok := req.Proto.(fsspec.Ext4Data)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}

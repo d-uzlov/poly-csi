@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockvolume"
 )
 
@@ -34,7 +34,7 @@ type Share interface {
 }
 
 type Capabilities struct {
-	ProtocolName blockapi.Name
+	ProtocolName blockspec.Name
 	// UnpublishAll indicates whether this ShareManager implements an optimized UnpublishAll method.
 	// When false, dispatcher will call Unpublish for each published node instead of attempting to use UnpublishAll.
 	UnpublishAll bool
@@ -60,13 +60,13 @@ type CreateShareRequest struct {
 
 type PublishRequest struct {
 	NodeName    string
-	ConInfo     blockapi.NodeInfo
+	ConInfo     blockspec.NodeInfo
 	AddressList []string
 }
 
 type PublishContext struct {
 	// Protocol data is passed to node connector
-	Protocol blockapi.Data
+	Protocol blockspec.Data
 	// LocalData is serialized into JSON and then used on [Share.Unpublish]
 	LocalData any
 }

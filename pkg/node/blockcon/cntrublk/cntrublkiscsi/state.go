@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
 	"meoe.io/poly-csi/pkg/transport"
@@ -19,7 +19,7 @@ type state struct {
 
 	Uuid    string               `json:"uuid"`
 	Address string               `json:"address"`
-	Pc      blockapi.IscsiShare `json:"iscsi"`
+	Pc      blockspec.IscsiShare `json:"iscsi"`
 
 	IscsiUrl string `json:"IscsiUrl"`
 	DevId    string `json:"devId"`
@@ -51,9 +51,9 @@ func (s *state) Connect(ctx context.Context) (err error) {
 		Lun:       "0", // TODO add lun into iscsi share
 	}
 	switch s.Pc.AuthType {
-	case blockapi.IscsiAuthNone:
+	case blockspec.IscsiAuthNone:
 		// nothing to do
-	case blockapi.IscsiAuthChap:
+	case blockspec.IscsiAuthChap:
 		url.Username = s.Pc.ClientUser
 		url.Password = s.Pc.ClientPass
 		url.TargetUsername = s.Pc.TargetUser

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/controller/fileshare"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -27,7 +27,7 @@ func New(tr transport.Transport, globalParams map[string]string) (fileshare.Mana
 
 func (m *manager) GetCapabilities() fileshare.Capabilities {
 	return fileshare.Capabilities{
-		ProtocolName: fsapi.Smb,
+		ProtocolName: fsspec.Smb,
 		UnpublishAll: true,
 		OpaqueVolume: "",
 	}

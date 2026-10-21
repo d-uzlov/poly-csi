@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
@@ -47,13 +47,13 @@ func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
 
 func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
 	return blockcon.Capabilities{
-		Protocol:    blockapi.Nvme,
+		Protocol:    blockspec.Nvme,
 		HasNodeInfo: false,
 	}, nil
 }
 
 func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
-	proto, ok := req.Proto.(blockapi.NvmeShare)
+	proto, ok := req.Proto.(blockspec.NvmeShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
 	}

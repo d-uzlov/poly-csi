@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -16,7 +16,7 @@ type Metadata interface {
 	Configure(requestedSize int64, params map[string]string) error
 	RequestBlockDevices() map[string]BlockDeviceRequirement
 	SetVolumeProps(props map[string]StorageProperties) error
-	GetData() fsapi.Data
+	GetData() fsspec.Data
 	GetSize() int64
 	Serialize() (json.RawMessage, error)
 	Restore(serialized json.RawMessage) error
@@ -46,7 +46,7 @@ type Manager interface {
 
 type ConnectRequest struct {
 	Uuid                    string            `json:"uuid"`
-	Proto                   fsapi.Data        `json:"proto"`
+	Proto                   fsspec.Data       `json:"proto"`
 	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
 	Preset                  map[string]string `json:"preset"`
 }
@@ -57,7 +57,7 @@ type CommonConfig struct {
 }
 
 type Capabilities struct {
-	FsType fsapi.Name
+	FsType fsspec.Name
 
 	// HasNodeInfo indicates if GetInfo of this connector provides essential info needed to create shares
 	HasNodeInfo bool `json:"has_node_info"`

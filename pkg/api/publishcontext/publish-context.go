@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/utils/secrets"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -16,12 +16,12 @@ import (
 
 type PublishContext struct {
 	BlockDevices map[string]Block `map:"block"`
-	Filesystem   fsapi.Data       `map:"fs"`
+	Filesystem   fsspec.Data      `map:"fs"`
 }
 
 type Block struct {
-	ConnectorId string        `map:"connectorId"`
-	Data        blockapi.Data `map:"data"`
+	ConnectorId string         `map:"connectorId"`
+	Data        blockspec.Data `map:"data"`
 }
 
 // type AddressOption struct {
@@ -36,26 +36,26 @@ type Serialized struct {
 }
 
 type SerializedBlock struct {
-	ConnectorId string        `map:":connectorId"`
-	Name        string        `map:":name"`
-	Public      blockapi.Data `map:":"`
-	Secret      []byte        `map:":secret"`
+	ConnectorId string         `map:":connectorId"`
+	Name        string         `map:":name"`
+	Public      blockspec.Data `map:":"`
+	Secret      []byte         `map:":secret"`
 }
 
 type SerializedFilesystem struct {
-	Public fsapi.Data `map:":"`
-	Secret []byte     `map:":secret"`
+	Public fsspec.Data `map:":"`
+	Secret []byte      `map:":secret"`
 }
 
 var Registry = typeregistry.NewPrepopulated([]typeregistry.Sample{
-	{Name: string(blockapi.Aoe), Sample: blockapi.AoeShare{}},
-	{Name: string(blockapi.Iscsi), Sample: blockapi.IscsiShare{}},
-	{Name: string(blockapi.Nbd), Sample: blockapi.NbdShare{}},
-	{Name: string(blockapi.Nvme), Sample: blockapi.NvmeShare{}},
-	{Name: string(fsapi.Nfs), Sample: fsapi.NfsShare{}},
-	{Name: string(fsapi.Smb), Sample: fsapi.SmbShare{}},
-	{Name: string(fsapi.Ext4), Sample: fsapi.Ext4Data{}},
-	{Name: string(fsapi.Xfs), Sample: fsapi.XfsData{}},
+	{Name: string(blockspec.Aoe), Sample: blockspec.AoeShare{}},
+	{Name: string(blockspec.Iscsi), Sample: blockspec.IscsiShare{}},
+	{Name: string(blockspec.Nbd), Sample: blockspec.NbdShare{}},
+	{Name: string(blockspec.Nvme), Sample: blockspec.NvmeShare{}},
+	{Name: string(fsspec.Nfs), Sample: fsspec.NfsShare{}},
+	{Name: string(fsspec.Smb), Sample: fsspec.SmbShare{}},
+	{Name: string(fsspec.Ext4), Sample: fsspec.Ext4Data{}},
+	{Name: string(fsspec.Xfs), Sample: fsspec.XfsData{}},
 })
 
 func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.PublicKey) error {

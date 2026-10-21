@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
 	"meoe.io/poly-csi/pkg/transport"
@@ -19,7 +19,7 @@ type state struct {
 
 	Uuid    string             `json:"uuid"`
 	Address string             `json:"address"`
-	Pc      blockapi.NbdShare `json:"nbd"`
+	Pc      blockspec.NbdShare `json:"nbd"`
 
 	DevId string `json:"devId"`
 }

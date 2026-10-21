@@ -3,7 +3,7 @@ package shrtnnfs
 import (
 	"encoding/json"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/controller/fileshare"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -20,7 +20,7 @@ func New(tr transport.Transport, globalParams map[string]string) (fileshare.Mana
 
 func (sh *manager) GetCapabilities() fileshare.Capabilities {
 	return fileshare.Capabilities{
-		ProtocolName: fsapi.Nfs,
+		ProtocolName: fsspec.Nfs,
 		UnpublishAll: true,
 		OpaqueVolume: "",
 	}

@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type metadata struct {
-	User     fsapi.Ext4UserParams `json:"user"`
-	Format   fsapi.Ext4Format     `json:"format"`
-	MainSize int64                `json:"mainSize"`
+	User     fsspec.Ext4UserParams `json:"user"`
+	Format   fsspec.Ext4Format     `json:"format"`
+	MainSize int64                 `json:"mainSize"`
 }
 
 const prefix = "ext4"
@@ -24,7 +24,7 @@ func NewMetadata() filecon.Metadata {
 func (s *metadata) Configure(requestedSize int64, params map[string]string) error {
 	s.MainSize = requestedSize
 
-	s.User = fsapi.Ext4UserParams{
+	s.User = fsspec.Ext4UserParams{
 		BytesPerInode:    "65536",
 		JournalSizeDenom: 70,
 		SeparateJournal:  false,
@@ -75,8 +75,8 @@ func (s *metadata) SetVolumeProps(props map[string]filecon.StorageProperties) er
 	return nil
 }
 
-func (s *metadata) GetData() fsapi.Data {
-	return &fsapi.Ext4Data{
+func (s *metadata) GetData() fsspec.Data {
+	return &fsspec.Ext4Data{
 		User:   s.User,
 		Format: s.Format,
 	}

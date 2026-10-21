@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -14,7 +14,7 @@ type state struct {
 	tr        transport.Transport `json:"-"`
 	devFolder string              `json:"-"`
 
-	Pc blockapi.AoeShare `json:"pc"`
+	Pc blockspec.AoeShare `json:"pc"`
 }
 
 var _ blockcon.Handle = &state{}

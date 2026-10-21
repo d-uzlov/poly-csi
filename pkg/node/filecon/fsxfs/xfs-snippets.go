@@ -6,18 +6,18 @@ import (
 	"strings"
 	"time"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
 type snippets struct {
 	tr            transport.Transport
-	Data          fsapi.XfsData
+	Data          fsspec.XfsData
 	mainDevice    string
 	journalDevice string
 }
 
-func NewSnippets(tr transport.Transport, Data fsapi.XfsData, Devices map[string]string) *snippets {
+func NewSnippets(tr transport.Transport, Data fsspec.XfsData, Devices map[string]string) *snippets {
 	return &snippets{
 		tr:            tr,
 		Data:          Data,

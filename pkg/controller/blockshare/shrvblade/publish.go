@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 )
 
 func (s *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*blockshare.PublishContext, error) {
 	return &blockshare.PublishContext{
-		Protocol: blockapi.AoeShare{
+		Protocol: blockspec.AoeShare{
 			Shelf: new(int(s.Shelf)),
 			Slot:  new(int(s.Slot)),
 		},

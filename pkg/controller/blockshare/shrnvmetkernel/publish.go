@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockshare"
 	"meoe.io/poly-csi/pkg/utils/nvmet"
 )
@@ -74,11 +74,11 @@ func (sh *share) Publish(ctx context.Context, req blockshare.PublishRequest) (*b
 		return nil, fmt.Errorf("nvmet_save: %w", err)
 	}
 
-	pc := blockapi.NvmeShare{
+	pc := blockspec.NvmeShare{
 		TargetNqn:     sh.Nqn,
 		HostNqn:       hostNqn,
 		HostId:        hostId,
-		AuthType:      blockapi.NvmeAuthNqn,
+		AuthType:      blockspec.NvmeAuthNqn,
 		ConnectPort:   sh.Port,
 		TransportType: sh.Transport,
 		ServerAddress: req.AddressList,

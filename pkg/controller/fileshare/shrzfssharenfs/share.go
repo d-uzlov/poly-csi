@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/controller/fileshare"
 	"meoe.io/poly-csi/pkg/controller/filevol/strzfsdataset"
 	"meoe.io/poly-csi/pkg/transport"
@@ -86,7 +86,7 @@ func (sh *share) Publish(ctx context.Context, req fileshare.PublishRequest) (*fi
 		return nil, fmt.Errorf("nfs needs exactly one server address")
 	}
 	return &fileshare.PublishContext{
-		Protocol: fsapi.NfsShare{
+		Protocol: fsspec.NfsShare{
 			Path:          sh.Folder,
 			ServerAddress: req.AddressList[0],
 		},

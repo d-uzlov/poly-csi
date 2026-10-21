@@ -1,4 +1,4 @@
-package fsapi
+package fsspec
 
 const Xfs = Name("xfs")
 

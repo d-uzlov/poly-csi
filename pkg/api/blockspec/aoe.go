@@ -1,4 +1,4 @@
-package blockapi
+package blockspec
 
 const Aoe = Name("aoe")
 

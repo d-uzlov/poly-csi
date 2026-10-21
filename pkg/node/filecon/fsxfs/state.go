@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/fsapi"
+	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/fsutils"
@@ -14,7 +14,7 @@ import (
 type state struct {
 	tr transport.Transport `json:"-"`
 
-	Data    fsapi.XfsData     `json:"data"`
+	Data    fsspec.XfsData    `json:"data"`
 	Devices map[string]string `json:"devices"`
 }
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/api/node_registry"
 )
 
@@ -17,8 +17,8 @@ type NodeInfo struct {
 }
 
 type ConnectorInfo struct {
-	Protocol blockapi.Name     `json:"protocol"`
-	Info     blockapi.NodeInfo `json:"info"`
+	Protocol blockspec.Name     `json:"protocol"`
+	Info     blockspec.NodeInfo `json:"info"`
 }
 
 func (ni *NodeInfo) Validate() error {
@@ -67,11 +67,11 @@ func ParseNodeInfo(id string, src node_registry.NodeInfo) (*NodeInfo, error) {
 
 	for k, v := range src.Connectors {
 		ci := ConnectorInfo{
-			Protocol: blockapi.Name(v.Protocol),
+			Protocol: blockspec.Name(v.Protocol),
 		}
 		dataString := string(v.Data)
 		if len(v.Data) != 0 && dataString != "null" {
-			err := blockapi.ParseNodeInfo(blockapi.Name(v.Protocol), v.Data, &ci.Info)
+			err := blockspec.ParseNodeInfo(blockspec.Name(v.Protocol), v.Data, &ci.Info)
 			if err != nil {
 				return nil, fmt.Errorf("parse connector '%s' protocol '%s' info: %w", k, v.Protocol, err)
 			}

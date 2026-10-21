@@ -1,4 +1,4 @@
-package blockapi
+package blockspec
 
 const Nbd = Name("nbd")
 
