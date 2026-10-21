@@ -7,11 +7,11 @@ import (
 	"net"
 
 	slogctx "github.com/veqryn/slog-context"
-	"meoe.io/poly-csi/pkg/node/blockcon"
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/node/nodeconfig"
 )
 
-func GatherNodeInfo(ctx context.Context, nodeId string, privateKey hpke.PrivateKey, connectorList map[string]blockcon.Manager, networks []nodeconfig.ParsedNetworks, presets []string) (*NodeInfo, error) {
+func GatherNodeInfo(ctx context.Context, nodeId string, privateKey hpke.PrivateKey, connectorList map[string]blockapi.Manager, networks []nodeconfig.ParsedNetworks, presets []string) (*NodeInfo, error) {
 	info := NodeInfo{
 		Id:         nodeId,
 		PublicKey:  privateKey.PublicKey().Bytes(),

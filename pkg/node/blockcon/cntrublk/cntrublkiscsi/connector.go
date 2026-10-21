@@ -4,33 +4,33 @@ import (
 	"context"
 	"fmt"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/blockspec"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
 )
 
 type connector struct {
-	blockcon.NoInfo
+	blockapi.NoInfo
 
-	conf blockcon.CommonConfig
+	conf blockapi.CommonConfig
 	sv   cntrublk.Supervisor
 }
 
-func New(sv cntrublk.Supervisor, conf blockcon.CommonConfig) blockcon.Manager {
+func New(sv cntrublk.Supervisor, conf blockapi.CommonConfig) blockapi.Manager {
 	return &connector{
 		sv:   sv,
 		conf: conf,
 	}
 }
 
-func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
-	return blockcon.Capabilities{
+func (c *connector) Capabilities(ctx context.Context) (blockapi.Capabilities, error) {
+	return blockapi.Capabilities{
 		Protocol:    blockspec.Iscsi,
 		HasNodeInfo: false,
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
+func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) (blockapi.Handle, error) {
 	proto, ok := req.Proto.(blockspec.IscsiShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
@@ -50,7 +50,7 @@ func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) 
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (blockcon.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (blockapi.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

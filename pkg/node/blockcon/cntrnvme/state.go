@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -27,10 +27,10 @@ type state struct {
 
 type ExpectedConnection struct {
 	Addr       string `json:"addr"`
-	Controller string                       `json:"controller"`
+	Controller string `json:"controller"`
 }
 
-var _ blockcon.Handle = &state{}
+var _ blockapi.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -124,29 +124,29 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, error) {
-	var issues []blockcon.HealthMessage
+func (s *state) CheckHealth(ctx context.Context) ([]blockapi.HealthMessage, error) {
+	var issues []blockapi.HealthMessage
 	subsys, err := s.snip.GetSubsysInfo(ctx, s.Params.TargetNqn)
 	if err != nil {
 		return nil, err
 	}
 	if subsys == nil {
-		issues = append(issues, blockcon.HealthMessage{
-			Status:  blockcon.HealthStatusInaccessible,
+		issues = append(issues, blockapi.HealthMessage{
+			Status:  blockapi.HealthStatusInaccessible,
 			Reason:  "NotConnected",
 			Message: "subsystem is no longer connected to this host",
 		})
 		return issues, nil
 	} else if len(subsys.Controllers) == 0 {
-		issues = append(issues, blockcon.HealthMessage{
-			Status:  blockcon.HealthStatusInaccessible,
+		issues = append(issues, blockapi.HealthMessage{
+			Status:  blockapi.HealthStatusInaccessible,
 			Reason:  "NotConnected",
 			Message: "subsystem is not associated with any controller",
 		})
 		return issues, nil
 	} else if len(subsys.Namespaces) == 0 {
-		issues = append(issues, blockcon.HealthMessage{
-			Status:  blockcon.HealthStatusInaccessible,
+		issues = append(issues, blockapi.HealthMessage{
+			Status:  blockapi.HealthStatusInaccessible,
 			Reason:  "NoNamespaces",
 			Message: "subsystem does not have any namespaces",
 		})
@@ -183,15 +183,15 @@ func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, erro
 	}
 
 	if len(missingControllers) > 0 {
-		issues = append(issues, blockcon.HealthMessage{
-			Status:  blockcon.HealthStatusDegraded,
+		issues = append(issues, blockapi.HealthMessage{
+			Status:  blockapi.HealthStatusDegraded,
 			Reason:  "MultipathLoss",
 			Message: strings.Join(missingControllers, ", "),
 		})
 	}
 	if len(missingControllers) > 0 {
-		issues = append(issues, blockcon.HealthMessage{
-			Status:  blockcon.HealthStatusDegraded,
+		issues = append(issues, blockapi.HealthMessage{
+			Status:  blockapi.HealthStatusDegraded,
 			Reason:  "InternalError",
 			Message: strings.Join(internalErrors, ", "),
 		})
@@ -205,8 +205,8 @@ func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, erro
 		}
 	}
 	if len(missingControllers) > 0 {
-		issues = append(issues, blockcon.HealthMessage{
-			Status:  blockcon.HealthStatusInaccessible,
+		issues = append(issues, blockapi.HealthMessage{
+			Status:  blockapi.HealthStatusInaccessible,
 			Reason:  "NamespaceFailed",
 			Message: strings.Join(failedNamespaces, ", "),
 		})

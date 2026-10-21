@@ -1,4 +1,4 @@
-package blockcon
+package blockapi
 
 import (
 	"context"
@@ -55,10 +55,10 @@ type CommonConfig struct {
 }
 
 type Capabilities struct {
-	Protocol blockspec.Name
+	Protocol blockspec.Name `json:"protocol"`
 
 	// HasNodeInfo indicates if GetInfo of this connector provides essential info needed to create shares
-	HasNodeInfo bool `json:"has_node_info"`
+	HasNodeInfo bool `json:"hasNodeInfo"`
 }
 
 type ConnectRequest struct {

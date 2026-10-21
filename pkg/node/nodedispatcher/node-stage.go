@@ -9,10 +9,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
@@ -91,7 +91,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			return nil, fmt.Errorf("block connector with id '%s' is not found", v.ConnectorId)
 		}
 
-		handle, err := con.GetHandle(ctx, blockcon.ConnectRequest{
+		handle, err := con.GetHandle(ctx, blockapi.ConnectRequest{
 			Uuid:                    vc.Uuid,
 			Proto:                   v.Data,
 			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,

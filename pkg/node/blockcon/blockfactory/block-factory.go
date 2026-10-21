@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"meoe.io/poly-csi/pkg/node/blockcon"
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntraoe"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrnvme"
@@ -21,7 +21,7 @@ const (
 	TypePlugin   = "plugin_json"
 )
 
-var types = map[string]blockcon.InflateFunc{
+var types = map[string]blockapi.InflateFunc{
 	TypeNvme:     cntrnvme.New,
 	TypeIscsiadm: cntriscsiadm.New,
 	TypeAoe:      cntraoe.New,
@@ -31,7 +31,7 @@ var types = map[string]blockcon.InflateFunc{
 	// },
 }
 
-func GetByType(mtype string) (blockcon.InflateFunc, error) {
+func GetByType(mtype string) (blockapi.InflateFunc, error) {
 	v, ok := types[mtype]
 	if !ok {
 		keys := slices.Collect(maps.Keys(types))

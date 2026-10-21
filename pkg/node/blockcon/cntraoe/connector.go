@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/blockspec"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 )
 
 type connector struct {
-	blockcon.NoInfo
+	blockapi.NoInfo
 
-	conf blockcon.CommonConfig
+	conf blockapi.CommonConfig
 }
 
 type AoeConfig struct {
@@ -22,7 +22,7 @@ type AoeConfig struct {
 	MaxSectors string   `yaml:"maxSectors"`
 }
 
-func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
+func New(conf blockapi.CommonConfig) (blockapi.Manager, error) {
 	var cfg AoeConfig
 	err := conf.Cfg.Decode(&cfg)
 	if err != nil {
@@ -75,14 +75,14 @@ func (c *connector) setAoeModuleParams(ctx context.Context, conf AoeConfig) erro
 	return nil
 }
 
-func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
-	return blockcon.Capabilities{
+func (c *connector) Capabilities(ctx context.Context) (blockapi.Capabilities, error) {
+	return blockapi.Capabilities{
 		Protocol:    blockspec.Aoe,
 		HasNodeInfo: false,
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
+func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) (blockapi.Handle, error) {
 	proto, ok := req.Proto.(blockspec.AoeShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
@@ -95,7 +95,7 @@ func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) 
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (blockcon.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (blockapi.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

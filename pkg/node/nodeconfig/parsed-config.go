@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/dustin/go-humanize"
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/node/multipath"
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
@@ -33,7 +33,7 @@ type ParsedConfig struct {
 	Encrypt                 ParsedEncrypt
 	NodeInfoDb              NodeInfoDbConfig
 	Multipath               mpfactory.ParsedMultipath
-	BlockConnectors         map[string]blockcon.Manager
+	BlockConnectors         map[string]blockapi.Manager
 	FsConnectors            map[string]filecon.Manager
 	Presets                 map[string]map[string]string
 	Networks                []ParsedNetworks

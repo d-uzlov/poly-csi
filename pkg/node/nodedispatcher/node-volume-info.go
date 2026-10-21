@@ -8,8 +8,8 @@ import (
 	"io/fs"
 	"os"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport"
 )
@@ -39,7 +39,7 @@ type NodeVolumeInfo struct {
 type Block struct {
 	ConnectorId string          `json:"connectorId"`
 	Data        string          `json:"data"`
-	handler     blockcon.Handle `json:"-"`
+	handler     blockapi.Handle `json:"-"`
 }
 
 type SavedParams struct {
@@ -56,7 +56,7 @@ func newVolumeHandle(parentFolder string, tr transport.Transport, preset map[str
 	}
 }
 
-func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.Transport, devFolder string, bm map[string]blockcon.Manager, fm map[string]filecon.Manager) (*NodeVolumeInfo, error) {
+func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.Transport, devFolder string, bm map[string]blockapi.Manager, fm map[string]filecon.Manager) (*NodeVolumeInfo, error) {
 	result, err := TryParseMountInfo(ctx, parentFolder, tr, devFolder, bm, fm)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func ParseNodeVolumeInfo(ctx context.Context, parentFolder string, tr transport.
 	return result, nil
 }
 
-func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Transport, devFolder string, bm map[string]blockcon.Manager, fm map[string]filecon.Manager) (*NodeVolumeInfo, error) {
+func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Transport, devFolder string, bm map[string]blockapi.Manager, fm map[string]filecon.Manager) (*NodeVolumeInfo, error) {
 	content, err := os.ReadFile(parentFolder + metadataFile)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -12,8 +12,8 @@ import (
 	"os"
 
 	"go.yaml.in/yaml/v3"
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/node/blockcon/blockfactory"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/node/filecon/fsfactory"
@@ -148,8 +148,8 @@ func loadOrGenerateKey(filepath string) (hpke.PrivateKey, error) {
 	return key, nil
 }
 
-func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder string, list []BlockSpec) map[string]blockcon.Manager {
-	cons := map[string]blockcon.Manager{}
+func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder string, list []BlockSpec) map[string]blockapi.Manager {
+	cons := map[string]blockapi.Manager{}
 	for i, v := range list {
 		if v.Id == "" {
 			logger.Error(fmt.Sprintf("block[i=%d]: missing id", i))
@@ -173,7 +173,7 @@ func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder str
 			logger.Error(fmt.Sprintf("block[i=%d/id=%s]: GetByType returned nil", i, v.Id))
 			continue
 		}
-		con, err := inflate(blockcon.CommonConfig{
+		con, err := inflate(blockapi.CommonConfig{
 			Tr:        tr,
 			DevFolder: devFolder,
 			Cfg:       v.Config,

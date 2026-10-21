@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/blockspec"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type connector struct {
-	blockcon.NoInfo
+	blockapi.NoInfo
 
-	commonConfig blockcon.CommonConfig
+	commonConfig blockapi.CommonConfig
 	snip         NvmeSnippets
 	config       Config
 }
@@ -27,7 +27,7 @@ type PresetData struct {
 	ReconnectDelay        string `map:"reconnectDelaySec"`
 }
 
-func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
+func New(conf blockapi.CommonConfig) (blockapi.Manager, error) {
 	result := &connector{}
 	result.commonConfig = conf
 
@@ -45,14 +45,14 @@ func New(conf blockcon.CommonConfig) (blockcon.Manager, error) {
 	return result, nil
 }
 
-func (c *connector) Capabilities(ctx context.Context) (blockcon.Capabilities, error) {
-	return blockcon.Capabilities{
+func (c *connector) Capabilities(ctx context.Context) (blockapi.Capabilities, error) {
+	return blockapi.Capabilities{
 		Protocol:    blockspec.Nvme,
 		HasNodeInfo: false,
 	}, nil
 }
 
-func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) (blockcon.Handle, error) {
+func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) (blockapi.Handle, error) {
 	proto, ok := req.Proto.(blockspec.NvmeShare)
 	if !ok {
 		return nil, fmt.Errorf("protocol mismatch")
@@ -103,7 +103,7 @@ func (c *connector) GetHandle(ctx context.Context, req blockcon.ConnectRequest) 
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (blockcon.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData string) (blockapi.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

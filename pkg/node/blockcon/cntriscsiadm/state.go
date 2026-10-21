@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/logs"
-	"meoe.io/poly-csi/pkg/node/blockcon"
 	"meoe.io/poly-csi/pkg/transport"
 )
 
@@ -23,7 +23,7 @@ type state struct {
 	Connections             []string          `json:"connections"`
 }
 
-var _ blockcon.Handle = &state{}
+var _ blockapi.Handle = &state{}
 
 func parseState(serialized string) (*state, error) {
 	var result state
@@ -171,7 +171,7 @@ func (s *state) Expand(ctx context.Context) error {
 	return nil
 }
 
-func (s *state) CheckHealth(ctx context.Context) ([]blockcon.HealthMessage, error) {
+func (s *state) CheckHealth(ctx context.Context) ([]blockapi.HealthMessage, error) {
 	return nil, nil
 }
 
