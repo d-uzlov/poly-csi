@@ -29,3 +29,5 @@ mountOptions:
 # - dir_mode=0775
 # - file_mode=0664
 - seal
+- multichannel
+- max_channels=2
