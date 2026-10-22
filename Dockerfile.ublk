@@ -86,7 +86,7 @@ COPY go.mod go.sum /app/
 
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
-COPY ./cmd/builtinplugin/ /app/cmd/builtinplugin/
+COPY ./cmd/blockplugin/ /app/cmd/blockplugin/
 COPY ./pkg/ /app/pkg/
 
 ARG APP_VERSION
@@ -95,7 +95,7 @@ ARG APP_VERSION
 RUN test -n "${APP_VERSION}"
 RUN --mount=type=cache,target=/go/pkg/mod \
 	--mount=type=cache,target=/root/.cache/go-build \
-  CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/builtinplugin/config.externalVersion=${APP_VERSION}" ./cmd/builtinplugin/
+  CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/blockplugin/config.externalVersion=${APP_VERSION}" ./cmd/blockplugin/
 
 # ========================
 
@@ -113,8 +113,8 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 COPY --from=builder_libiscsi /install/usr/local/ /usr/local/
 COPY --from=builder_ublksrv /install/usr/local/ /usr/local/
 COPY --from=builder_nbdublk /install/usr/local/ /usr/local/
-COPY --from=builder_plugin /app/builtinplugin /builtinplugin
+COPY --from=builder_plugin /app/blockplugin /blockplugin
 
 RUN ldconfig
 
-ENTRYPOINT ["/usr/bin/tini", "-s", "--", "/builtinplugin"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "/blockplugin"]

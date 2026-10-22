@@ -9,18 +9,16 @@ allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
 parameters:
+  dispatch.mode: block-fs
   dispatch.serverName: rose
   dispatch.storageType: zfs-zvol
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.shareType: nbd
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nbd
-  dispatch.nodePreset: ''
+  dispatch.nodePresets: ''
   dispatch.addressNames: storage
   dispatch.fsFormatSide: node
-
-  # none, sameShare, sameServer, separate
-  dispatch.journalVolume: none
 
   zfs.parentDataset: rose/test
   zfs.reservedPercent: 0%

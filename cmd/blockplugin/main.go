@@ -11,9 +11,15 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
-	"meoe.io/poly-csi/cmd/builtinplugin/argconfig"
-	"meoe.io/poly-csi/cmd/builtinplugin/connectorpluginconfig"
+	"meoe.io/poly-csi/cmd/blockplugin/argconfig"
+	"meoe.io/poly-csi/cmd/blockplugin/connectorpluginconfig"
+	"meoe.io/poly-csi/cmd/blockplugin/server"
+	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/logs"
+	"meoe.io/poly-csi/pkg/node/blockcon/blockfactory"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/supervisor"
+	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk/ublkfactory"
+	"meoe.io/poly-csi/pkg/node/nodeconfig"
 	"meoe.io/poly-csi/pkg/transport/localexec"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -64,39 +70,37 @@ func main() {
 
 	serverDoneCh := make(chan struct{})
 
-	var handler http.Handler
+	var dispatcher *server.DispatcherServer
 
 	switch argConfig.PluginType {
-	// case "connector":
-	// 	cons := nodeconfig.ParseBlockList(logsLogger, tr, config.DevFolder, config.Connectors)
-	// 	dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
-	// 	handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
+	case "connector":
+		cons := nodeconfig.ParseBlockList(logsLogger, tr, config.DevFolder, config.Connectors, blockfactory.GetByType)
+		dispatcher = server.New(tr, config.DevFolder, cons, config.Logs)
 
-	// case "ublk":
-	// 	err = os.MkdirAll(config.Supervisor.ConfigDir, 0777)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	supervisor := supervisor.New(ctx, tr, config.Supervisor.ConfigDir, config.Supervisor.MinId, config.Supervisor.MaxId)
-	// 	logsLogger.Info("running supervisor.StartupRestore")
-	// 	err := supervisor.StartupRestore()
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	logsLogger.Info("finished supervisor.StartupRestore")
+	case "ublk":
+		err = os.MkdirAll(config.Supervisor.ConfigDir, 0777)
+		if err != nil {
+			panic(err)
+		}
+		supervisor := supervisor.New(ctx, tr, config.Supervisor.ConfigDir, config.Supervisor.MinId, config.Supervisor.MaxId)
+		logsLogger.Info("running supervisor.StartupRestore")
+		err := supervisor.StartupRestore()
+		if err != nil {
+			panic(err)
+		}
+		logsLogger.Info("finished supervisor.StartupRestore")
 
-	// 	cons := connectorfactory.ParseList(logsLogger, tr, config.DevFolder, config.Connectors, func(mtype string) (connectors.InflateFunc, error) {
-	// 		inflate, err := ublkfactory.GetByType(mtype)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		return func(conf connectors.CommonConfig) (connectors.Manager, error) {
-	// 			return inflate(supervisor, conf), nil
-	// 		}, nil
-	// 	})
+		cons := nodeconfig.ParseBlockList(logsLogger, tr, config.DevFolder, config.Connectors, func(mtype string) (blockapi.InflateFunc, error) {
+			inflate, err := ublkfactory.GetByType(mtype)
+			if err != nil {
+				return nil, err
+			}
+			return func(conf blockapi.CommonConfig) (blockapi.Manager, error) {
+				return inflate(supervisor, conf), nil
+			}, nil
+		})
 
-	// 	dispatcher := cntrhttpjsonplugin.NewDispatcherServer(tr, config.DevFolder, cons)
-	// 	handler = cntrhttpjsonplugin.NewHttpServer(ctx, dispatcher, config.Logs)
+		dispatcher = server.New(tr, config.DevFolder, cons, config.Logs)
 	default:
 		panic("unknown plugin type: " + argConfig.PluginType)
 	}
@@ -106,7 +110,7 @@ func main() {
 	if err := os.RemoveAll(config.Socket); err != nil {
 		panic(err)
 	}
-	serverInstance := NewServer(ctx, config.Socket, handler)
+	serverInstance := NewServer(ctx, config.Socket, dispatcher)
 
 	serverInstance.StartServe(ctx, time.Second, func(err error) {
 		if err != nil {
@@ -129,23 +133,22 @@ func main() {
 }
 
 type Server struct {
-	socket  string
-	callCtx context.Context
-	hs      http.Handler
+	socket     string
+	callCtx    context.Context
+	dispatcher *server.DispatcherServer
 }
 
-func NewServer(callCtx context.Context, socket string, hs http.Handler) *Server {
+func NewServer(callCtx context.Context, socket string, dispatcher *server.DispatcherServer) *Server {
 	return &Server{
-		callCtx: callCtx,
-		socket:  socket,
-		hs:      hs,
+		callCtx:    callCtx,
+		socket:     socket,
+		dispatcher: dispatcher,
 	}
 }
 
 func (s *Server) StartServe(ctx context.Context, shutdownTimeout time.Duration, doneCallback func(error)) {
 	mux := http.NewServeMux()
-	// mux.Handle(cntrhttpjsonplugin.ConnectorHttpPath, s.hs)
-	mux.Handle("/", s.hs)
+	s.dispatcher.RegisterSelf(mux)
 
 	srv := &http.Server{
 		Addr:    ":8080",

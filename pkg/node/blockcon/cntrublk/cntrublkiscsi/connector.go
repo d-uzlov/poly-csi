@@ -2,6 +2,7 @@ package cntrublkiscsi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
@@ -33,7 +34,7 @@ func (c *connector) Capabilities(ctx context.Context) (blockapi.Capabilities, er
 func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) (blockapi.Handle, error) {
 	proto, ok := req.Proto.(blockspec.IscsiShare)
 	if !ok {
-		return nil, fmt.Errorf("protocol mismatch")
+		return nil, fmt.Errorf("protocol mismatch: got %T", req.Proto)
 	}
 
 	if len(proto.ServerAddress) != 1 {
@@ -50,7 +51,7 @@ func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) 
 	}, nil
 }
 
-func (c *connector) ParseHandle(serializedConnectorData string) (blockapi.Handle, error) {
+func (c *connector) ParseHandle(serializedConnectorData json.RawMessage) (blockapi.Handle, error) {
 	res, err := parseState(serializedConnectorData)
 	if err != nil {
 		return nil, err

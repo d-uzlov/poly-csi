@@ -2,6 +2,7 @@ package blockapi
 
 import (
 	"context"
+	"encoding/json"
 
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/api/blockspec"
@@ -20,7 +21,7 @@ type Manager interface {
 	// Manager must parse params and create a handle, without making any changes in OS.
 	GetHandle(ctx context.Context, req ConnectRequest) (Handle, error)
 	// ParseHandle recreates handle object from [Handle.Serialize] result
-	ParseHandle(serializedData string) (Handle, error)
+	ParseHandle(serializedData json.RawMessage) (Handle, error)
 }
 
 type NoInfo struct{}
@@ -44,7 +45,7 @@ type Handle interface {
 	CheckHealth(ctx context.Context) ([]HealthMessage, error)
 
 	// Serialize creates an opaque string that can be used in [Manager.ParseHandle]
-	Serialize() (string, error)
+	Serialize() (json.RawMessage, error)
 	Validate() error
 }
 

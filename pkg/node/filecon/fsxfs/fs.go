@@ -29,7 +29,7 @@ func (c *connector) Capabilities(ctx context.Context) (filecon.Capabilities, err
 func (c *connector) GetHandle(ctx context.Context, req filecon.ConnectRequest) (filecon.Handle, error) {
 	proto, ok := req.Proto.(fsspec.XfsData)
 	if !ok {
-		return nil, fmt.Errorf("protocol mismatch")
+		return nil, fmt.Errorf("protocol mismatch: got %T", req.Proto)
 	}
 
 	return &state{

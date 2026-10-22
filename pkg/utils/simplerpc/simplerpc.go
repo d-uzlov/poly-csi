@@ -9,7 +9,11 @@ import (
 	"net/http"
 )
 
-func MakeHandler[In any, Out any](handle func(ctx context.Context, input In) Out) http.HandlerFunc {
+func MakeHandler[In any, Out any](handle func(ctx context.Context, input In) Out, opts ...Option) http.HandlerFunc {
+	o := Opts{}
+	for _, v := range opts {
+		v(&o)
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			http.Error(w, fmt.Sprintf("expected POST method but got '%s'", r.Method), http.StatusMethodNotAllowed)
@@ -26,11 +30,23 @@ func MakeHandler[In any, Out any](handle func(ctx context.Context, input In) Out
 		var in In
 		err := json.NewDecoder(limitedReader).Decode(&in)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to parse request body as protojson: %s", err.Error()), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("failed to parse request body as json: %s", err.Error()), http.StatusBadRequest)
 			return
 		}
 
-		out := handle(r.Context(), in)
+		var out Out
+		if o.mw != nil {
+			err = o.mw(r.Context(), r, in, func(ctx context.Context) any {
+				out = handle(ctx, in)
+				return out
+			})
+			if err != nil {
+				http.Error(w, fmt.Sprintf("middleware failed: %s", err.Error()), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			out = handle(r.Context(), in)
+		}
 
 		encoded, err := json.Marshal(out)
 		if err != nil {

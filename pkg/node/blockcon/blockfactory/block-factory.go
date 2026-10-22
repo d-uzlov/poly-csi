@@ -7,28 +7,24 @@ import (
 	"strings"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
+	"meoe.io/poly-csi/pkg/node/blockcon/blockclient"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntraoe"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntriscsiadm"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrnvme"
 )
 
 const (
-	TypeNfs      = "nfs"
-	TypeCifs     = "cifs"
 	TypeNvme     = "nvme"
 	TypeIscsiadm = "iscsiadm"
 	TypeAoe      = "aoe"
-	TypePlugin   = "plugin_json"
+	TypePlugin   = "plugin"
 )
 
 var types = map[string]blockapi.InflateFunc{
 	TypeNvme:     cntrnvme.New,
 	TypeIscsiadm: cntriscsiadm.New,
 	TypeAoe:      cntraoe.New,
-	// TypePlugin: func(conf blockcon.CommonConfig) (blockcon.Manager, error) {
-	// 	httpClient := cntrhttpjsonplugin.NewHttpClient()
-	// 	return cntrhttpjsonplugin.NewDispatcherClient(httpClient, conf)
-	// },
+	TypePlugin:   blockclient.New,
 }
 
 func GetByType(mtype string) (blockapi.InflateFunc, error) {

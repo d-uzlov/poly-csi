@@ -6,7 +6,7 @@ COPY go.mod go.sum /app/
 
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
-COPY ./cmd/builtinplugin/ /app/cmd/builtinplugin/
+COPY ./cmd/blockplugin/ /app/cmd/blockplugin/
 COPY ./pkg/ /app/pkg/
 
 ARG APP_VERSION
@@ -15,12 +15,12 @@ ARG APP_VERSION
 RUN test -n "${APP_VERSION}"
 RUN --mount=type=cache,target=/go/pkg/mod \
 	--mount=type=cache,target=/root/.cache/go-build \
-  CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/builtinplugin/config.externalVersion=${APP_VERSION}" ./cmd/builtinplugin/
+  CGO_ENABLED=0 go build -ldflags="-X meoe.io/poly-csi/cmd/blockplugin/config.externalVersion=${APP_VERSION}" ./cmd/blockplugin/
 
 FROM alpine:3.24.2 AS runtime
 
 WORKDIR /
 
-COPY --from=builder /app/builtinplugin /builtinplugin
+COPY --from=builder /app/blockplugin /blockplugin
 
-ENTRYPOINT ["/builtinplugin"]
+ENTRYPOINT ["/blockplugin"]

@@ -24,19 +24,19 @@ blockConnectors:
     nvmeCmd: [ "nvme" ]
     parseKernelLog: true
 - id: iscsi
-  type: plugin_json
+  type: plugin
   config:
-    socket: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
+    socketPath: /run/io.meoe.poly-csi/plugins/iscsi-container/iscsi.sock
     remoteId: iscsi
 - id: nbd
-  type: plugin_json
+  type: plugin
   config:
-    socket: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
+    socketPath: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
     remoteId: ublk_nbd
 - id: ublk_iscsi
-  type: plugin_json
+  type: plugin
   config:
-    socket: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
+    socketPath: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
     remoteId: ublk_iscsi
 - id: aoe
   type: aoe

@@ -38,7 +38,7 @@ type NodeVolumeInfo struct {
 
 type Block struct {
 	ConnectorId string          `json:"connectorId"`
-	Data        string          `json:"data"`
+	Data        json.RawMessage `json:"data"`
 	handler     blockapi.Handle `json:"-"`
 }
 
@@ -83,7 +83,7 @@ func TryParseMountInfo(ctx context.Context, parentFolder string, tr transport.Tr
 	}
 
 	for k, v := range result.Blocks {
-		if v.Data == "" {
+		if v.Data == nil {
 			continue
 		}
 		m, ok := bm[v.ConnectorId]

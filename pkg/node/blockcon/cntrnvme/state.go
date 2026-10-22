@@ -32,7 +32,7 @@ type ExpectedConnection struct {
 
 var _ blockapi.Handle = &state{}
 
-func parseState(serialized string) (*state, error) {
+func parseState(serialized json.RawMessage) (*state, error) {
 	var result state
 	err := json.Unmarshal([]byte(serialized), &result)
 	if err != nil {
@@ -215,12 +215,12 @@ func (s *state) CheckHealth(ctx context.Context) ([]blockapi.HealthMessage, erro
 	return issues, nil
 }
 
-func (s *state) Serialize() (string, error) {
+func (s *state) Serialize() (json.RawMessage, error) {
 	res, err := json.Marshal(s)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(res), nil
+	return res, nil
 }
 
 func (s *state) Validate() error {

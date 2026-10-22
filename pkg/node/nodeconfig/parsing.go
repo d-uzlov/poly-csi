@@ -60,7 +60,7 @@ func ParseConfig(ctx context.Context, raw []byte) (*ParsedConfig, error) {
 	tr := localexec.New(config.ExecConfig)
 
 	// logger.Info(fmt.Sprintf("connectors in config: %d: %v", len(connectorList), connectorList))
-	bm := ParseBlockList(logger, tr, config.DevFolder, config.BlockConnectors)
+	bm := ParseBlockList(logger, tr, config.DevFolder, config.BlockConnectors, blockfactory.GetByType)
 	fm := ParseFilesystems(logger, tr, config.Filesystems)
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
@@ -148,7 +148,7 @@ func loadOrGenerateKey(filepath string) (hpke.PrivateKey, error) {
 	return key, nil
 }
 
-func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder string, list []BlockSpec) map[string]blockapi.Manager {
+func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder string, list []BlockSpec, getByType func(mtype string) (blockapi.InflateFunc, error)) map[string]blockapi.Manager {
 	cons := map[string]blockapi.Manager{}
 	for i, v := range list {
 		if v.Id == "" {
@@ -164,7 +164,7 @@ func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder str
 			logger.Error(fmt.Sprintf("block[i=%d/id=%s]: missing type", i, v.Id))
 			continue
 		}
-		inflate, err := blockfactory.GetByType(v.Type)
+		inflate, err := getByType(v.Type)
 		if err != nil {
 			logger.Error(fmt.Sprintf("block[i=%d/id=%s]: GetByType failed", i, v.Id), "error", err)
 			continue

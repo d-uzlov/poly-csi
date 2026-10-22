@@ -9,6 +9,7 @@ allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
 parameters:
+  dispatch.mode: block-fs
   dispatch.serverName: tulip
   dispatch.storageType: zfs-zvol
   dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
