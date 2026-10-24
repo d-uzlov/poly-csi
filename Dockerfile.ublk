@@ -78,7 +78,7 @@ RUN make install DESTDIR=/install
 
 # ========================
 
-FROM golang:1.27.1-alpine3.23 AS builder_plugin
+FROM golang:1.27.3-alpine3.24 AS builder_plugin
 
 WORKDIR /app
 
