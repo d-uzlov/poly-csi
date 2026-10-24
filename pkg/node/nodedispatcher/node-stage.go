@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -15,6 +16,7 @@ import (
 	"meoe.io/poly-csi/pkg/logs"
 	"meoe.io/poly-csi/pkg/node/filecon"
 	"meoe.io/poly-csi/pkg/transport/localexec"
+	"meoe.io/poly-csi/pkg/utils/blockdevice"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
@@ -41,12 +43,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("parse volume context: %w", err)
 	}
 
-	fullPreset, err := conf.AssemblePreset(vc.Presets)
-	if err != nil {
-		return nil, fmt.Errorf("parse preset: %w", err)
-	}
-	logs.FromCtx(ctx).MicroOp("using preset", "fullPreset", fullPreset)
-
 	pc, err := publishcontext.Parse(req.PublishContext, conf.Encrypt.NodeKey)
 	if err != nil {
 		return nil, fmt.Errorf("parse publish context: %w", err)
@@ -57,7 +53,7 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	// 	return nil, fmt.Errorf("validateContext: %w", err)
 	// }
 
-	nvi := newVolumeHandle(req.StagingTargetPath, tr, fullPreset)
+	nvi := newVolumeHandle(req.StagingTargetPath, tr)
 	nvi.FsRootDirMode = vc.FsRootDirMode
 	defer func() {
 		saveErr := nvi.writeToDisk()
@@ -70,18 +66,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			err = saveErr
 			saveErr = nil
 		}
-		if err != nil {
-			if conf.DisableCleanupOnFailure {
-				logger.Warn("detected failure, but skipping cleanup due to config")
-				return
-			}
-			logger.Warn("detected failure, running cleanup")
-			cleanupErr := nvi.cleanup(ctx)
-			if cleanupErr != nil {
-				// TODO retry cleanup in background?
-				logger.Error("failed to cleanup partially initialized volume", "error", cleanupErr.Error())
-			}
-		}
 	}()
 
 	devices := map[string]string{}
@@ -92,10 +76,9 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		}
 
 		handle, err := con.GetHandle(ctx, blockapi.ConnectRequest{
-			Uuid:                    vc.Uuid,
-			Proto:                   v.Data,
-			DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-			Preset:                  fullPreset,
+			Uuid:       vc.Uuid,
+			Proto:      v.Data,
+			PresetName: v.ConnectorPreset,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("blockcon.GetHandle: %w", err)
@@ -114,10 +97,27 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 			return nil, fmt.Errorf("blockcon.GetDevices: %w", err)
 		}
 
-		// var devicePath string
-		// devicePath = setupMultipath(dd)
-		// devices[k] = devicePath
-		devices[k] = dd[0]
+		// mainDevice = setupMultipath(dd)
+		mainDevice := dd[0]
+
+		if n.conf.PodCgroupRoot != "" {
+			cgroupPreset, ok := conf.BlockCgroupPresets[v.CgroupPreset]
+			if ok {
+				logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", cgroupPreset)
+				blockPath, err := tr.Cmds().ReadLink(ctx, mainDevice)
+				if err != nil {
+					return nil, fmt.Errorf("readLink(%s): %w", mainDevice, err)
+				}
+				bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
+				// TODO this also affects csi-driver itself
+				err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, cgroupPreset)
+				if err != nil {
+					return nil, fmt.Errorf("SetCgroupsIoLimit: %w", err)
+				}
+			}
+		}
+
+		devices[k] = mainDevice
 		nvi.Blocks[k] = Block{
 			ConnectorId: v.ConnectorId,
 			handler:     handle,
@@ -131,10 +131,8 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 		return nil, fmt.Errorf("filesystem is not found: '%s'", vc.FsType)
 	}
 	fsHandle, err := fs.GetHandle(ctx, filecon.ConnectRequest{
-		Uuid:                    vc.Uuid,
-		Proto:                   pc.Filesystem,
-		DisableCleanupOnFailure: conf.DisableCleanupOnFailure,
-		Preset:                  fullPreset,
+		Uuid:  vc.Uuid,
+		Proto: pc.Filesystem,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("filecon.GetHandle: %w", err)
@@ -155,31 +153,6 @@ func (n *Node) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequ
 	if err != nil {
 		return nil, fmt.Errorf("fsHandle.Prepare: %w", err)
 	}
-
-	// TODO
-	// if n.conf.PodCgroupRoot != "" {
-	// 	dev, err := nvi.getMainBlockDevice(ctx)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("getMainBlockDevice: %w", err)
-	// 	}
-	// 	limits, foundAny, err := nodeconfig.ParseCgroupIoLimits(fullPreset)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("ParseCgroupIoLimits: %w", err)
-	// 	}
-	// 	if foundAny {
-	// 		logs.FromCtx(ctx).MicroOp("configuring cgroup io.max for volume", "limits", limits)
-	// 		blockPath, err := tr.Cmds().ReadLink(ctx, dev)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("readLink(%s): %w", dev, err)
-	// 		}
-	// 		bsnip := blockdevice.NewSnippets(tr, filepath.Base(blockPath))
-	// 		// TODO this also affects csi-driver itself
-	// 		err = bsnip.SetCgroupsIoLimit(ctx, n.conf.PodCgroupRoot, limits)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("SetCgroupsIoLimit: %w", err)
-	// 		}
-	// 	}
-	// }
 
 	return &csi.NodeStageVolumeResponse{}, nil
 }

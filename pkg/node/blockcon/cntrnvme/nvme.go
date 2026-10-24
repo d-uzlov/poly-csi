@@ -8,7 +8,6 @@ import (
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/blockspec"
-	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type connector struct {
@@ -17,9 +16,8 @@ type connector struct {
 	commonConfig blockapi.CommonConfig
 	snip         NvmeSnippets
 	config       Config
+	presets      map[string]PresetData
 }
-
-const mapPrefix = "nvme"
 
 type PresetData struct {
 	IoQueues              string `map:"ioQueues"`
@@ -29,16 +27,26 @@ type PresetData struct {
 }
 
 func New(conf blockapi.CommonConfig) (blockapi.Manager, error) {
-	result := &connector{}
+	result := &connector{
+		presets: map[string]PresetData{},
+	}
 	result.commonConfig = conf
 
 	err := conf.Cfg.Decode(&result.config)
 	if err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
-	result.config.FillDefaults()
 	if err := result.config.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
+	}
+
+	for k, v := range conf.Presets {
+		var preset PresetData
+		err = v.Decode(&preset)
+		if err != nil {
+			return nil, fmt.Errorf("parse preset '%s': %w", k, err)
+		}
+		result.presets[k] = preset
 	}
 
 	result.snip = newNvmeSnippets(conf.Tr, result.config.NvmeCmd, conf.DevFolder, result.config.ParseKernelLog)
@@ -59,10 +67,9 @@ func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) 
 		return nil, fmt.Errorf("protocol mismatch: got %T", req.Proto)
 	}
 
-	var parsedPreset PresetData
-	err := serialmaps.Parse(req.Preset, mapPrefix, &parsedPreset)
-	if err != nil {
-		return nil, fmt.Errorf("parse preset: %w", err)
+	preset, ok := c.presets[req.PresetName]
+	if !ok {
+		return nil, fmt.Errorf("preset not found: '%s'", req.PresetName)
 	}
 
 	cp := ConnectParams{
@@ -80,10 +87,10 @@ func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) 
 		}
 	}
 	extra := ConnectExtra{
-		IoQueues:              parsedPreset.IoQueues,
-		KeepAliveTimeout:      parsedPreset.KeepAliVeTimeout,
-		ControllerLossTimeout: parsedPreset.ControllerLossTimeout,
-		ReconnectDelay:        parsedPreset.ReconnectDelay,
+		IoQueues:              preset.IoQueues,
+		KeepAliveTimeout:      preset.KeepAliVeTimeout,
+		ControllerLossTimeout: preset.ControllerLossTimeout,
+		ReconnectDelay:        preset.ReconnectDelay,
 	}
 
 	ecs := []ExpectedConnection{}

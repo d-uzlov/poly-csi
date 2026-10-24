@@ -69,14 +69,13 @@ func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) 
 	}
 
 	return &state{
-		tr:                      c.commonConfig.Tr,
-		snip:                    &snip,
-		DevFolder:               c.commonConfig.DevFolder,
-		DisableCleanupOnFailure: req.DisableCleanupOnFailure,
-		Iqn:                     proto.Iqn,
-		Port:                    proto.Port,
-		Attributes:              attributes,
-		Connections:             ecs,
+		tr:          c.commonConfig.Tr,
+		snip:        &snip,
+		DevFolder:   c.commonConfig.DevFolder,
+		Iqn:         proto.Iqn,
+		Port:        proto.Port,
+		Attributes:  attributes,
+		Connections: ecs,
 	}, nil
 }
 

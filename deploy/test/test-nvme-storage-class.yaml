@@ -16,7 +16,8 @@ parameters:
   dispatch.shareType: nvmet-keeper
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nvme
-  dispatch.nodePresets: nvmeCon,nvmeIoq4
+  dispatch.blockPreset: basic
+  dispatch.cgroupPreset: ''
   dispatch.addressNames: storage,k8s
   dispatch.fsFormatSide: node
 

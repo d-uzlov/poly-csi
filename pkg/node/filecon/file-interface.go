@@ -45,10 +45,8 @@ type Manager interface {
 }
 
 type ConnectRequest struct {
-	Uuid                    string            `json:"uuid"`
-	Proto                   fsspec.Data       `json:"proto"`
-	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
-	Preset                  map[string]string `json:"preset"`
+	Uuid  string      `json:"uuid"`
+	Proto fsspec.Data `json:"proto"`
 }
 
 type CommonConfig struct {

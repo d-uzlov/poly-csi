@@ -16,7 +16,6 @@ parameters:
   dispatch.shareType: nbd
   dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
   dispatch.connectorId: nbd
-  dispatch.nodePresets: ''
   dispatch.addressNames: storage
   dispatch.fsFormatSide: node
 

@@ -15,12 +15,11 @@ type state struct {
 	tr   transport.Transport `json:"-"`
 	snip *iscsiSnippets      `json:"-"`
 
-	DevFolder               string            `json:"devFolder"`
-	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
-	Iqn                     string            `json:"iqn"`
-	Port                    int               `json:"port"`
-	Attributes              map[string]string `json:"attributes"`
-	Connections             []string          `json:"connections"`
+	DevFolder   string            `json:"devFolder"`
+	Iqn         string            `json:"iqn"`
+	Port        int               `json:"port"`
+	Attributes  map[string]string `json:"attributes"`
+	Connections []string          `json:"connections"`
 }
 
 var _ blockapi.Handle = &state{}
@@ -35,26 +34,6 @@ func parseState(serialized json.RawMessage) (*state, error) {
 }
 
 func (s *state) Connect(ctx context.Context) (err error) {
-	// setting up cleanup before even attempting to connect
-	// because failure could be caused by invalid state, that should be forcefully disconnected.
-	// TODO remove this?
-	defer func() {
-		if s.DisableCleanupOnFailure {
-			return
-		}
-		if err == nil {
-			return
-		}
-		logs.FromCtx(ctx).MicroOp("detected failure, running cleanup")
-		for _, v := range s.Connections {
-			addr := fmt.Sprintf("%s:%d", v, s.Port)
-			cleanupErr := s.snip.disconnect(ctx, s.Iqn, addr)
-			if cleanupErr != nil {
-				logs.FromCtx(ctx).Error("failed to run cleanup", "address", addr, "error", cleanupErr.Error())
-			}
-		}
-	}()
-
 	successCount := 0
 	for _, v := range s.Connections {
 		addr := fmt.Sprintf("%s:%d", v, s.Port)

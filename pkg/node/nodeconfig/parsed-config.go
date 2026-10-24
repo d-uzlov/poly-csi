@@ -2,11 +2,8 @@ package nodeconfig
 
 import (
 	"crypto/hpke"
-	"fmt"
-	"maps"
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/dustin/go-humanize"
 	"meoe.io/poly-csi/pkg/api/blockapi"
@@ -35,72 +32,50 @@ type ParsedConfig struct {
 	Multipath               mpfactory.ParsedMultipath
 	BlockConnectors         map[string]blockapi.Manager
 	FsConnectors            map[string]filecon.Manager
-	Presets                 map[string]map[string]string
+	BlockCgroupPresets      map[string]blockdevice.IoLimit
 	Networks                []ParsedNetworks
 	DevFolder               string
 	PodCgroupRoot           string
 	ExecConfig              localexec.Config
 	Logs                    Logs
-	DisableCleanupOnFailure bool
 }
 
-func ParseCgroupIoLimits(preset map[string]string) (limit blockdevice.IoLimit, foundAny bool, err error) {
+func ParseCgroupPreset(src BlockPreset) (blockdevice.IoLimit, error) {
 	result := blockdevice.IoLimit{
 		ReadBW:    "max",
 		WriteBW:   "max",
 		ReadIops:  "max",
 		WriteIops: "max",
 	}
-	const prefix = "cgroup_io_max"
-	for k, v := range preset {
-		type_, ok := strings.CutPrefix(k, prefix)
-		if !ok {
-			continue
+	if src.ReadBw != "" {
+		value, err := humanize.ParseBytes(src.ReadBw)
+		if err != nil {
+			return blockdevice.IoLimit{}, err
 		}
-		switch type_ {
-		case "readBw":
-			value, err := humanize.ParseBytes(v)
-			if err != nil {
-				return blockdevice.IoLimit{}, false, err
-			}
-			foundAny = true
-			result.ReadBW = strconv.Itoa(int(value))
-		case "writeBw":
-			value, err := humanize.ParseBytes(v)
-			if err != nil {
-				return blockdevice.IoLimit{}, false, err
-			}
-			foundAny = true
-			result.WriteBW = strconv.Itoa(int(value))
-		case "readIops":
-			value, _, err := humanize.ParseSI(v)
-			if err != nil {
-				return blockdevice.IoLimit{}, false, err
-			}
-			foundAny = true
-			result.ReadIops = strconv.Itoa(int(value))
-		case "writeIops":
-			value, _, err := humanize.ParseSI(v)
-			if err != nil {
-				return blockdevice.IoLimit{}, false, err
-			}
-			foundAny = true
-			result.WriteIops = strconv.Itoa(int(value))
-		}
+		result.ReadBW = strconv.Itoa(int(value))
 	}
-	return result, foundAny, nil
-}
-
-func (c *ParsedConfig) AssemblePreset(presets []string) (map[string]string, error) {
-	fullPreset := map[string]string{}
-	for _, v := range presets {
-		preset, ok := c.Presets[v]
-		if !ok {
-			return nil, fmt.Errorf("preset with name '%s' is not found", v)
+	if src.WriteBw != "" {
+		value, err := humanize.ParseBytes(src.WriteBw)
+		if err != nil {
+			return blockdevice.IoLimit{}, err
 		}
-		maps.Copy(fullPreset, preset)
+		result.WriteBW = strconv.Itoa(int(value))
 	}
-	return fullPreset, nil
+	if src.ReadIops != "" {
+		value, _, err := humanize.ParseSI(src.ReadIops)
+		if err != nil {
+			return blockdevice.IoLimit{}, err
+		}
+		result.ReadIops = strconv.Itoa(int(value))
+	}
+	if src.WriteIops != "" {
+		value, _, err := humanize.ParseSI(src.WriteIops)
+		if err != nil {
+			return blockdevice.IoLimit{}, err
+		}
+		result.WriteIops = strconv.Itoa(int(value))
+	}
+	return result, nil
 }
 
 func (c *ParsedConfig) GetRpcLogConfig(rpcPath string) logs.Config {

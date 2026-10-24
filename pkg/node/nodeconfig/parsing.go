@@ -20,6 +20,7 @@ import (
 	"meoe.io/poly-csi/pkg/node/multipath/mpfactory"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/transport/localexec"
+	"meoe.io/poly-csi/pkg/utils/blockdevice"
 )
 
 func ParseConfig(ctx context.Context, raw []byte) (*ParsedConfig, error) {
@@ -65,17 +66,14 @@ func ParseConfig(ctx context.Context, raw []byte) (*ParsedConfig, error) {
 
 	mp := mpfactory.ParseMultipath(ctx, &config.Multipath, config.DevFolder)
 
-	presetMap := map[string]map[string]string{}
-	for i, v := range config.Presets {
-		if v.Name == "" {
-			logger.Error(fmt.Sprintf("preset[i=%d]: missing 'name' field", i))
+	presetMap := map[string]blockdevice.IoLimit{}
+	for k, v := range config.BlockCgroupPresets {
+		preset, err := ParseCgroupPreset(v)
+		if err != nil {
+			logger.Error("failed to parse cgroup preset", "preset", k, "error", err)
 			continue
 		}
-		if _, ok := presetMap[v.Name]; ok {
-			logger.Error(fmt.Sprintf("preset[i=%d]: duplicate preset with name=%s", i, v.Name))
-			continue
-		}
-		presetMap[v.Name] = v.Params
+		presetMap[k] = preset
 	}
 
 	return &ParsedConfig{
@@ -83,17 +81,16 @@ func ParseConfig(ctx context.Context, raw []byte) (*ParsedConfig, error) {
 			NodeKey: nodeKey,
 			Conf:    config.Encrypt,
 		},
-		NodeInfoDb:              config.NodeInfoDb,
-		DevFolder:               config.DevFolder,
-		PodCgroupRoot:           config.PodCgroupRoot,
-		Multipath:               *mp,
-		BlockConnectors:         bm,
-		FsConnectors:            fm,
-		Presets:                 presetMap,
-		Networks:                netList,
-		ExecConfig:              config.ExecConfig,
-		Logs:                    config.Logs,
-		DisableCleanupOnFailure: config.DisableCleanupOnFailure,
+		NodeInfoDb:         config.NodeInfoDb,
+		DevFolder:          config.DevFolder,
+		PodCgroupRoot:      config.PodCgroupRoot,
+		Multipath:          *mp,
+		BlockConnectors:    bm,
+		FsConnectors:       fm,
+		BlockCgroupPresets: presetMap,
+		Networks:           netList,
+		ExecConfig:         config.ExecConfig,
+		Logs:               config.Logs,
 	}, nil
 }
 
@@ -177,6 +174,7 @@ func ParseBlockList(logger *logs.Instance, tr transport.Transport, devFolder str
 			Tr:        tr,
 			DevFolder: devFolder,
 			Cfg:       v.Config,
+			Presets:   v.Presets,
 		})
 		if err != nil {
 			logger.Error(fmt.Sprintf("block[i=%d/id=%s]: inflate failed", i, v.Id), "error", err)

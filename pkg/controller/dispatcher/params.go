@@ -13,11 +13,12 @@ type DispatchParams struct {
 	ShareType         string `map:"shareType"`
 	ShareIdTemplate   string `map:"shareIdTemplate"`
 	ConnectorId       string `map:"connectorId"`
-	NodePresets       string `map:"nodePresets"`
 	AddressNames      string `map:"addressNames"`
 	ServerName        string `map:"serverName"`
 	// FsGroupPolicy     string `map:"fsGroupPolicy"`
 	FsFormatSide string `map:"fsFormatSide"`
+	BlockPreset  string `map:"blockPreset"`
+	CgroupPreset string `map:"cgroupPreset"`
 }
 
 const (

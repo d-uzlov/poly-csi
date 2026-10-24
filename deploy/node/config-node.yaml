@@ -23,6 +23,12 @@ blockConnectors:
   config:
     nvmeCmd: [ "nvme" ]
     parseKernelLog: true
+  presets:
+    basic:
+      keepAliveTimeoutSec: 1
+      controllerLossTimeoutSec: -1
+      reconnectDelaySec: 1
+      ioQueues: 4
 - id: iscsi
   type: plugin
   config:
@@ -55,27 +61,17 @@ filesystems:
 - id: cifs
   type: cifs
 
-presets:
-- name: nvmeCon
-  params:
-    nvme.keepAliveTimeoutSec: 1
-    nvme.controllerLossTimeoutSec: -1
-    nvme.reconnectDelaySec: 1
-- name: nvmeIoq4
-  params:
-    nvme.ioQueues: 4
-- name: cgroupIo10
-  params:
-    cgroup_io_max.readBw: 10Mi
-    cgroup_io_max.writeBw: 10Mi
-    cgroup_io_max.readIops: 100
-    cgroup_io_max.writeIops: 100
-- name: cgroupIo100
-  params:
-    cgroup_io_max.readBw: 100Mi
-    cgroup_io_max.writeBw: 100Mi
-    cgroup_io_max.readIops: 1000
-    cgroup_io_max.writeIops: 1000
+blockCgroupPresets:
+  tier10:
+    readBw: 10Mi
+    writeBw: 10Mi
+    readIops: 100
+    writeIops: 100
+  tier100:
+    readBw: 100Mi
+    writeBw: 100Mi
+    readIops: 1000
+    writeIops: 1000
 
 networks:
 - includeCidr:
@@ -129,5 +125,3 @@ logs:
     /csi.v1.Node/NodeGetVolumeStats:
       echoCommands: true
       skipOnSuccess: true
-
-disableCleanupOnFailure: true

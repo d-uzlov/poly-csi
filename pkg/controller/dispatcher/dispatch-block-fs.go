@@ -268,19 +268,11 @@ func (df *DispatchBlockFs) Create(ctx context.Context) error {
 }
 
 func (df *DispatchBlockFs) GetVolumeContext() volumecontext.VolumeContext {
-	var presets []string
-	if df.p.NodePresets != "" {
-		for v := range strings.SplitSeq(df.p.NodePresets, ",") {
-			presets = append(presets, v)
-		}
-	}
-
 	return volumecontext.VolumeContext{
 		Uuid:        df.uuid,
 		ServerName:  df.p.ServerName,
 		StorageType: df.p.StorageType,
 		ShareType:   df.p.ShareType,
-		Presets:     presets,
 		FsType:      df.FsType,
 		// TODO customize
 		FsRootDirMode: "2777",
@@ -336,8 +328,10 @@ func (df *DispatchBlockFs) Publish(ctx context.Context, nodeName string) (publis
 		}
 		logs.FromCtx(ctx).MicroOp("publish block (result)", "name", k, "result", sharePc)
 		result.BlockDevices[k] = publishcontext.Block{
-			ConnectorId: v.p.ConnectorId,
-			Data:        sharePc.Protocol,
+			ConnectorId:     v.p.ConnectorId,
+			Data:            sharePc.Protocol,
+			ConnectorPreset: v.p.BlockPreset,
+			CgroupPreset:    v.p.CgroupPreset,
 		}
 		if sharePc.LocalData != nil {
 			serializedData, err := json.Marshal(sharePc.LocalData)

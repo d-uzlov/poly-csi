@@ -212,19 +212,11 @@ func (df *DispatchNativeFs) Create(ctx context.Context) error {
 }
 
 func (df *DispatchNativeFs) GetVolumeContext() volumecontext.VolumeContext {
-	var presets []string
-	if df.p.NodePresets != "" {
-		for v := range strings.SplitSeq(df.p.NodePresets, ",") {
-			presets = append(presets, v)
-		}
-	}
-
 	return volumecontext.VolumeContext{
 		Uuid:        df.uuid,
 		ServerName:  df.p.ServerName,
 		StorageType: df.p.StorageType,
 		ShareType:   df.p.ShareType,
-		Presets:     presets,
 		FsType:      df.FsType,
 		// TODO customize
 		FsRootDirMode: "2777",

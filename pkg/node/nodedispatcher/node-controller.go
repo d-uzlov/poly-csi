@@ -49,7 +49,7 @@ func (n *Node) ReloadConfig(ctx context.Context, newConf *nodeconfig.ParsedConfi
 	pushCh := make(chan struct{})
 
 	presetNames := []string{}
-	for k := range newConf.Presets {
+	for k := range newConf.BlockCgroupPresets {
 		presetNames = append(presetNames, k)
 	}
 

@@ -10,23 +10,24 @@ import (
 )
 
 type NodeConfig struct {
-	Encrypt                 NodeEncryptConfig         `yaml:"encrypt" json:"encrypt"`
-	NodeInfoDb              NodeInfoDbConfig          `yaml:"nodeInfoDb" json:"nodeInfoDb"`
-	Multipath               mpfactory.MultipathConfig `yaml:"multipath" json:"multipath"`
-	BlockConnectors         []BlockSpec               `yaml:"blockConnectors" json:"blockConnectors"`
-	Filesystems             []FsSpec                  `yaml:"filesystems" json:"filesystems"`
-	Presets                 []Preset                  `yaml:"presets"`
-	Networks                []NodeNetworkConfig       `yaml:"networks" json:"networks"`
-	DevFolder               string                    `yaml:"devFolder" json:"devFolder"`
-	PodCgroupRoot           string                    `yaml:"podCgroupRoot" json:"podCgroupRoot"`
-	ExecConfig              localexec.Config          `yaml:"execConfig" json:"execConfig"`
-	Logs                    Logs                      `yaml:"logs" json:"logs"`
-	DisableCleanupOnFailure bool                      `yaml:"disableCleanupOnFailure" json:"disableCleanupOnFailure"`
+	Encrypt            NodeEncryptConfig         `yaml:"encrypt" json:"encrypt"`
+	NodeInfoDb         NodeInfoDbConfig          `yaml:"nodeInfoDb" json:"nodeInfoDb"`
+	Multipath          mpfactory.MultipathConfig `yaml:"multipath" json:"multipath"`
+	BlockConnectors    []BlockSpec               `yaml:"blockConnectors" json:"blockConnectors"`
+	Filesystems        []FsSpec                  `yaml:"filesystems" json:"filesystems"`
+	BlockCgroupPresets map[string]BlockPreset    `yaml:"blockCgroupPresets"`
+	Networks           []NodeNetworkConfig       `yaml:"networks" json:"networks"`
+	DevFolder          string                    `yaml:"devFolder" json:"devFolder"`
+	PodCgroupRoot      string                    `yaml:"podCgroupRoot" json:"podCgroupRoot"`
+	ExecConfig         localexec.Config          `yaml:"execConfig" json:"execConfig"`
+	Logs               Logs                      `yaml:"logs" json:"logs"`
 }
 
-type Preset struct {
-	Name   string            `yaml:"name"`
-	Params map[string]string `yaml:"params"`
+type BlockPreset struct {
+	ReadBw    string `yaml:"readBw"`
+	WriteBw   string `yaml:"writeBw"`
+	ReadIops  string `yaml:"readIops"`
+	WriteIops string `yaml:"writeIops"`
 }
 
 type Logs struct {
@@ -54,9 +55,10 @@ type KeyInfoConfig struct {
 }
 
 type BlockSpec struct {
-	Id     string    `yaml:"id"`
-	Type   string    `yaml:"type"`
-	Config yaml.Node `yaml:"config"`
+	Id      string               `yaml:"id"`
+	Type    string               `yaml:"type"`
+	Config  yaml.Node            `yaml:"config"`
+	Presets map[string]yaml.Node `yaml:"presets"`
 }
 
 type FsSpec struct {

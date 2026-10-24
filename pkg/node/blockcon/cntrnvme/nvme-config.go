@@ -7,8 +7,6 @@ type Config struct {
 	ParseKernelLog bool     `yaml:"parseKernelLog"`
 }
 
-func (c *Config) FillDefaults() {}
-
 func (c *Config) Validate() error {
 	if len(c.NvmeCmd) == 0 {
 		return fmt.Errorf("nvmeCmd missing")

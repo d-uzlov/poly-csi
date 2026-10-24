@@ -20,14 +20,11 @@ type PublishContext struct {
 }
 
 type Block struct {
-	ConnectorId string         `map:"connectorId"`
-	Data        blockspec.Data `map:"data"`
+	ConnectorId     string         `map:"connectorId"`
+	Data            blockspec.Data `map:"data"`
+	ConnectorPreset string         `map:"preset"`
+	CgroupPreset    string         `map:"cgroupPreset"`
 }
-
-// type AddressOption struct {
-// 	Name    string `map:"n" json:"n" validate:"required"`
-// 	Address string `map:"a" json:"a" validate:"required"`
-// }
 
 type Serialized struct {
 	Enc   []byte               `map:"enc"`
@@ -36,10 +33,12 @@ type Serialized struct {
 }
 
 type SerializedBlock struct {
-	ConnectorId string         `map:":connectorId"`
-	Name        string         `map:":name"`
-	Public      blockspec.Data `map:":"`
-	Secret      []byte         `map:":secret"`
+	ConnectorId     string         `map:":connectorId"`
+	Name            string         `map:":name"`
+	Public          blockspec.Data `map:":"`
+	Secret          []byte         `map:":secret"`
+	ConnectorPreset string         `map:"preset"`
+	CgroupPreset    string         `map:"cgroupPreset"`
 }
 
 type SerializedFilesystem struct {
@@ -85,10 +84,12 @@ func (pc *PublishContext) Serialize(out map[string]string, publicKey hpke.Public
 		}
 
 		s.Block = append(s.Block, SerializedBlock{
-			ConnectorId: b.ConnectorId,
-			Name:        k,
-			Public:      public,
-			Secret:      ciphertext,
+			ConnectorId:     b.ConnectorId,
+			Name:            k,
+			Public:          public,
+			Secret:          ciphertext,
+			ConnectorPreset: b.ConnectorPreset,
+			CgroupPreset:    b.CgroupPreset,
 		})
 	}
 
@@ -145,8 +146,10 @@ func Parse(src map[string]string, privateKey hpke.PrivateKey) (PublishContext, e
 			return PublishContext{}, fmt.Errorf("block i=%d: unmarshal: %w", i, err)
 		}
 		result.BlockDevices[v.Name] = Block{
-			ConnectorId: v.ConnectorId,
-			Data:        v.Public,
+			ConnectorId:     v.ConnectorId,
+			Data:            v.Public,
+			ConnectorPreset: v.ConnectorPreset,
+			CgroupPreset:    v.CgroupPreset,
 		}
 	}
 

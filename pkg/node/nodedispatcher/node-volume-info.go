@@ -22,10 +22,9 @@ type NodeVolumeInfo struct {
 	FsStagePath string `json:"fsMountPath"`
 	// MultipathData        string            `json:"multipathData"`
 	// MultipathJournalData string            `json:"multipathJournalData"`
-	ConnectorData string            `json:"connectorData"`
-	Preset        map[string]string `json:"preset"`
+	ConnectorData string `json:"connectorData"`
 
-	Blocks map[string]Block
+	Blocks map[string]Block `json:"blocks"`
 
 	FsType    string         `json:"fsType"`
 	FsData    string         `json:"fsData"`
@@ -47,10 +46,9 @@ type SavedParams struct {
 
 const metadataFile = "/mount-info.json"
 
-func newVolumeHandle(parentFolder string, tr transport.Transport, preset map[string]string) NodeVolumeInfo {
+func newVolumeHandle(parentFolder string, tr transport.Transport) NodeVolumeInfo {
 	return NodeVolumeInfo{
 		parentFolder: parentFolder,
-		Preset:       preset,
 		tr:           tr,
 		Blocks:       map[string]Block{},
 	}
@@ -159,27 +157,6 @@ func (nvi *NodeVolumeInfo) writeToDisk() error {
 	// todo do this via transport
 	return os.WriteFile(nvi.parentFolder+metadataFile, encoded, 0660)
 }
-
-// TODO use
-// func (nvi *NodeVolumeInfo) adjustPermissions(ctx context.Context, group string) error {
-// 	fsAdjStart := time.Now()
-// 	sr, err := nvi.tr.Cmds().Stat(ctx, nvi.FsMountPath)
-// 	if err != nil {
-// 		return fmt.Errorf("stat path: %w", err)
-// 	}
-// 	if !sr.FileExists {
-// 		return fmt.Errorf("target path does not exist")
-// 	}
-// 	if group == "" || group == sr.Gid {
-// 		return nil
-// 	}
-// 	err = nvi.tr.SudoCmds().Chown(ctx, nvi.FsMountPath, sr.Uid, group, true)
-// 	if err != nil {
-// 		return fmt.Errorf("chown: %w", err)
-// 	}
-// 	logs.FromCtx(ctx).MicroOp("chown: success", "duration", time.Since(fsAdjStart).String())
-// 	return nil
-// }
 
 func (nvi *NodeVolumeInfo) cleanup(ctx context.Context) (err error) {
 	defer func() {

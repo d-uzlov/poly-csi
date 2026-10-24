@@ -5,14 +5,13 @@ import "fmt"
 const Prefix = "poly-csi/"
 
 type VolumeContext struct {
-	ServerName    string   `map:"server_name"`
-	StorageType   string   `map:"storage_type"`
-	ShareType     string   `map:"share_type"`
-	Presets       []string `map:"preset"`
-	FsRootDirMode string   `map:"fs_root_dir_mode"`
-	Uuid          string   `map:"uuid"`
-	FsType        string   `map:"fs_type"`
-	FsData        string   `map:"fs_data"`
+	ServerName    string `map:"server_name"`
+	StorageType   string `map:"storage_type"`
+	ShareType     string `map:"share_type"`
+	FsRootDirMode string `map:"fs_root_dir_mode"`
+	Uuid          string `map:"uuid"`
+	FsType        string `map:"fs_type"`
+	FsData        string `map:"fs_data"`
 }
 
 func (v *VolumeContext) Validate() error {

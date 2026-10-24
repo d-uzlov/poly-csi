@@ -53,6 +53,7 @@ type CommonConfig struct {
 	Tr        transport.Transport
 	DevFolder string
 	Cfg       yaml.Node
+	Presets   map[string]yaml.Node
 }
 
 type Capabilities struct {
@@ -63,10 +64,9 @@ type Capabilities struct {
 }
 
 type ConnectRequest struct {
-	Uuid                    string            `json:"uuid"`
-	Proto                   blockspec.Data    `json:"proto"`
-	DisableCleanupOnFailure bool              `json:"disableCleanupOnFailure"`
-	Preset                  map[string]string `json:"preset"`
+	Uuid       string         `json:"uuid"`
+	Proto      blockspec.Data `json:"proto"`
+	PresetName string         `json:"presetName"`
 }
 
 const (

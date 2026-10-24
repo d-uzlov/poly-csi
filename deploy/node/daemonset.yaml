@@ -45,7 +45,7 @@ spec:
           name: kernel-modules
       containers:
       - name: csi-driver
-        image: harbor.k8s.lan/local-test/poly-csi-node:v0.5.58
+        image: harbor.k8s.lan/local-test/poly-csi-node:v0.5.62
         args:
         - --csi-name=io.meoe.poly-csi
         - --listen-address=unix:///var/lib/kubelet/plugins/io.meoe.poly-csi/csi.sock
@@ -118,7 +118,7 @@ spec:
           name: registration-dir
 
       - name: iscsiadm
-        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.5.59
+        image: harbor.k8s.lan/local-test/poly-csi-mounter-plugin:v0.5.62
         args:
         - --plugin-type=connector
         - --node-config=/poly-csi/iscsi-config/config.yaml
@@ -148,7 +148,7 @@ spec:
           subPath: iscsi-container
 
       - name: ublk
-        image: harbor.k8s.lan/local-test/poly-csi-ublk:v0.5.59
+        image: harbor.k8s.lan/local-test/poly-csi-ublk:v0.5.62
         args:
         - --plugin-type=ublk
         - --node-config=/poly-csi/ublk-config/config.yaml
