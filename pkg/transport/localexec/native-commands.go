@@ -37,6 +37,9 @@ func (s *nativeCommands) Read(ctx context.Context, path string, trim bool) ([]by
 
 	result, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if trim {

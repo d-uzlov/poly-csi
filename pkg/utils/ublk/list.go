@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"meoe.io/poly-csi/pkg/transport"
 )
 
-func (s *Snippets) List(ctx context.Context, devId string) ([]DeviceInfo, error) {
+func (s *Snippets) List(ctx context.Context, devId int) ([]DeviceInfo, error) {
 	cmd := append(ublkCmd, "list")
-	if devId != "" {
-		cmd = append(cmd, "-n", devId)
+	if devId != -1 {
+		cmd = append(cmd, "-n", strconv.Itoa(devId))
 	}
 	rr, err := s.tr.RunCommand(ctx, cmd)
 	if err != nil {
@@ -52,36 +53,36 @@ var (
 )
 
 type QueueInfo struct {
-	QueueIndex string
-	Tid        string
-	Affinity   string
+	QueueIndex string `json:"queueIndex"`
+	Tid        string `json:"tid"`
+	Affinity   string `json:"affinity"`
 }
 
 type DeviceInfo struct {
 	// line 1
-	DevId       string
-	HwQueues    string
-	QueueDepth  string
-	BlockSize   string
-	DevCapacity string
+	DevId       string `json:"devId"`
+	HwQueues    string `json:"hwQueues"`
+	QueueDepth  string `json:"queueDepth"`
+	BlockSize   string `json:"blockSize"`
+	DevCapacity string `json:"devCapacity"`
 
 	// line 2
-	MaxRqSize string
-	DaemonPid string
-	State     string
+	MaxRqSize string `json:"maxRqSize"`
+	DaemonPid string `json:"daemonPid"`
+	State     string `json:"state"`
 
 	// line 3
-	Flags Flags
+	Flags Flags `json:"flags"`
 
 	// line 4
-	CharMajMin  string
-	BlockMajMin string
-	OwnerUidGid string
+	CharMajMin  string `json:"charMajMin"`
+	BlockMajMin string `json:"blockMajMin"`
+	OwnerUidGid string `json:"ownerUidGid"`
 
-	Queues []QueueInfo
+	Queues []QueueInfo `json:"queues"`
 
-	Target     string
-	TargetType string
+	Target     string `json:"target"`
+	TargetType string `json:"targetType"`
 }
 
 func ParseUblkOutput(humanString string) (DeviceInfo, error) {

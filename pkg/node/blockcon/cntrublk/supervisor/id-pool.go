@@ -24,6 +24,17 @@ func NewIdPool(min, max int) *IdPool {
 	}
 }
 
+func (p *IdPool) SetNext(val int) error {
+	if val < p.min {
+		return fmt.Errorf("value '%d' < min '%d'", val, p.min)
+	}
+	if val > p.max {
+		return fmt.Errorf("value '%d' > max '%d'", val, p.max)
+	}
+	p.next = val
+	return nil
+}
+
 func (p *IdPool) Allocate() (int, error) {
 	p.mut.Lock()
 	defer p.mut.Unlock()

@@ -34,19 +34,20 @@ type Service struct {
 	tr        transport.Transport `json:"-"`
 	ctx       context.Context     `json:"-"`
 	cancel    context.CancelFunc  `json:"-"`
-	ConfigDir string              `json:"configDir"`
+	configDir string              `json:"-"`
 
 	// Info is populated after device is first created
 	Info *ublk.DeviceInfo `json:"info"`
 
 	// fields below should be filled by caller before calling [UblkSupervisor.runLoop]
 	Uuid         string            `json:"uuid"`
-	DevId        string            `json:"devId"`
+	DevId        int               `json:"devId"`
 	CreateParams ublk.CreateParams `json:"createParams"`
 	ExtraParams  ublk.ExtraParams  `json:"-"`
 }
 
 const supervisorConfigPrefix = "supervisor-"
+const persistentNextFile = "pool-next"
 
 func New(ctx context.Context, tr transport.Transport, configDir string, minId int, maxId int) *UblkSupervisor {
 	return &UblkSupervisor{
@@ -58,11 +59,63 @@ func New(ctx context.Context, tr transport.Transport, configDir string, minId in
 	}
 }
 
+func (s *UblkSupervisor) makeConfigPath(uuid string) string {
+	return s.configDir + "/" + supervisorConfigPrefix + uuid + ".json"
+}
+
+func (s *UblkSupervisor) parseConfigName(filename string) (uuid string, err error) {
+	result, ok := strings.CutPrefix(filename, supervisorConfigPrefix)
+	if !ok {
+		return "", fmt.Errorf("file does not have '%s' prefix", supervisorConfigPrefix)
+	}
+
+	result, ok = strings.CutSuffix(result, ".json")
+	if !ok {
+		return "", fmt.Errorf("file does not have '.json' suffix")
+	}
+
+	return result, nil
+}
+
 func (s *UblkSupervisor) StartupRestore() error {
 	if s.configDir == "" {
 		return fmt.Errorf("config dir is not set")
 	}
 	ctx := s.ctx
+
+	// TODO write this file before exit
+	next, err := s.tr.Cmds().Read(ctx, s.configDir+"/"+persistentNextFile, true)
+	if err != nil {
+		return fmt.Errorf("read persistent next file: %w", err)
+	}
+	if next != nil {
+		nextId, err := strconv.Atoi(string(next))
+		if err != nil {
+			return fmt.Errorf("parse persistent next: %w", err)
+		}
+		err = s.pool.SetNext(nextId)
+		if err != nil {
+			return fmt.Errorf("restore persistent next: %w", err)
+		}
+	} else {
+		logs.FromCtx(ctx).Info("persistent next file does not exist, will start counting ublk devices from min")
+	}
+
+	snip := ublk.New(s.tr)
+
+	devices, err := snip.List(ctx, -1)
+	if err != nil {
+		return fmt.Errorf("list ublk devices: %w", err)
+	}
+	devicesById := map[int]ublk.DeviceInfo{}
+	for _, v := range devices {
+		devId, err := strconv.Atoi(v.DevId)
+		if err != nil {
+			return fmt.Errorf("parse device id '%s': %w", v.DevId, err)
+		}
+		devicesById[devId] = v
+	}
+
 	files, err := s.tr.Cmds().Ls(ctx, s.configDir)
 	if err != nil {
 		return fmt.Errorf("list config dir: %w", err)
@@ -71,19 +124,34 @@ func (s *UblkSupervisor) StartupRestore() error {
 		if !strings.HasPrefix(f, supervisorConfigPrefix) {
 			continue
 		}
+		uuid, err := s.parseConfigName(f)
+		if err != nil {
+			return fmt.Errorf("parse config at '%s': %w", f, err)
+		}
 		data, err := s.tr.Cmds().Read(ctx, s.configDir+"/"+f, false)
 		if err != nil {
 			return fmt.Errorf("failed to read file: '%s': %w", f, err)
 		}
-		var svc Service
+		svc := s.serviceRef(uuid)
+
 		err = json.Unmarshal(data, &svc)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal json from '%s': %w", f, err)
 		}
-		svc.tr = s.tr
-		svc.ConfigDir = s.configDir
-		svc.ctx, svc.cancel = context.WithCancel(s.ctx)
-		// TODO check if device even exists before doing recover?
+
+		err = s.pool.Grab(svc.DevId)
+		if err != nil {
+			return fmt.Errorf("grab ublk dev id from pool: %w", err)
+		}
+
+		_, ok := devicesById[svc.DevId]
+		if !ok {
+			// TODO log error and skip device?
+			return fmt.Errorf("need to restore device[devId=%d] but the device no longer exist", svc.DevId)
+		}
+
+		logs.FromCtx(ctx).Info("starting recovery for device", "dev-uuid", svc.Uuid, "devId", svc.DevId)
+
 		// TODO check if pid file exists
 		go svc.recoverLoop()
 	}
@@ -95,17 +163,15 @@ func (s *UblkSupervisor) saveConfig(svc *Service) error {
 	if err != nil {
 		return err
 	}
-	savePath := s.configDir + "/" + supervisorConfigPrefix + svc.Uuid + ".json"
-	return s.tr.Cmds().Write(s.ctx, savePath, data)
+	return s.tr.Cmds().Write(s.ctx, s.makeConfigPath(svc.Uuid), data)
 }
 
-func (s *UblkSupervisor) deleteConfig(devId string, uuid string) error {
-	savePath := s.configDir + "/" + supervisorConfigPrefix + uuid + ".json"
-	err := s.tr.Cmds().RmFile(s.ctx, savePath)
+func (s *UblkSupervisor) deleteConfig(devId int, uuid string) error {
+	err := s.tr.Cmds().RmFile(s.ctx, s.makeConfigPath(uuid))
 	if err != nil {
 		return err
 	}
-	return s.tr.Cmds().RmFile(s.ctx, fmt.Sprintf("%s/%s.pid", s.configDir, devId))
+	return s.tr.Cmds().RmFile(s.ctx, fmt.Sprintf("%s/%d.pid", s.configDir, devId))
 }
 
 func (s *UblkSupervisor) Launch(ctx context.Context, uuid string, cp ublk.CreateParams, ep ublk.ExtraParams) (result ublk.DeviceInfo, err error) {
@@ -126,10 +192,10 @@ func (s *UblkSupervisor) Launch(ctx context.Context, uuid string, cp ublk.Create
 		return ublk.DeviceInfo{}, fmt.Errorf("allocate device id: %w", err)
 	}
 
-	logs.FromCtx(ctx).Info("allocated devId", "uuid", uuid, "devId", devIndex)
-	svc.DevId = strconv.Itoa(devIndex)
+	logs.FromCtx(ctx).Info("allocated devId", "dev-uuid", uuid, "devId", devIndex)
+	svc.DevId = devIndex
 	svc.CreateParams = cp
-	svc.CreateParams.DevNum = svc.DevId
+	svc.CreateParams.DevNum = strconv.Itoa(svc.DevId)
 	svc.ExtraParams = ep
 
 	defer func() {
@@ -158,7 +224,7 @@ func (s *UblkSupervisor) Launch(ctx context.Context, uuid string, cp ublk.Create
 
 	select {
 	case <-ctx.Done():
-		logs.FromCtx(ctx).Error("context cancelled when waiting for runLoop() result")
+		logs.FromCtx(ctx).Error("context cancelled when waiting for runLoop() result", "dev-uuid", uuid, "devId", devIndex)
 		svc.cancel()
 	case err := <-errCh:
 		if err != nil {
@@ -191,13 +257,14 @@ func (s *UblkSupervisor) Remove(uuid string) error {
 	}
 	if svc.cancel != nil {
 		svc.cancel()
+		svc.cancel = nil
 	}
 	snip := ublk.New(s.tr)
 	err := snip.Delete(s.ctx, svc.DevId)
 	if err != nil {
 		return fmt.Errorf("delete ublk device: %w", err)
 	}
-	if svc.DevId != "" && svc.Uuid != "" {
+	if svc.DevId != 0 && svc.Uuid != "" {
 		err := s.deleteConfig(svc.DevId, svc.Uuid)
 		if err != nil {
 			return err
@@ -218,7 +285,7 @@ func (s *UblkSupervisor) serviceRef(uuid string) *Service {
 	svc = &Service{
 		tr:        s.tr,
 		Uuid:      uuid,
-		ConfigDir: s.configDir,
+		configDir: s.configDir,
 	}
 	svc.ctx, svc.cancel = context.WithCancel(s.ctx)
 
@@ -243,14 +310,14 @@ func (si *Service) runLoop(errCh chan<- error) {
 	snip := ublk.New(si.tr)
 	logger := logs.FromCtx(ctx)
 
-	err := snip.CreateForeground(ctx, si.ConfigDir, si.CreateParams, si.ExtraParams, func(info *ublk.DeviceInfo) {
+	err := snip.CreateForeground(ctx, si.configDir, si.CreateParams, si.ExtraParams, func(info *ublk.DeviceInfo) {
 		si.Info = info
 		if info != nil {
 			safeClose(nil)
-			logger.MicroOp("ublk daemon pushed device info", "devId", si.DevId, "info", info)
+			logger.MicroOp("ublk daemon pushed device info", "dev-uuid", si.Uuid, "devId", si.DevId, "info", info)
 		}
 	}, func(s string) {
-		logger.Info("ublk daemon log line", "devId", si.DevId, "line", s)
+		logger.Info("ublk daemon log line", "dev-uuid", si.Uuid, "devId", si.DevId, "line", s)
 	})
 
 	if err != nil {
@@ -259,7 +326,7 @@ func (si *Service) runLoop(errCh chan<- error) {
 			return
 		}
 		// TODO remove this when we intentionally stopped?
-		logger.Error("ublk daemon finished with error", "devId", si.DevId, "error", err)
+		logger.Error("ublk daemon finished with error", "dev-uuid", si.Uuid, "devId", si.DevId, "error", err)
 	}
 
 	si.recoverLoop()
@@ -271,21 +338,21 @@ func (si *Service) recoverLoop() {
 	logger := logs.FromCtx(ctx)
 
 	for ctx.Err() == nil {
-		logger.MicroOp("restarting ublk daemon", "devId", si.DevId)
+		logger.MicroOp("restarting ublk daemon", "dev-uuid", si.Uuid, "devId", si.DevId)
 		start := time.Now()
 
-		err := snip.RecoverForeground(ctx, si.ConfigDir, si.CreateParams, func(info *ublk.DeviceInfo) {
+		err := snip.RecoverForeground(ctx, si.configDir, si.CreateParams, func(info *ublk.DeviceInfo) {
 			if info == nil {
 				// RecoverForeground will soon return with an error
 				// TODO or will it? there is no one to cancel the context
 				return
 			}
-			logger.MicroOp("recovery: successfully reconnected", "devId", si.Info.DevId, "info", info)
+			logger.MicroOp("recovery: successfully reconnected", "dev-uuid", si.Uuid, "devId", si.DevId, "info", info)
 		}, func(s string) {
-			logger.Info("ublk daemon log line", "devId", si.DevId, "line", s)
+			logger.Info("ublk daemon log line", "dev-uuid", si.Uuid, "devId", si.DevId, "line", s)
 		})
 
-		logger.Error("ublk daemon finished with error", "devId", si.DevId, "error", err)
+		logger.Error("ublk daemon finished with error", "dev-uuid", si.Uuid, "devId", si.DevId, "error", err)
 		timeToSleep := time.Second - time.Since(start)
 		if timeToSleep > 0 {
 			select {
@@ -294,4 +361,6 @@ func (si *Service) recoverLoop() {
 			}
 		}
 	}
+
+	logger.Info("recover loop stopped", "dev-uuid", si.Uuid, "devId", si.DevId)
 }

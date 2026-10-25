@@ -21,8 +21,8 @@ func New(tr transport.Transport) Snippets {
 	}
 }
 
-func (s *Snippets) Delete(ctx context.Context, devId string) error {
-	cmd := append(ublkCmd, "del", "-n", devId)
+func (s *Snippets) Delete(ctx context.Context, devId int) error {
+	cmd := append(ublkCmd, "del", "-n", strconv.Itoa(devId))
 	_, err := transport.RelaxedRun(ctx, s.tr, cmd, "can't get dev info")
 	return err
 }
