@@ -21,13 +21,13 @@ func NewMetadata() filecon.Metadata {
 	return &metadata{}
 }
 
-func (s *metadata) Configure(requestedSize int64, params map[string]string) error {
+func (s *metadata) Configure(requestedSize int64, parser *serialmaps.Parser) error {
 	s.MainSize = requestedSize
 	const minFsSize = 1024 * 1024 * 1024
 	if s.MainSize < minFsSize {
 		return fmt.Errorf("xfs size can not smaller than 1GiB")
 	}
-	err := serialmaps.Parse(params, prefix, &s.User, serialmaps.WithRemove(true))
+	err := parser.Parse(&s.User)
 	if err != nil {
 		return err
 	}

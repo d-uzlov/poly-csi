@@ -21,7 +21,7 @@ func NewMetadata() filecon.Metadata {
 	return &metadata{}
 }
 
-func (s *metadata) Configure(requestedSize int64, params map[string]string) error {
+func (s *metadata) Configure(requestedSize int64, parser *serialmaps.Parser) error {
 	s.MainSize = requestedSize
 
 	s.User = fsspec.Ext4UserParams{
@@ -31,7 +31,7 @@ func (s *metadata) Configure(requestedSize int64, params map[string]string) erro
 		ReservedPercent:  1,
 	}
 
-	err := serialmaps.Parse(params, prefix, &s.User, serialmaps.WithRemove(true))
+	err := parser.Parse(&s.User)
 	if err != nil {
 		return err
 	}

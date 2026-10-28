@@ -6,6 +6,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/controller/blockvolume"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type Manager interface {
@@ -51,11 +52,7 @@ type CreateShareRequest struct {
 	// It is user-supplied, so it helps the user identify share-related resources
 	// when accessing them for any kind of maintenance or debugging.
 	ShareId string
-	// StaticParams is an opaque set of parameters specifying the share properties
-	StaticParams map[string]string
-	// MutableParams override StaticParams.
-	// Implementation must fail if MutableParams contains something that can not be dynamically changed.
-	MutableParams map[string]string
+	Parser  *serialmaps.Parser
 }
 
 type PublishRequest struct {

@@ -43,24 +43,12 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (params, error) {
-	result := params{}
-	err := serialmaps.Parse(static, paramsPrefix, &result, serialmaps.WithRemove(true))
+func parseParams(parser *serialmaps.Parser) (params, error) {
+	var result params
+	err := parser.Parse(&result)
 	if err != nil {
-		return params{}, fmt.Errorf("static params: %w", err)
+		return params{}, fmt.Errorf("parse params: %w", err)
 	}
-
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		default:
-			return params{}, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
-
-	// no need to validate anything
 
 	return result, nil
 }

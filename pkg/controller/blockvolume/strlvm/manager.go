@@ -8,6 +8,7 @@ import (
 	"meoe.io/poly-csi/pkg/controller/blockvolume"
 	"meoe.io/poly-csi/pkg/transport"
 	"meoe.io/poly-csi/pkg/utils/lvm"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type manager struct {
@@ -31,13 +32,13 @@ func (m *manager) GetCapabilities() blockvolume.Capabilities {
 	}
 }
 
-func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[string]string) (int64, error) {
-	p, err := parseParams(staticParams, nil)
+func (m *manager) GetAvailableCapacity(ctx context.Context, parser *serialmaps.Parser) (int64, error) {
+	p, err := parseParams(parser)
 	if err != nil {
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	fsInfo, err := m.tr.Cmds().Df(ctx, p.vgName)
+	fsInfo, err := m.tr.Cmds().Df(ctx, p.VgName)
 	if err != nil {
 		return 0, fmt.Errorf("get filesystem info: %w", err)
 	}
@@ -54,11 +55,11 @@ func (m *manager) ParseSnapshot(serialized json.RawMessage) (blockvolume.Snapsho
 }
 
 func (m *manager) CreateVolume(req blockvolume.CreateRequest) (blockvolume.Volume, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
+	p, err := parseParams(req.Parser)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}
 
 	lvName := req.Id
-	return newVolume(p.vgName, lvName, m.snip), nil
+	return newVolume(p.VgName, lvName, m.snip), nil
 }

@@ -3,26 +3,24 @@ package shrtniscsi
 import (
 	"fmt"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type globalParams struct {
-	iqnBase          string
+	iqnBase string
 }
 
 type params struct {
-	transport        string
-	listenPort       string
-	authType         string
+	Transport  string `map:"transport"`
+	ListenPort string `map:"listenPort"`
+	AuthType   string `map:"authType"`
 }
 
 const paramsPrefix = "lio"
 
 const (
-	keyIqnBase          = "iqnBase"
-
-	keyTransport  = "lio.transport"
-	keyListenPort = "lio.listenPort"
-	keyAuthType   = "lio.authType"
+	keyIqnBase = "iqnBase"
 )
 
 const (
@@ -58,53 +56,14 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
-	result := params{}
-
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyTransport:
-			result.transport = v
-		case keyListenPort:
-			result.listenPort = v
-		case keyAuthType:
-			result.authType = v
-		default:
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
+func parseParams(parser *serialmaps.Parser) (*params, error) {
+	var result params
+	err := parser.Parse(&result)
+	if err != nil {
+		return nil, fmt.Errorf("parse params: %w", err)
 	}
 
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyTransport:
-			return nil, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyListenPort:
-			return nil, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyAuthType:
-			return nil, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
-
-	// fill defaults
-	if result.transport == "" {
-		result.transport = "tcp"
-	}
-	if result.listenPort == "" {
-		result.listenPort = "3260"
-	}
-	if result.authType == "" {
-		result.authType = authTypeChapProvision
-	}
-
-	err := result.validate()
+	err = result.validate()
 	if err != nil {
 		return nil, err
 	}
@@ -113,22 +72,22 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 }
 
 func (p params) validate() error {
-	if p.transport == "" {
+	if p.Transport == "" {
 		return fmt.Errorf("transport is empty")
 	}
-	if p.listenPort == "" {
+	if p.ListenPort == "" {
 		return fmt.Errorf("listenPort is empty")
 	}
-	if p.authType == "" {
+	if p.AuthType == "" {
 		return fmt.Errorf("authType is empty")
 	}
-	switch p.authType {
+	switch p.AuthType {
 	case "":
 		return fmt.Errorf("authType is empty")
 	case authTypeNone, authTypeIqn, authTypeChapProvision:
 		// ok
 	default:
-		return fmt.Errorf("auth: unknown type: '%s', must be one of: %v", p.authType, allowedAuth)
+		return fmt.Errorf("auth: unknown type: '%s', must be one of: %v", p.AuthType, allowedAuth)
 	}
 	return nil
 }

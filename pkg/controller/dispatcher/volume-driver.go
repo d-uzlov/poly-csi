@@ -6,11 +6,12 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"meoe.io/poly-csi/pkg/api/publishcontext"
 	"meoe.io/poly-csi/pkg/api/volumecontext"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type VolumeDriver interface {
 	MakeVolumeId() string
-	ParseRequest(req *csi.CreateVolumeRequest) error
+	ParseRequest(req *csi.CreateVolumeRequest, parser *serialmaps.Parser) error
 	InitHandles() error
 	Create(ctx context.Context) error
 	GetVolumeContext() volumecontext.VolumeContext

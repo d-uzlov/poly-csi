@@ -10,19 +10,18 @@ volumeBindingMode: Immediate
 
 parameters:
   dispatch.mode: native-fs
-  dispatch.serverName: tulip
-  dispatch.storageType: zfs-dataset
-  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.shareType: zfs-sharenfs
-  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.connectorId: nfs
-  dispatch.addressNames: storage
+  dispatch.server: tulip
 
-  zfs.parentDataset: tulip/test-guid
+  fs.storage.type: zfs-dataset
+  fs.storage.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  fs.storage.parentDataset: tulip/test-guid
 
-  nfs.shareOptions: rw,no_subtree_check,no_root_squash
+  fs.share.type: zfs-sharenfs
+  fs.share.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  fs.share.shareOptions: rw,no_subtree_check,no_root_squash
 
-  fsType: nfs
+  fs.connector.id: nfs
+  fs.address: storage
 
 mountOptions:
 - vers=4.2

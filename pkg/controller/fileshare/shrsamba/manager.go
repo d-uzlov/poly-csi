@@ -34,7 +34,7 @@ func (m *manager) GetCapabilities() fileshare.Capabilities {
 }
 
 func (m *manager) CreateShare(req fileshare.CreateShareRequest) (fileshare.Share, error) {
-	_, err := parseParams(req.StaticParams, req.MutableParams)
+	_, err := parseParams(req.Parser)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}

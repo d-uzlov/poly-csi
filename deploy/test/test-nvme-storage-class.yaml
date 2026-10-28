@@ -10,40 +10,32 @@ volumeBindingMode: Immediate
 
 parameters:
   dispatch.mode: block-fs
-  dispatch.serverName: rose
-  dispatch.storageType: zfs-zvol
-  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.shareType: nvmet-keeper
-  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.connectorId: nvme
-  dispatch.blockPreset: basic
-  dispatch.cgroupPreset: ''
-  dispatch.addressNames: storage,k8s
-  dispatch.fsFormatSide: node
+  dispatch.server: rose
 
-  zfs.parentDataset: rose/test
-  zfs.reservedPercent: 0%
-  zfs.volblocksize: 32k
+  fs.type: ext4
+  fs.separateJournal: 'false'
+  fs.bytesPerInode: 64k
+  fs.journalSizeDenom: '70'
+  fs.reservedPercent: '1'
 
-  # journal.serverName: rose
-  # journal.storageType: zfs-zvol
-  # journal.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}-journal'
-  # journal.shareType: nvmet-keeper
-  # journal.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  # journal.connectorId: nvme
-  # journal.nodePreset: nvmeCon,nvmeIoq4
-  # journal.addressNames: storage,k8s
+  block.server: rose
+  block.storage.type: zfs-zvol
+  block.storage.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  block.storage.parentDataset: rose/test
+  block.storage.reservedPercent: 0%
+  block.storage.volblocksize: 32k
 
-  # journal.zfs.parentDataset: rose/test
-  # journal.zfs.reservedPercent: 105%
-  # journal.zfs.volblocksize: 4k
+  block.share.type: nvmet-keeper
+  block.share.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  block.share.nvmetPortName: '4420'
+  block.share.connectPort: '4420'
+  block.share.transportType: tcp
+  block.share.authType: chap-provision
 
-  nvmet.nvmetPortName: '4420'
-  nvmet.connectPort: '4420'
-  nvmet.transportType: tcp
-  nvmet.authType: chap-provision
-
-  fsType: ext4
+  block.connector.id: nvme
+  block.connector.preset: basic
+  block.cgroupPreset: ''
+  block.address: storage,k8s
 
 mountOptions:
 - noatime

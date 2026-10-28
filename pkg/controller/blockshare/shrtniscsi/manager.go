@@ -34,7 +34,7 @@ func (sh *manager) GetCapabilities() blockshare.Capabilities {
 }
 
 func (m *manager) CreateShare(req blockshare.CreateShareRequest) (blockshare.Share, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
+	p, err := parseParams(req.Parser)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}

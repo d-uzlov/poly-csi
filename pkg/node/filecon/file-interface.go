@@ -7,13 +7,14 @@ import (
 	"go.yaml.in/yaml/v3"
 	"meoe.io/poly-csi/pkg/api/fsspec"
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type InflateFunc = func(conf CommonConfig) (Manager, error)
 type MetadataInflateFunc = func() Metadata
 
 type Metadata interface {
-	Configure(requestedSize int64, params map[string]string) error
+	Configure(requestedSize int64, parser *serialmaps.Parser) error
 	RequestBlockDevices() map[string]BlockDeviceRequirement
 	SetVolumeProps(props map[string]StorageProperties) error
 	GetData() fsspec.Data

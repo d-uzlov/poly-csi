@@ -2,53 +2,23 @@ package strbtrfs
 
 import (
 	"fmt"
-	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type params struct {
-	parentPath    string
-	customOptions string
+	ParentPath    string `map:"parentPath"`
+	CustomOptions string `map:"customOptions"`
 }
 
-const paramsPrefix = "btrfs"
-
-const (
-	keyParentPath    = "btrfs.parentPath"
-	keyCustomOptions = "btrfs.customOptions"
-)
-
-func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
-	result := params{}
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyParentPath:
-			result.parentPath = v
-		case keyCustomOptions:
-			result.customOptions = v
-		default:
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyParentPath:
-			return nil, fmt.Errorf("key %s is not allowed in mutable params", k)
-		case keyCustomOptions:
-			return nil, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
+func parseParams(parser *serialmaps.Parser) (*params, error) {
+	var result params
+	err := parser.Parse(&result)
+	if err != nil {
+		return nil, fmt.Errorf("parse params: %w", err)
 	}
 
-	// no defaults needed
-
-	err := result.validate()
+	err = result.validate()
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +27,8 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 }
 
 func (p params) validate() error {
-	if p.parentPath == "" {
-		return fmt.Errorf("%s is empty", keyParentPath)
+	if p.ParentPath == "" {
+		return fmt.Errorf("parentPath is empty")
 	}
 	return nil
 }

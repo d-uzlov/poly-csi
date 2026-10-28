@@ -2,47 +2,21 @@ package strlvm
 
 import (
 	"fmt"
-	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type params struct {
-	vgName string
+	VgName string `map:"vgName"`
 }
 
-const paramsPrefix = "lvm"
-
-const (
-	keyVgName = "lvm.vgName"
-)
-
-func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
-	result := params{}
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyVgName:
-			result.vgName = v
-		default:
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyVgName:
-			return nil, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return nil, fmt.Errorf("unknown key '%s'", k)
-		}
-	}
+func parseParams(parser *serialmaps.Parser) (*params, error) {
+	var result params
+	err := parser.Parse(&result)
 
 	// no defaults needed
 
-	err := result.validate()
+	err = result.validate()
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +25,8 @@ func parseParams(static map[string]string, mutable map[string]string) (*params, 
 }
 
 func (p params) validate() error {
-	if p.vgName == "" {
-		return fmt.Errorf("%s is empty", keyVgName)
+	if p.VgName == "" {
+		return fmt.Errorf("vgName is empty")
 	}
 	return nil
 }

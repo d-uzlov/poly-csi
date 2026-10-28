@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"time"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type Manager interface {
 	GetCapabilities() Capabilities
-	GetAvailableCapacity(ctx context.Context, staticParams map[string]string) (int64, error)
+	GetAvailableCapacity(ctx context.Context, parser *serialmaps.Parser) (int64, error)
 	// CreateVolume creates a new volume handle.
 	// It does not check or change underlying storage.
 	CreateVolume(req CreateRequest) (Volume, error)
@@ -62,9 +64,8 @@ type Snapshot interface {
 }
 
 type CreateRequest struct {
-	Id            string
-	StaticParams  map[string]string
-	MutableParams map[string]string
+	Id     string
+	Parser *serialmaps.Parser
 }
 
 type Capabilities struct {

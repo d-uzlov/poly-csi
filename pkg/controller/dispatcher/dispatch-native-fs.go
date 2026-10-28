@@ -15,25 +15,26 @@ import (
 	"meoe.io/poly-csi/pkg/controller/filevol/filevolfactory"
 	"meoe.io/poly-csi/pkg/controller/voldb"
 	"meoe.io/poly-csi/pkg/controller/voldbwrapper"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 type DispatchNativeFs struct {
 	conf *DispatcherConf
 
-	srv *parsedServer
+	dbSrv *parsedServer
+	fsSrv *parsedServer
 
 	rawName string
 	uuid    string
 	size    int64
 
-	rawStaticParams  map[string]string
-	rawMutableParams map[string]string
+	idHelper IdHelper
+	parser   *serialmaps.Parser
 
 	dbEntry voldb.Entry
 
-	FsType string
-
-	p DispatchParams
+	serverName string
+	fsParams   DispatchFsParams
 
 	str filevol.Manager
 	vol filevol.Volume
@@ -43,6 +44,19 @@ type DispatchNativeFs struct {
 	addrOpt      []AddressOption
 
 	publishData map[string]json.RawMessage
+}
+
+type DispatchFsParams struct {
+	ServerName        string `map:"server" validate:"required" json:"serverName"`
+	ServerId          string `map:"-" json:"serverId"`
+	StorageIdTemplate string `map:"storage.id" json:"storageIdTemplate"`
+	StorageType       string `map:"storage.type" validate:"required" json:"storageType"`
+	ShareType         string `map:"share.type" json:"shareType"`
+	ShareIdTemplate   string `map:"share.id" json:"shareIdTemplate"`
+	AddressNames      string `map:"address" validate:"required" json:"addressNames"`
+	ConnectorId       string `map:"connector.id" validate:"required" json:"connectorId"`
+	BlockPreset       string `map:"connector.preset" json:"blockPreset"`
+	CgroupPreset      string `map:"cgroupPreset" json:"cgroupPreset"`
 }
 
 var _ VolumeDriver = &DispatchNativeFs{}
@@ -55,45 +69,46 @@ func NewDispatchNativeFs(conf *DispatcherConf, uuid string) VolumeDriver {
 }
 
 func (df *DispatchNativeFs) MakeVolumeId() string {
-	return createVolumeId(df.srv.Conf.StableId, df.rawName)
+	return createVolumeId(df.dbSrv.Conf.StableId, df.rawName)
 }
 
-func (df *DispatchNativeFs) ParseRequest(req *csi.CreateVolumeRequest) error {
+func (df *DispatchNativeFs) ParseRequest(req *csi.CreateVolumeRequest, parser *serialmaps.Parser) error {
 	df.rawName = req.Name
+	df.parser = parser
+	df.idHelper = NewIdHelper(req.Name, req.Parameters)
+	df.serverName = parser.WithPrefix(dispatchPrefix).Take("server")
 
-	fsCaps := req.VolumeCapabilities[0].GetMount()
-	if fsCaps.FsType == "" {
-		return fmt.Errorf("missing fs type")
-	}
-	df.FsType = fsCaps.FsType
 	df.size = req.CapacityRange.RequiredBytes
 
-	df.rawStaticParams = req.Parameters
-	df.rawMutableParams = req.MutableParameters
-
-	dispatchParams, err := parseDispatchParams(paramsPrefix, nil, req.Parameters, req.MutableParameters)
+	err := parser.WithPrefix("fs").Parse(&df.fsParams)
 	if err != nil {
-		return fmt.Errorf("parseDispatchParams: %w", err)
+		return fmt.Errorf("parse fs params: %w", err)
 	}
-	df.p = dispatchParams
+
+	if df.fsParams.ServerName == "" {
+		df.fsParams.ServerName = df.serverName
+	}
 
 	return nil
 }
 
 func (df *DispatchNativeFs) InitHandles() error {
-	df.srv = df.conf.FindServerByName(df.p.ServerName)
-	if df.srv == nil {
-		return fmt.Errorf("server not found: '%s'", df.p.ServerName)
+	df.dbSrv = df.conf.FindServerByName(df.serverName)
+	if df.dbSrv == nil {
+		return fmt.Errorf("server not found: '%s'", df.serverName)
+	}
+	df.fsSrv = df.conf.FindServerByName(df.fsParams.ServerName)
+	if df.fsSrv == nil {
+		return fmt.Errorf("server not found: '%s'", df.fsParams.ServerName)
 	}
 
-	srv := df.conf.FindServerByName(df.p.ServerName)
-	if srv == nil {
-		return fmt.Errorf("server is missing: '%s'", df.p.ServerName)
-	}
+	srv := df.fsSrv
 	tr := srv.trInstance
 
+	df.fsParams.ServerId = srv.Conf.StableId
+
 	df.addrOpt = nil
-	for name := range strings.SplitSeq(df.p.AddressNames, ",") {
+	for name := range strings.SplitSeq(df.fsParams.AddressNames, ",") {
 		found := false
 		for _, v := range srv.Conf.AddressList {
 			if v.Name == name {
@@ -107,13 +122,13 @@ func (df *DispatchNativeFs) InitHandles() error {
 		}
 	}
 
-	str, err := filevolfactory.StorageFromType(tr, df.p.StorageType, srv.Conf.GlobalParams)
+	str, err := filevolfactory.StorageFromType(tr, df.fsParams.StorageType, srv.Conf.GlobalParams)
 	if err != nil {
 		return fmt.Errorf("find storage: %w", err)
 	}
 	df.str = str
 
-	shr, err := filesharefactory.ShareFromType(tr, df.p.ShareType, srv.Conf.GlobalParams)
+	shr, err := filesharefactory.ShareFromType(tr, df.fsParams.ShareType, srv.Conf.GlobalParams)
 	if err != nil {
 		return fmt.Errorf("find share: %w", err)
 	}
@@ -123,21 +138,20 @@ func (df *DispatchNativeFs) InitHandles() error {
 	shrCaps := shr.GetCapabilities()
 
 	if shrCaps.OpaqueVolume != "" && shrCaps.OpaqueVolume != strCaps.OpaqueType {
-		return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", df.p.ShareType, shrCaps.OpaqueVolume, df.p.StorageType, strCaps.OpaqueType)
+		return fmt.Errorf("share %s accepts volumes %v but storage %s provides %s", df.fsParams.ShareType, shrCaps.OpaqueVolume, df.fsParams.StorageType, strCaps.OpaqueType)
 	}
 
 	storageId := df.rawName
-	if df.p.StorageIdTemplate != "" {
-		storageId, err = generateId("storageIdTemplate", df.p.StorageIdTemplate, df.rawName, df.rawStaticParams)
+	if df.fsParams.StorageIdTemplate != "" {
+		storageId, err = df.idHelper.Generate(df.fsParams.StorageIdTemplate)
 		if err != nil {
 			return fmt.Errorf("generate storage id: %w", err)
 		}
 	}
 
 	vol, err := str.CreateVolume(filevol.CreateRequest{
-		Id:            storageId,
-		StaticParams:  df.rawStaticParams,
-		MutableParams: df.rawMutableParams,
+		Id:     storageId,
+		Parser: df.parser.WithPrefix("fs.storage"),
 	})
 	if err != nil {
 		return fmt.Errorf("CreateVolume: %w", err)
@@ -146,8 +160,8 @@ func (df *DispatchNativeFs) InitHandles() error {
 	df.vol = vol
 
 	shareId := df.rawName
-	if df.p.ShareIdTemplate != "" {
-		id, err := generateId("shareIdTemplate", df.p.ShareIdTemplate, df.rawName, df.rawStaticParams)
+	if df.fsParams.ShareIdTemplate != "" {
+		id, err := df.idHelper.Generate(df.fsParams.ShareIdTemplate)
 		if err != nil {
 			return fmt.Errorf("generate share id: %w", err)
 		}
@@ -155,9 +169,8 @@ func (df *DispatchNativeFs) InitHandles() error {
 	}
 
 	shareHandle, err := shr.CreateShare(fileshare.CreateShareRequest{
-		ShareId:       shareId,
-		StaticParams:  df.rawStaticParams,
-		MutableParams: df.rawMutableParams,
+		ShareId: shareId,
+		Parser: df.parser.WithPrefix("fs.share"),
 	})
 	if err != nil {
 		return fmt.Errorf("CreateShare: %w", err)
@@ -168,7 +181,7 @@ func (df *DispatchNativeFs) InitHandles() error {
 }
 
 func (df *DispatchNativeFs) Create(ctx context.Context) error {
-	dbEntry, err := df.srv.dbInstance.CreateEntry(ctx, df.rawName, df.uuid)
+	dbEntry, err := df.dbSrv.dbInstance.CreateEntry(ctx, df.rawName, df.uuid)
 	if err != nil {
 		return fmt.Errorf("create db entry: %w", err)
 	}
@@ -214,10 +227,11 @@ func (df *DispatchNativeFs) Create(ctx context.Context) error {
 func (df *DispatchNativeFs) GetVolumeContext() volumecontext.VolumeContext {
 	return volumecontext.VolumeContext{
 		Uuid:        df.uuid,
-		ServerName:  df.p.ServerName,
-		StorageType: df.p.StorageType,
-		ShareType:   df.p.ShareType,
-		FsType:      df.FsType,
+		ServerName:  df.fsParams.ServerName,
+		StorageType: df.fsParams.StorageType,
+		ShareType:   df.fsParams.ShareType,
+		// TODO
+		FsType: "",
 		// TODO customize
 		FsRootDirMode: "2777",
 	}
@@ -327,10 +341,8 @@ type SerializedDispatchNativeFs struct {
 	Uuid    string `json:"uuid"`
 	Size    int64  `json:"size"`
 
-	RawStaticParams  map[string]string `json:"rawStaticParams"`
-	RawMutableParams map[string]string `json:"rawMutableParams"`
-
-	P DispatchParams `json:"p"`
+	ServerName string           `json:"serverName"`
+	FsParams   DispatchFsParams `json:"fsParams"`
 
 	StorageData json.RawMessage            `json:"storageData"`
 	ShareData   json.RawMessage            `json:"shareData"`
@@ -354,16 +366,15 @@ func (df *DispatchNativeFs) Save(ctx context.Context) error {
 	}
 
 	result := SerializedDispatchNativeFs{
-		RawName:          df.rawName,
-		Uuid:             df.uuid,
-		Size:             df.size,
-		RawStaticParams:  df.rawStaticParams,
-		RawMutableParams: df.rawMutableParams,
-		P:                df.p,
-		StorageData:      storageData,
-		ShareData:        shareData,
-		PublishData:      df.publishData,
-		AddrOpt:          addrOpt,
+		RawName:     df.rawName,
+		Uuid:        df.uuid,
+		Size:        df.size,
+		ServerName:  df.serverName,
+		FsParams:    df.fsParams,
+		StorageData: storageData,
+		ShareData:   shareData,
+		PublishData: df.publishData,
+		AddrOpt:     addrOpt,
 	}
 	_ = result
 
@@ -384,31 +395,32 @@ func (df *DispatchNativeFs) Save(ctx context.Context) error {
 	return nil
 }
 
-func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *DispatcherConf) (DispatchNativeFs, error) {
+func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *DispatcherConf, dbSrv *parsedServer) (DispatchNativeFs, error) {
 	result := DispatchNativeFs{
-		conf:             conf,
-		rawName:          ds.RawName,
-		uuid:             ds.Uuid,
-		size:             ds.Size,
-		rawStaticParams:  ds.RawStaticParams,
-		rawMutableParams: ds.RawMutableParams,
-		p:                ds.P,
+		conf:       conf,
+		dbSrv:      dbSrv,
+		rawName:    ds.RawName,
+		uuid:       ds.Uuid,
+		size:       ds.Size,
+		serverName: ds.ServerName,
+		fsParams:   ds.FsParams,
 	}
 
-	result.srv = conf.FindServerByName(ds.P.ServerName)
-	if result.srv == nil {
-		return result, fmt.Errorf("server not found: '%s'", ds.P.ServerName)
+	result.fsSrv = conf.FindServerById(ds.FsParams.ServerId)
+	if result.fsSrv == nil {
+		return result, fmt.Errorf("server not found: 'id=%s'", ds.FsParams.ServerId)
 	}
 
-	dbEntry, err := result.srv.dbInstance.CreateEntry(ctx, ds.RawName, ds.Uuid)
+	dbEntry, err := result.dbSrv.dbInstance.CreateEntry(ctx, ds.RawName, ds.Uuid)
 	if err != nil {
 		return result, fmt.Errorf("find db entry: %w", err)
 	}
 	result.dbEntry = dbEntry
 
-	tr := result.srv.trInstance
+	srv := result.fsSrv
+	tr := srv.trInstance
 
-	str, err := filevolfactory.StorageFromType(tr, ds.P.StorageType, result.srv.Conf.GlobalParams)
+	str, err := filevolfactory.StorageFromType(tr, ds.FsParams.StorageType, srv.Conf.GlobalParams)
 	if err != nil {
 		return result, fmt.Errorf("find storage: %w", err)
 	}
@@ -420,7 +432,7 @@ func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *Dispatche
 	}
 	result.vol = vol
 
-	shr, err := filesharefactory.ShareFromType(tr, ds.P.ShareType, result.srv.Conf.GlobalParams)
+	shr, err := filesharefactory.ShareFromType(tr, ds.FsParams.ShareType, srv.Conf.GlobalParams)
 	if err != nil {
 		return result, fmt.Errorf("find share: %w", err)
 	}
@@ -434,7 +446,7 @@ func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *Dispatche
 
 	for _, a := range ds.AddrOpt {
 		found := false
-		for _, v := range result.srv.Conf.AddressList {
+		for _, v := range srv.Conf.AddressList {
 			if v.StableId == a {
 				result.addrOpt = append(result.addrOpt, v)
 				found = true

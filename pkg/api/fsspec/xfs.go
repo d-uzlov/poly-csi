@@ -20,8 +20,8 @@ type XfsFormat struct {
 
 type XfsData struct {
 	// public
-	User   XfsUserParams `map:"user,omitempty" json:"userParams,omitempty"`
-	Format XfsFormat     `map:"fmt,omitempty" json:"format,omitempty"`
+	User   XfsUserParams `map:"user,omitempty" json:"userParams,omitzero"`
+	Format XfsFormat     `map:"fmt,omitempty" json:"format,omitzero"`
 
 	// secret
 }

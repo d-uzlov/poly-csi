@@ -2,7 +2,6 @@ package shrsamba
 
 import (
 	"fmt"
-	"strings"
 
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
@@ -24,8 +23,6 @@ type globalParams struct {
 type params struct {
 }
 
-const paramsPrefix = "samba"
-
 func parseGlobalParams(src map[string]string) (globalParams, error) {
 	result := globalParams{}
 
@@ -43,29 +40,11 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (*params, error) {
-	result := params{}
-	err := serialmaps.Parse(static, paramsPrefix, &result, serialmaps.WithRemove(true))
+func parseParams(parser *serialmaps.Parser) (*params, error) {
+	var result params
+	err := parser.Parse(&result)
 	if err != nil {
-		return nil, fmt.Errorf("static params: %w", err)
-	}
-
-	resMutable := params{}
-	err = serialmaps.Parse(mutable, paramsPrefix, &resMutable, serialmaps.WithRemove(true))
-	if err != nil {
-		return nil, fmt.Errorf("mutable params: %w", err)
-	}
-
-	for k := range static {
-		if strings.HasPrefix(k, paramsPrefix) {
-			return nil, fmt.Errorf("unknown key: %s", k)
-		}
-	}
-
-	for k := range static {
-		if strings.HasPrefix(k, paramsPrefix) {
-			return nil, fmt.Errorf("unknown mutable key: %s", k)
-		}
+		return nil, fmt.Errorf("parse params: %w", err)
 	}
 
 	return &result, nil

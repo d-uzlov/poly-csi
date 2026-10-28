@@ -46,7 +46,7 @@ func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId strin
 			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}
 
-		result, err := s.parse(ctx, conf)
+		result, err := s.parse(ctx, conf, srv)
 		if err != nil {
 			return nil, fmt.Errorf("parse SerializedDispatchBlockFs: %w", err)
 		}
@@ -59,7 +59,7 @@ func (d *Dispatcher) getExistingVolumeHandle(ctx context.Context, volumeId strin
 			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}
 
-		result, err := s.parse(ctx, conf)
+		result, err := s.parse(ctx, conf, srv)
 		if err != nil {
 			return nil, fmt.Errorf("parse SerializedDispatchNativeFs: %w", err)
 		}

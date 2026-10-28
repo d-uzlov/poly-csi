@@ -3,6 +3,8 @@ package shrnfs
 import (
 	"fmt"
 	"strings"
+
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
 
 var nfsReloadCmd = []string{"nfs_reload"}
@@ -11,14 +13,10 @@ type globalParams struct {
 }
 
 type Params struct {
-	shareOptions string
+	ShareOptions string `map:"shareOptions"`
 }
 
 const paramsPrefix = "nfs"
-
-const (
-	keyShareOptions = "nfs.shareOptions"
-)
 
 func parseGlobalParams(src map[string]string) (globalParams, error) {
 	result := globalParams{}
@@ -36,39 +34,16 @@ func parseGlobalParams(src map[string]string) (globalParams, error) {
 	return result, nil
 }
 
-func parseParams(static map[string]string, mutable map[string]string) (Params, error) {
-	result := Params{}
-
-	for k, v := range static {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyShareOptions:
-			result.shareOptions = v
-		default:
-			return Params{}, fmt.Errorf("unknown key '%s'", k)
-		}
+func parseParams(parser *serialmaps.Parser) (Params, error) {
+	var result Params
+	err := parser.Parse(&result)
+	if err != nil {
+		return Params{}, fmt.Errorf("parse params: %w", err)
 	}
 
-	for k := range mutable {
-		if !strings.HasPrefix(k, paramsPrefix) {
-			continue
-		}
-		switch k {
-		case keyShareOptions:
-			return Params{}, fmt.Errorf("key %s is not allowed in mutable params", k)
-		default:
-			return Params{}, fmt.Errorf("unknown key '%s'", k)
-		}
+	if result.ShareOptions == "" {
+		result.ShareOptions = "rw,no_subtree_check,no_root_squash"
 	}
-
-	// fill defaults
-	if result.shareOptions == "" {
-		result.shareOptions = "rw,no_subtree_check,no_root_squash"
-	}
-
-	// no need to validate anything
 
 	return result, nil
 }

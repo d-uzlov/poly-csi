@@ -7,6 +7,7 @@ import (
 
 	"meoe.io/poly-csi/pkg/controller/filevol"
 	"meoe.io/poly-csi/pkg/transport"
+	"meoe.io/poly-csi/pkg/utils/serialmaps"
 	"meoe.io/poly-csi/pkg/utils/zfs"
 )
 
@@ -31,13 +32,13 @@ func (m *manager) GetCapabilities() filevol.Capabilities {
 	}
 }
 
-func (m *manager) GetAvailableCapacity(ctx context.Context, staticParams map[string]string) (int64, error) {
-	p, err := parseParams(staticParams, nil)
+func (m *manager) GetAvailableCapacity(ctx context.Context, parser *serialmaps.Parser) (int64, error) {
+	p, err := parseParams(parser)
 	if err != nil {
 		return 0, fmt.Errorf("parse params: %w", err)
 	}
 
-	info, err := m.snip.GetProperties(ctx, p.parentDataset)
+	info, err := m.snip.GetProperties(ctx, p.ParentDataset)
 	if err != nil {
 		return 0, err
 	}
@@ -67,12 +68,12 @@ func (m *manager) ParseSnapshot(serialized json.RawMessage) (filevol.Snapshot, e
 }
 
 func (m *manager) CreateVolume(req filevol.CreateRequest) (filevol.Volume, error) {
-	p, err := parseParams(req.StaticParams, req.MutableParams)
+	p, err := parseParams(req.Parser)
 	if err != nil {
 		return nil, fmt.Errorf("parse params: %w", err)
 	}
 
-	datasetPath := fmt.Sprintf("%s/%s", p.parentDataset, req.Id)
+	datasetPath := fmt.Sprintf("%s/%s", p.ParentDataset, req.Id)
 
 	return newVolume(datasetPath, m.snip), nil
 }

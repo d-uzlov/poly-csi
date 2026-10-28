@@ -57,7 +57,7 @@ func (sh *share) AttachPath(ctx context.Context, fsPath string) error {
 
 	return snip.configureNfsShare(ctx, sh.Name, nfsShareConfig{
 		path:        fsPath,
-		globalFlags: sh.Params.shareOptions,
+		globalFlags: sh.Params.ShareOptions,
 		clients: []nfsClientOptions{
 			{id: "*"},
 		},

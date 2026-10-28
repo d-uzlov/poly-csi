@@ -1,10 +1,8 @@
 package dispatcher
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"text/template"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 
@@ -12,30 +10,6 @@ import (
 	"meoe.io/poly-csi/pkg/controller/uuidctx"
 	"meoe.io/poly-csi/pkg/utils/serialmaps"
 )
-
-type IdFields struct {
-	RequestName string
-	K8sNs       string
-	K8sPvc      string
-}
-
-func generateId(tmplName string, tmpl string, requestName string, staticParams map[string]string) (string, error) {
-	t, err := template.New(tmplName).Parse(tmpl)
-	if err != nil {
-		return "", err
-	}
-
-	buf := bytes.Buffer{}
-	err = t.Execute(&buf, IdFields{
-		RequestName: requestName,
-		K8sNs:       staticParams["csi.storage.k8s.io/pvc/namespace"],
-		K8sPvc:      staticParams["csi.storage.k8s.io/pvc/name"],
-	})
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
 
 // type cloneSource struct {
 // 	srv *parsedServer
@@ -106,8 +80,9 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("fs access mode is not specified")
 	}
 
-	dispatchMode := req.Parameters["dispatch.mode"]
-	delete(req.Parameters, "dispatch.mode")
+	parser := serialmaps.NewParser(req.Parameters, serialmaps.WithRemove(true))
+
+	dispatchMode := parser.Take("dispatch.mode")
 	var helper VolumeDriver
 	switch dispatchMode {
 	case "block-fs":
@@ -118,7 +93,7 @@ func (d *Dispatcher) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		return nil, fmt.Errorf("dispatch.mode: '%s'", dispatchMode)
 	}
 
-	err := helper.ParseRequest(req)
+	err := helper.ParseRequest(req, parser)
 	if err != nil {
 		return nil, fmt.Errorf("helper.parseRequest: %w", err)
 	}

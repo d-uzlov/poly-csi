@@ -16,8 +16,8 @@ type Ext4Format struct {
 
 type Ext4Data struct {
 	// public
-	User   Ext4UserParams `map:"user,omitempty" json:"user,omitempty"`
-	Format Ext4Format     `map:"fmt,omitempty" json:"format,omitempty"`
+	User   Ext4UserParams `map:"user,omitempty" json:"user,omitzero"`
+	Format Ext4Format     `map:"fmt,omitempty" json:"format,omitzero"`
 
 	// secret
 }
