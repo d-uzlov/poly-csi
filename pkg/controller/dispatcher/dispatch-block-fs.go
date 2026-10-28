@@ -489,6 +489,9 @@ func (df *DispatchBlockFs) Save(ctx context.Context) error {
 		for _, a := range v.addrOpt {
 			addrOpt = append(addrOpt, a.StableId)
 		}
+		if v.srv == nil {
+			return fmt.Errorf("block '%s': server is not initialized", k)
+		}
 		result.Block[k] = SerializedBlockInfo{
 			ServerId:    v.srv.Conf.StableId,
 			Req:         v.Req,
@@ -599,6 +602,7 @@ func (ds *SerializedDispatchBlockFs) parse(ctx context.Context, conf *Dispatcher
 		}
 
 		result.Block[k] = BlockInfo{
+			srv:            srv,
 			storageManager: str,
 			storageHandle:  vol,
 			shareManager:   shr,
