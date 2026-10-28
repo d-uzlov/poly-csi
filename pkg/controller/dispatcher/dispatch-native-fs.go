@@ -170,7 +170,7 @@ func (df *DispatchNativeFs) InitHandles() error {
 
 	shareHandle, err := shr.CreateShare(fileshare.CreateShareRequest{
 		ShareId: shareId,
-		Parser: df.parser.WithPrefix("fs.share"),
+		Parser:  df.parser.WithPrefix("fs.share"),
 	})
 	if err != nil {
 		return fmt.Errorf("CreateShare: %w", err)
@@ -230,8 +230,7 @@ func (df *DispatchNativeFs) GetVolumeContext() volumecontext.VolumeContext {
 		ServerName:  df.fsParams.ServerName,
 		StorageType: df.fsParams.StorageType,
 		ShareType:   df.fsParams.ShareType,
-		// TODO
-		FsType: "",
+		FsType:      df.fsParams.ConnectorId,
 		// TODO customize
 		FsRootDirMode: "2777",
 	}
