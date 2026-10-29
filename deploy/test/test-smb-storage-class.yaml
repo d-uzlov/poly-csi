@@ -10,17 +10,17 @@ volumeBindingMode: Immediate
 
 parameters:
   dispatch.mode: native-fs
-  dispatch.serverName: rose
-  dispatch.storageType: zfs-dataset
-  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.shareType: samba
-  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.connectorId: smb
-  dispatch.addressNames: storage
+  dispatch.server: rose
 
-  zfs.parentDataset: rose/test
+  fs.storage.type: zfs-dataset
+  fs.storage.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  fs.storage.parentDataset: rose/test
 
-  fsType: cifs
+  fs.share.type: samba
+  fs.share.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+
+  fs.connector.id: smb
+  fs.address: storage
 
 mountOptions:
 - noatime

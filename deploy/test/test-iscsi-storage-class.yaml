@@ -10,23 +10,31 @@ volumeBindingMode: Immediate
 
 parameters:
   dispatch.mode: block-fs
-  dispatch.serverName: tulip
-  dispatch.storageType: zfs-zvol
-  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.shareType: targetcli
-  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.connectorId: ublk_iscsi
-  # dispatch.addressNames: storage,k8s
-  dispatch.addressNames: storage
-  dispatch.fsFormatSide: controller
+  dispatch.server: tulip
 
-  zfs.parentDataset: tulip/test-guid
+  fs.type: ext4
+  fs.separateJournal: 'false'
+  fs.bytesPerInode: 64k
+  fs.journalSizeDenom: '70'
+  fs.reservedPercent: '1'
 
-  lio.transport: tcp
-  lio.listenPort: '3260'
-  lio.authType: chap-provision
+  block.server: tulip
+  block.storage.type: zfs-zvol
+  block.storage.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  block.storage.parentDataset: tulip/test-guid
+  block.storage.reservedPercent: 0%
+  block.storage.volblocksize: 32k
 
-  fsType: ext4
+  block.share.type: targetcli
+  block.share.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  block.share.transport: tcp
+  block.share.listenPort: '3260'
+  block.share.authType: chap-provision
+
+  block.connector.id: ublk_iscsi
+  block.connector.preset: ''
+  block.cgroupPreset: ''
+  block.address: storage
 
 mountOptions:
 - noatime

@@ -10,22 +10,29 @@ volumeBindingMode: Immediate
 
 parameters:
   dispatch.mode: block-fs
-  dispatch.serverName: rose
-  dispatch.storageType: zfs-zvol
-  dispatch.storageIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.shareType: nbd
-  dispatch.shareIdTemplate: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
-  dispatch.connectorId: nbd
-  dispatch.addressNames: storage
-  dispatch.fsFormatSide: node
+  dispatch.server: rose
 
-  zfs.parentDataset: rose/test
-  zfs.reservedPercent: 0%
-  zfs.volblocksize: 16k
+  fs.type: ext4
+  fs.separateJournal: 'false'
+  fs.bytesPerInode: 64k
+  fs.journalSizeDenom: '70'
+  fs.reservedPercent: '1'
 
-  nbd.connectPort: '10809'
+  block.server: rose
+  block.storage.type: zfs-zvol
+  block.storage.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  block.storage.parentDataset: rose/test
+  block.storage.reservedPercent: 0%
+  block.storage.volblocksize: 32k
 
-  fsType: ext4
+  block.share.type: nbd
+  block.share.id: '{{.K8sNs}}.{{.K8sPvc}}.{{.RequestName}}'
+  block.share.connectPort: '10809'
+
+  block.connector.id: nbd
+  block.connector.preset: ''
+  block.cgroupPreset: ''
+  block.address: storage
 
 mountOptions:
 - noatime
