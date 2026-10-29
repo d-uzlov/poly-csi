@@ -148,7 +148,7 @@ spec:
           subPath: iscsi-container
 
       - name: ublk
-        image: harbor.k8s.lan/local-test/poly-csi-ublk:v0.5.65
+        image: harbor.k8s.lan/local-test/poly-csi-ublk:v0.5.74
         args:
         - --plugin-type=ublk
         - --node-config=/poly-csi/ublk-config/config.yaml

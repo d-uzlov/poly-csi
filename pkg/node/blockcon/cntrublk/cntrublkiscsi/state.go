@@ -20,6 +20,7 @@ type state struct {
 	Uuid    string               `json:"uuid"`
 	Address string               `json:"address"`
 	Pc      blockspec.IscsiShare `json:"iscsi"`
+	Preset  ublk.Preset          `json:"preset"`
 
 	IscsiUrl string `json:"IscsiUrl"`
 	DevId    string `json:"devId"`
@@ -37,13 +38,6 @@ func parseState(serialized json.RawMessage) (*state, error) {
 }
 
 func (s *state) Connect(ctx context.Context) (err error) {
-	defer func() {
-		if err != nil {
-			s.sv.Remove(s.Uuid)
-			s.DevId = ""
-		}
-	}()
-
 	url := ublk.IscsiUrlParams{
 		TargetIqn: s.Pc.Iqn,
 		Host:      s.Address,
@@ -68,6 +62,7 @@ func (s *state) Connect(ctx context.Context) (err error) {
 	info, err := s.sv.Launch(ctx, s.Uuid, ublk.CreateParams{
 		Type:     "iscsi",
 		Zerocopy: false,
+		Preset:   s.Preset,
 	}, &ublk.CreateIscsi{
 		InitiatorName: s.Pc.Initiator,
 		Url:           s.IscsiUrl,

@@ -13,4 +13,4 @@ type Supervisor interface {
 	Remove(uuid string) error
 }
 
-type InflateFunc func(sv Supervisor, conf blockapi.CommonConfig) blockapi.Manager
+type InflateFunc func(sv Supervisor, conf blockapi.CommonConfig) (blockapi.Manager, error)

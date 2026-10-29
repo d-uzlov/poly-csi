@@ -11,10 +11,16 @@ import (
 )
 
 type CreateParams struct {
-	DevNum string
-	Type   string
-	// enable zero-copy in io_uring
+	DevNum   string
+	Type     string
 	Zerocopy bool
+	Preset   Preset
+}
+
+type Preset struct {
+	Queues     int `json:"queues"`
+	QueueDepth int `json:"queueDepth"`
+	BufSize    int `json:"bufSize"`
 }
 
 func (p CreateParams) GetForegroundBinary() string {
@@ -24,6 +30,9 @@ func (p CreateParams) GetForegroundBinary() string {
 func (c CreateParams) MakeParams() []string {
 	result := []string{
 		"--user_recovery", "1",
+		"--queues", strconv.Itoa(c.Preset.Queues),
+		"--depth", strconv.Itoa(c.Preset.QueueDepth),
+		"--max_io_buf_bytes", strconv.Itoa(c.Preset.BufSize),
 	}
 	if c.Zerocopy {
 		result = append(result, "--zerocopy")

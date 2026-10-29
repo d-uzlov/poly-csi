@@ -32,7 +32,7 @@ parameters:
   block.share.authType: chap-provision
 
   block.connector.id: ublk_iscsi
-  block.connector.preset: ''
+  block.connector.preset: basic
   block.cgroupPreset: ''
   block.address: storage
 

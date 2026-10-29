@@ -20,6 +20,7 @@ type state struct {
 	Uuid    string             `json:"uuid"`
 	Address string             `json:"address"`
 	Pc      blockspec.NbdShare `json:"nbd"`
+	Preset  ublk.Preset        `json:"preset"`
 
 	DevId string `json:"devId"`
 }
@@ -36,15 +37,10 @@ func parseState(serialized json.RawMessage) (*state, error) {
 }
 
 func (s *state) Connect(ctx context.Context) (err error) {
-	defer func() {
-		if err != nil {
-			s.sv.Remove(s.Uuid)
-			s.DevId = ""
-		}
-	}()
 	info, err := s.sv.Launch(ctx, s.Uuid, ublk.CreateParams{
 		Type:     "nbd",
 		Zerocopy: true,
+		Preset:   s.Preset,
 	}, ublk.CreateNbd{
 		Host:         s.Address,
 		Port:         s.Pc.Port,

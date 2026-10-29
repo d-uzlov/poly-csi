@@ -1,6 +1,5 @@
 
 socket: /run/io.meoe.poly-csi/plugins/ublk-container/ublk.sock
-# socket: ./iscsi.sock
 
 devFolder: /dev
 
@@ -8,9 +7,23 @@ connector:
 - id: ublk_nbd
   type: ublk_nbd
   config: {}
+  presets:
+    basic:
+      # 4 x (31 + 1) x 131KiB -> 16MiB of buffers
+      # +1 to queue depth because of nbd target implementation:
+      #     https://github.com/ublk-org/ublksrv/blob/6d0d922614ec18e6f2b5d476af8d540a1d9c1de8/targets/nbd/ublk.nbd.cpp#L1039
+      queues: 4
+      queueDepth: 31
+      bufSize: 128Ki
 - id: ublk_iscsi
   type: ublk_iscsi
   config: {}
+  presets:
+    basic:
+      # 4 x 32 x 131KiB -> 16MiB of buffers
+      queues: 4
+      queueDepth: 32
+      bufSize: 128Ki
 
 logs:
   logLevel: debug

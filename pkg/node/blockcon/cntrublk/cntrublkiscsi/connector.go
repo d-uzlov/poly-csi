@@ -4,24 +4,36 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"meoe.io/poly-csi/pkg/api/blockapi"
 	"meoe.io/poly-csi/pkg/api/blockspec"
 	"meoe.io/poly-csi/pkg/node/blockcon/cntrublk"
+	"meoe.io/poly-csi/pkg/utils/ublk"
 )
 
 type connector struct {
 	blockapi.NoInfo
 
-	conf blockapi.CommonConfig
-	sv   cntrublk.Supervisor
+	conf    blockapi.CommonConfig
+	sv      cntrublk.Supervisor
+	presets map[string]ublk.Preset
 }
 
-func New(sv cntrublk.Supervisor, conf blockapi.CommonConfig) blockapi.Manager {
-	return &connector{
-		sv:   sv,
-		conf: conf,
+func New(sv cntrublk.Supervisor, conf blockapi.CommonConfig) (blockapi.Manager, error) {
+	presets := map[string]ublk.Preset{}
+	for k, v := range conf.Presets {
+		p, err := cntrublk.ParsePreset(v)
+		if err != nil {
+			return nil, fmt.Errorf("preset '%s': %w", k, err)
+		}
+		presets[k] = p
 	}
+	return &connector{
+		sv:      sv,
+		conf:    conf,
+		presets: presets,
+	}, nil
 }
 
 func (c *connector) Capabilities(ctx context.Context) (blockapi.Capabilities, error) {
@@ -41,6 +53,20 @@ func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) 
 		return nil, fmt.Errorf("ublk iscsi connector does not support more than one address")
 	}
 
+	var preset ublk.Preset
+	if req.PresetName == "" {
+		preset = ublk.Preset{
+			Queues:     1,
+			QueueDepth: 128,
+			BufSize:    512 * 1024,
+		}
+	} else {
+		preset, ok = c.presets[req.PresetName]
+		if !ok {
+			return nil, fmt.Errorf("preset '%s': not found (config has %v)", req.PresetName, maps.Keys(c.presets))
+		}
+	}
+
 	return &state{
 		tr:        c.conf.Tr,
 		sv:        c.sv,
@@ -48,6 +74,7 @@ func (c *connector) GetHandle(ctx context.Context, req blockapi.ConnectRequest) 
 		Uuid:      req.Uuid,
 		Address:   proto.ServerAddress[0],
 		Pc:        proto,
+		Preset:    preset,
 	}, nil
 }
 

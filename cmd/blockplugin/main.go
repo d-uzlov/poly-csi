@@ -96,7 +96,7 @@ func main() {
 				return nil, err
 			}
 			return func(conf blockapi.CommonConfig) (blockapi.Manager, error) {
-				return inflate(supervisor, conf), nil
+				return inflate(supervisor, conf)
 			}, nil
 		})
 
