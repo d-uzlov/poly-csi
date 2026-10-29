@@ -101,12 +101,15 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM debian:forky-20260918-slim AS runtime
 
+# libgnutls30 and libxml2-16 are for nbd tools
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
 	apt-get update \
 	&& apt-get install -y --no-install-recommends --no-install-suggests \
   liburing2 \
   libstdc++6 \
+  libgnutls30 \
+  libxml2-16 \
   tini \
   rsyslog
 
