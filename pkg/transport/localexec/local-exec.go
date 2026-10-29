@@ -172,10 +172,18 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 	// give the program some time to terminate
 	select {
 	case <-commandDoneCh:
-		// using double timeout: after ExitTimeout exec.Cmd will send sigkill,
+		// after ExitTimeout exec.Cmd will send sigkill,
 		// and then we want to wait a bit to get command result
-	case <-time.Tick(2 * options.ExitTimeout):
+	case <-time.Tick(options.ExitTimeout + time.Second):
 		return transport.RunResult{}, fmt.Errorf("timed out waiting for command to finish")
+	}
+
+	var exitErr *exec.ExitError
+
+	if waitErr != nil {
+		if ok := errors.As(waitErr, &exitErr); !ok {
+			return transport.RunResult{}, err
+		}
 	}
 
 	result := transport.RunResult{
@@ -187,13 +195,7 @@ func (s *localExecWrapper) RunCommand(ctx context.Context, cmd []string, opts ..
 	if options.Timeout != nil {
 		result.Timeout = time.Since(start) > *options.Timeout
 	}
-
-	if waitErr != nil {
-		var exitErr *exec.ExitError
-		if ok := errors.As(waitErr, &exitErr); !ok {
-			return transport.RunResult{}, err
-		}
-
+	if exitErr != nil {
 		result.ExitCode = exitErr.ExitCode()
 	}
 

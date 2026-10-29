@@ -142,6 +142,18 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 		return transport.RunResult{}, fmt.Errorf("timed out waiting for command to finish")
 	}
 
+	var exitErr *ssh.ExitError
+
+	if waitErr != nil {
+		if ok := errors.As(waitErr, &exitErr); !ok {
+			if checkIoError(err) {
+				go client.Close()
+			}
+
+			return transport.RunResult{}, err
+		}
+	}
+
 	result := transport.RunResult{
 		Stdout:    stdoutBuf.Bytes(),
 		Stderr:    stderrBuf.Bytes(),
@@ -151,17 +163,7 @@ func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...trans
 	if options.Timeout != nil {
 		result.Timeout = time.Since(start) > *options.Timeout
 	}
-
-	if waitErr != nil {
-		var exitErr *ssh.ExitError
-		if ok := errors.As(waitErr, &exitErr); !ok {
-			if checkIoError(err) {
-				go client.Close()
-			}
-
-			return transport.RunResult{}, err
-		}
-
+	if exitErr != nil {
 		result.ExitCode = exitErr.ExitStatus()
 	}
 

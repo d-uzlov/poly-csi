@@ -29,6 +29,23 @@ func newNativeCommands(tr transport.Transport) *nativeCommands {
 }
 
 func (s *nativeCommands) Read(ctx context.Context, path string, trim bool) ([]byte, error) {
+	finishCh := make(chan struct{})
+	var result []byte
+	var err error
+	go func() {
+		defer close(finishCh)
+		result, err = s.readSync(ctx, path, trim)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-finishCh:
+		return result, err
+	}
+}
+
+func (s *nativeCommands) readSync(ctx context.Context, path string, trim bool) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -49,6 +66,22 @@ func (s *nativeCommands) Read(ctx context.Context, path string, trim bool) ([]by
 }
 
 func (s *nativeCommands) Write(ctx context.Context, path string, data []byte) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.writeSync(ctx, path, data)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) writeSync(ctx context.Context, path string, data []byte) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -59,6 +92,22 @@ func (s *nativeCommands) Write(ctx context.Context, path string, data []byte) er
 }
 
 func (s *nativeCommands) WriteMove(ctx context.Context, path string, data []byte) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.writeMoveSync(ctx, path, data)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) writeMoveSync(ctx context.Context, path string, data []byte) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -79,6 +128,23 @@ func (s *nativeCommands) WriteMove(ctx context.Context, path string, data []byte
 }
 
 func (s *nativeCommands) Ls(ctx context.Context, path string) ([]string, error) {
+	finishCh := make(chan struct{})
+	var result []string
+	var err error
+	go func() {
+		defer close(finishCh)
+		result, err = s.lsSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-finishCh:
+		return result, err
+	}
+}
+
+func (s *nativeCommands) lsSync(ctx context.Context, path string) ([]string, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -100,6 +166,22 @@ func (s *nativeCommands) Ls(ctx context.Context, path string) ([]string, error) 
 }
 
 func (s *nativeCommands) Move(ctx context.Context, source string, dest string) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.moveSync(ctx, source, dest)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) moveSync(ctx context.Context, source string, dest string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -116,6 +198,22 @@ func (s *nativeCommands) Move(ctx context.Context, source string, dest string) e
 }
 
 func (s *nativeCommands) Mkdir(ctx context.Context, path string, parents bool) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.mkdirSync(ctx, path, parents)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) mkdirSync(ctx context.Context, path string, parents bool) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -134,6 +232,22 @@ func (s *nativeCommands) Mkdir(ctx context.Context, path string, parents bool) e
 }
 
 func (s *nativeCommands) RmDirRecursive(ctx context.Context, path string) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.rmDirRecursiveSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) rmDirRecursiveSync(ctx context.Context, path string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -144,6 +258,22 @@ func (s *nativeCommands) RmDirRecursive(ctx context.Context, path string) error 
 }
 
 func (s *nativeCommands) RmDir(ctx context.Context, path string) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.rmDirSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) rmDirSync(ctx context.Context, path string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -161,6 +291,22 @@ func (s *nativeCommands) RmDir(ctx context.Context, path string) error {
 }
 
 func (s *nativeCommands) RmFile(ctx context.Context, path string) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.rmFileSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) rmFileSync(ctx context.Context, path string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -178,6 +324,21 @@ func (s *nativeCommands) RmFile(ctx context.Context, path string) error {
 }
 
 func (s *nativeCommands) ReadLink(ctx context.Context, path string) (result string, err error) {
+	finishCh := make(chan struct{})
+	go func() {
+		defer close(finishCh)
+		result, err = s.readLinkSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case <-finishCh:
+		return result, err
+	}
+}
+
+func (s *nativeCommands) readLinkSync(ctx context.Context, path string) (result string, err error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -200,6 +361,10 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (result stri
 		return "", fmt.Errorf("filepath.EvalSymlinks: %w", err)
 	}
 
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+
 	info, err := os.Stat(resolvedDir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -209,6 +374,10 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (result stri
 	}
 	if !info.IsDir() {
 		return "", fmt.Errorf("parent is not a directory: %s", resolvedDir)
+	}
+
+	if ctx.Err() != nil {
+		return "", ctx.Err()
 	}
 
 	// os.Readlink does not like it when file is not a symlink, need to check it first
@@ -222,6 +391,10 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (result stri
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
 		return file, nil
+	}
+
+	if ctx.Err() != nil {
+		return "", ctx.Err()
 	}
 
 	resolvedLink, err := os.Readlink(file)
@@ -243,6 +416,21 @@ func (s *nativeCommands) ReadLink(ctx context.Context, path string) (result stri
 }
 
 func (s *nativeCommands) Stat(ctx context.Context, path string) (result transport.StatResult, err error) {
+	finishCh := make(chan struct{})
+	go func() {
+		defer close(finishCh)
+		result, err = s.statSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return transport.StatResult{}, ctx.Err()
+	case <-finishCh:
+		return result, err
+	}
+}
+
+func (s *nativeCommands) statSync(ctx context.Context, path string) (result transport.StatResult, err error) {
 	if ctx.Err() != nil {
 		return transport.StatResult{}, ctx.Err()
 	}
@@ -263,6 +451,10 @@ func (s *nativeCommands) Stat(ctx context.Context, path string) (result transpor
 			FileExists:   false,
 			ParentExists: false,
 		}, nil
+	}
+
+	if ctx.Err() != nil {
+		return transport.StatResult{}, ctx.Err()
 	}
 
 	stat, err := os.Stat(realPath)
@@ -314,6 +506,22 @@ func (s *nativeCommands) Df(ctx context.Context, path string) (*transport.FsSize
 }
 
 func (s *nativeCommands) EnsureSymlink(ctx context.Context, link string, target string) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.ensureSymlinkSync(ctx, link, target)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) ensureSymlinkSync(ctx context.Context, link string, target string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -347,6 +555,21 @@ func (s *nativeCommands) EnsureSymlink(ctx context.Context, link string, target 
 }
 
 func (s *nativeCommands) MkFifo(ctx context.Context, path string) (alreadyExists bool, err error) {
+	finishCh := make(chan struct{})
+	go func() {
+		defer close(finishCh)
+		alreadyExists, err = s.mkFifoSync(ctx, path)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	case <-finishCh:
+		return alreadyExists, err
+	}
+}
+
+func (s *nativeCommands) mkFifoSync(ctx context.Context, path string) (alreadyExists bool, err error) {
 	if ctx.Err() != nil {
 		return false, ctx.Err()
 	}
@@ -372,6 +595,22 @@ func (s *nativeCommands) CreateLock(ctx context.Context, lockFile string, maxDur
 }
 
 func (s *nativeCommands) Chown(ctx context.Context, path string, user_ string, group string, recursive bool) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.chownSync(ctx, path, user_, group, recursive)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) chownSync(ctx context.Context, path string, user_ string, group string, recursive bool) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -386,11 +625,19 @@ func (s *nativeCommands) Chown(ctx context.Context, path string, user_ string, g
 		}
 	}
 
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	if group != "" {
 		gid, err = lookupGid(group)
 		if err != nil {
 			return fmt.Errorf("resolve group '%s': %w", group, err)
 		}
+	}
+
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 
 	logs.FromCtx(ctx).Command("local exec: os.Chown", "path", path, "uid", uid, "gid", gid, "recursive", recursive)
@@ -403,12 +650,16 @@ func (s *nativeCommands) Chown(ctx context.Context, path string, user_ string, g
 		if err != nil {
 			return err
 		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return os.Chown(curPath, uid, gid)
 	})
 }
 
 func lookupUid(str string) (int, error) {
-	if val, err := strconv.Atoi(str); err == nil {
+	val, err := strconv.Atoi(str)
+	if err == nil {
 		return val, nil
 	}
 	u, err := user.Lookup(str)
@@ -417,8 +668,10 @@ func lookupUid(str string) (int, error) {
 	}
 	return strconv.Atoi(u.Uid)
 }
+
 func lookupGid(str string) (int, error) {
-	if val, err := strconv.Atoi(str); err == nil {
+	val, err := strconv.Atoi(str)
+	if err == nil {
 		return val, nil
 	}
 	g, err := user.LookupGroup(str)
@@ -429,6 +682,22 @@ func lookupGid(str string) (int, error) {
 }
 
 func (s *nativeCommands) Chmod(ctx context.Context, path string, mode string, recursive bool) error {
+	finishCh := make(chan struct{})
+	var err error
+	go func() {
+		defer close(finishCh)
+		err = s.chmodSync(ctx, path, mode, recursive)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-finishCh:
+		return err
+	}
+}
+
+func (s *nativeCommands) chmodSync(ctx context.Context, path string, mode string, recursive bool) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
