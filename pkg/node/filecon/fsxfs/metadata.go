@@ -76,7 +76,7 @@ func (s *metadata) SetVolumeProps(props map[string]filecon.StorageProperties) er
 
 	s.Format.StripeUnitBytes = s.Format.BlockSize
 	s.Format.StripeWidth = 1
-	if main.RMWSize != 0 {
+	if main.RMWSize > s.Format.BlockSize {
 		s.Format.StripeUnitBytes = main.RMWSize
 		if main.OptimalWriteSize >= main.RMWSize {
 			s.Format.StripeWidth = main.OptimalWriteSize / main.RMWSize

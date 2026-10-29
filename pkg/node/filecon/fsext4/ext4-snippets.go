@@ -51,6 +51,12 @@ func (s *snippets) Format(ctx context.Context) error {
 	if s.Data.Format.SkipDiscard {
 		extended = append(extended, "assume_storage_prezeroed=1", "nodiscard")
 	}
+	if s.Data.Format.Stride > 0 {
+		extended = append(extended, fmt.Sprintf("stride=%d", s.Data.Format.Stride))
+	}
+	if s.Data.Format.Stripe > 0 {
+		extended = append(extended, fmt.Sprintf("stripe_width=%d", s.Data.Format.Stripe))
+	}
 	if len(extended) != 0 {
 		cmd = append(cmd, "-E", strings.Join(extended, ","))
 	}
@@ -82,6 +88,9 @@ func (s *snippets) Mount(ctx context.Context, targetPath string, opts []string) 
 	}
 	if s.journalDevice != "" {
 		opts = append(opts, fmt.Sprintf("journal_path=%s", s.journalDevice))
+	}
+	if s.Data.Format.Stripe != 0 {
+		opts = append(opts, fmt.Sprintf("stripe=%d", s.Data.Format.Stripe))
 	}
 
 	_, err := u.EnsureMounted(ctx, s.mainDevice, targetPath, "ext4", opts)

@@ -72,6 +72,15 @@ func (s *metadata) SetVolumeProps(props map[string]filecon.StorageProperties) er
 
 	main := props[mainVolumeKey]
 	s.Format.SkipDiscard = main.InitialEmpty
+	s.Format.Stride = 1
+	s.Format.Stripe = 1
+	if main.RMWSize > s.Format.BlockSize {
+		s.Format.Stride = main.RMWSize / s.Format.BlockSize
+		s.Format.Stripe = s.Format.Stride
+	}
+	if main.OptimalWriteSize > s.Format.BlockSize && main.OptimalWriteSize > main.RMWSize {
+		s.Format.Stripe = main.OptimalWriteSize / s.Format.BlockSize
+	}
 	return nil
 }
 

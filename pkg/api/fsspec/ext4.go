@@ -12,6 +12,8 @@ type Ext4UserParams struct {
 type Ext4Format struct {
 	SkipDiscard bool  `map:"skipDiscard,omitempty" json:"skipDiscard,omitempty"`
 	BlockSize   int64 `map:"blockSize,omitempty" json:"blockSize,omitempty"`
+	Stride      int64   `map:"stride,omitempty" json:"stride,omitempty"`
+	Stripe      int64   `map:"stripe,omitempty" json:"stripe,omitempty"`
 }
 
 type Ext4Data struct {
