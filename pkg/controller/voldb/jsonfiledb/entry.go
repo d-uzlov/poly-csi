@@ -23,7 +23,7 @@ const (
 func newEntry(tr transport.Transport, directory string, uuid string) *Entry {
 	return &Entry{
 		tr:        tr,
-		directory: directory,
+		directory: strings.TrimSuffix(directory, "/"),
 		uuid:      strings.TrimSpace(uuid),
 	}
 }
@@ -31,7 +31,13 @@ func newEntry(tr transport.Transport, directory string, uuid string) *Entry {
 func (e Entry) DeleteEntry(ctx context.Context) error {
 	cmds := e.tr.Cmds()
 
-	err := cmds.RmDirRecursive(ctx, e.directory)
+	delDir := e.directory + "-del"
+	err := cmds.Move(ctx, e.directory, delDir)
+	if err != nil {
+		return fmt.Errorf("move entry for safe deletion: %w", err)
+	}
+
+	err = cmds.RmDirRecursive(ctx, delDir)
 	if err != nil {
 		return fmt.Errorf("remove %s: %w", e.directory, err)
 	}

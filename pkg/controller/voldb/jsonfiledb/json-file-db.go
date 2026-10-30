@@ -17,6 +17,7 @@ type JsonFileDatabase struct {
 }
 
 func New(tr transport.Transport, config JsonFileInfoManagerConfig) voldb.VolumeDatabase {
+	config.Directory = strings.TrimSuffix(config.Directory, "/")
 	return &JsonFileDatabase{
 		tr:     tr,
 		config: config,
@@ -54,7 +55,7 @@ func (m *JsonFileDatabase) CreateEntry(ctx context.Context, name string, uuid st
 		}
 	}()
 
-	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
+	folder := fmt.Sprintf("%s/%s", m.config.Directory, name)
 	entry := newEntry(m.tr, folder, uuid)
 	err = entry.unsafeCreate(ctx)
 	if err != nil {
@@ -69,7 +70,7 @@ func (m *JsonFileDatabase) FindEntry(ctx context.Context, name string) (voldb.En
 		return nil, fmt.Errorf("entry name '%s' is invalid", name)
 	}
 
-	folder := fmt.Sprintf("%s/%s/", m.config.Directory, name)
+	folder := fmt.Sprintf("%s/%s", m.config.Directory, name)
 	entry := newEntry(m.tr, folder, "")
 	// CheckValid below expects valid UUID
 	fillUuidErr := entry.fillUuid(ctx)

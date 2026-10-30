@@ -289,6 +289,9 @@ func (df *DispatchNativeFs) Unpublish(ctx context.Context, nodeId string) error 
 }
 
 func (df *DispatchNativeFs) UnpublishAll(ctx context.Context) error {
+	if df.shareHandle == nil {
+		return nil
+	}
 	caps := df.shareManager.GetCapabilities()
 	if caps.UnpublishAll {
 		err := df.shareHandle.UnpublishAll(ctx)
@@ -318,12 +321,21 @@ func (df *DispatchNativeFs) UnpublishAll(ctx context.Context) error {
 }
 
 func (df *DispatchNativeFs) Destroy(ctx context.Context) error {
+	err := df.UnpublishAll(ctx)
+	if err != nil {
+		return fmt.Errorf("unpublishAll: %w", err)
+	}
+
 	if df.shareHandle != nil {
 		err := df.shareHandle.DeleteShare(ctx)
 		if err != nil {
 			return fmt.Errorf("shareHandle.DeleteShare: %w", err)
 		}
 		df.shareHandle = nil
+	}
+	err = df.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("save: %w", err)
 	}
 	if df.vol != nil {
 		err := df.vol.DeleteState(ctx)
@@ -332,7 +344,12 @@ func (df *DispatchNativeFs) Destroy(ctx context.Context) error {
 		}
 		df.vol = nil
 	}
-	return nil
+	err = df.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("save: %w", err)
+	}
+
+	return df.dbEntry.DeleteEntry(ctx)
 }
 
 type SerializedDispatchNativeFs struct {
@@ -350,13 +367,20 @@ type SerializedDispatchNativeFs struct {
 }
 
 func (df *DispatchNativeFs) Save(ctx context.Context) error {
-	storageData, err := df.vol.Serialize()
-	if err != nil {
-		return fmt.Errorf("serialize storage: %w", err)
+	var storageData json.RawMessage
+	var err error
+	if df.vol != nil {
+		storageData, err = df.vol.Serialize()
+		if err != nil {
+			return fmt.Errorf("serialize storage: %w", err)
+		}
 	}
-	shareData, err := df.shareHandle.Serialize()
-	if err != nil {
-		return fmt.Errorf("serialize share: %w", err)
+	var shareData json.RawMessage
+	if df.shareHandle != nil {
+		shareData, err = df.shareHandle.Serialize()
+		if err != nil {
+			return fmt.Errorf("serialize share: %w", err)
+		}
 	}
 
 	var addrOpt []string
@@ -425,11 +449,13 @@ func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *Dispatche
 	}
 	result.str = str
 
-	vol, err := str.ParseVolume(ds.StorageData)
-	if err != nil {
-		return result, fmt.Errorf("ParseVolume: %w", err)
+	if len(ds.StorageData) > 0 && string(ds.StorageData) != "null" {
+		vol, err := str.ParseVolume(ds.StorageData)
+		if err != nil {
+			return result, fmt.Errorf("ParseVolume: %w", err)
+		}
+		result.vol = vol
 	}
-	result.vol = vol
 
 	shr, err := filesharefactory.ShareFromType(tr, ds.FsParams.ShareType, srv.Conf.GlobalParams)
 	if err != nil {
@@ -437,11 +463,13 @@ func (ds *SerializedDispatchNativeFs) parse(ctx context.Context, conf *Dispatche
 	}
 	result.shareManager = shr
 
-	shareHandle, err := shr.ParseShare(ds.ShareData)
-	if err != nil {
-		return result, fmt.Errorf("ParseShare: %w", err)
+	if len(ds.ShareData) > 0 && string(ds.ShareData) != "null" {
+		shareHandle, err := shr.ParseShare(ds.ShareData)
+		if err != nil {
+			return result, fmt.Errorf("ParseShare: %w", err)
+		}
+		result.shareHandle = shareHandle
 	}
-	result.shareHandle = shareHandle
 
 	for _, a := range ds.AddrOpt {
 		found := false

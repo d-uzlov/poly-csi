@@ -373,6 +373,9 @@ func (df *DispatchBlockFs) Unpublish(ctx context.Context, nodeId string) error {
 
 func (df *DispatchBlockFs) UnpublishAll(ctx context.Context) error {
 	for k, v := range df.Block {
+		if v.shareHandle == nil {
+			continue
+		}
 		caps := v.shareManager.GetCapabilities()
 		if caps.UnpublishAll {
 			err := v.shareHandle.UnpublishAll(ctx)
@@ -405,7 +408,11 @@ func (df *DispatchBlockFs) UnpublishAll(ctx context.Context) error {
 func (df *DispatchBlockFs) Destroy(ctx context.Context) error {
 	err := df.UnpublishAll(ctx)
 	if err != nil {
-		return fmt.Errorf("unpublishAll")
+		return fmt.Errorf("unpublishAll: %w", err)
+	}
+	err = df.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("save: %w", err)
 	}
 	for k, v := range df.Block {
 		if v.shareHandle != nil {
@@ -419,6 +426,7 @@ func (df *DispatchBlockFs) Destroy(ctx context.Context) error {
 				return fmt.Errorf("save: %w", err)
 			}
 		}
+
 		if v.storageHandle != nil {
 			err := v.storageHandle.DeleteState(ctx)
 			if err != nil {
@@ -432,7 +440,8 @@ func (df *DispatchBlockFs) Destroy(ctx context.Context) error {
 		}
 		df.Block[k] = v
 	}
-	return nil
+
+	return df.dbEntry.DeleteEntry(ctx)
 }
 
 type SerializedDispatchBlockFs struct {
@@ -470,20 +479,29 @@ func (df *DispatchBlockFs) Save(ctx context.Context) error {
 		BlockParams: df.blockParams,
 		Block:       map[string]SerializedBlockInfo{},
 	}
-	fsMetaSerialized, err := df.FsMeta.Serialize()
-	if err != nil {
-		return err
+	if df.FsMeta != nil {
+		fsMetaSerialized, err := df.FsMeta.Serialize()
+		if err != nil {
+			return err
+		}
+		result.FsMeta = fsMetaSerialized
 	}
-	result.FsMeta = fsMetaSerialized
 
 	for k, v := range df.Block {
-		storageData, err := v.storageHandle.Serialize()
-		if err != nil {
-			return fmt.Errorf("block '%s': serialize storage: %w", k, err)
+		var storageData json.RawMessage
+		var err error
+		if v.storageHandle != nil {
+			storageData, err = v.storageHandle.Serialize()
+			if err != nil {
+				return fmt.Errorf("block '%s': serialize storage: %w", k, err)
+			}
 		}
-		shareData, err := v.shareHandle.Serialize()
-		if err != nil {
-			return fmt.Errorf("block '%s': serialize share: %w", k, err)
+		var shareData json.RawMessage
+		if v.shareHandle != nil {
+			shareData, err = v.shareHandle.Serialize()
+			if err != nil {
+				return fmt.Errorf("block '%s': serialize share: %w", k, err)
+			}
 		}
 		var addrOpt []string
 		for _, a := range v.addrOpt {
@@ -550,9 +568,11 @@ func (ds *SerializedDispatchBlockFs) parse(ctx context.Context, conf *Dispatcher
 	if result.FsMeta == nil {
 		return result, fmt.Errorf("fs: nil metadata")
 	}
-	err = result.FsMeta.Restore(ds.FsMeta)
-	if err != nil {
-		return result, fmt.Errorf("fs: restore: %w", err)
+	if len(ds.FsMeta) > 0 && string(ds.FsMeta) != "null" {
+		err = result.FsMeta.Restore(ds.FsMeta)
+		if err != nil {
+			return result, fmt.Errorf("fs: restore: %w", err)
+		}
 	}
 
 	for k, v := range ds.Block {
@@ -567,9 +587,13 @@ func (ds *SerializedDispatchBlockFs) parse(ctx context.Context, conf *Dispatcher
 			return result, fmt.Errorf("block '%s': find storage: %w", k, err)
 		}
 
-		vol, err := str.ParseVolume(v.StorageData)
-		if err != nil {
-			return result, fmt.Errorf("block '%s': ParseVolume: %w", k, err)
+		var vol blockvolume.Volume
+		if len(v.StorageData) > 0 && string(v.StorageData) != "null" {
+			vol, err = str.ParseVolume(v.StorageData)
+			if err != nil {
+				logs.FromCtx(ctx).MicroOp("failed to parse volume", "raw-data-len", "raw-data", v.StorageData)
+				return result, fmt.Errorf("block '%s': ParseVolume: %w", k, err)
+			}
 		}
 
 		shr, err := blkshrfactory.ShareFromType(tr, v.P.ShareType, srv.Conf.GlobalParams)
@@ -577,9 +601,12 @@ func (ds *SerializedDispatchBlockFs) parse(ctx context.Context, conf *Dispatcher
 			return result, fmt.Errorf("block '%s': find share: %w", k, err)
 		}
 
-		shareHandle, err := shr.ParseShare(v.ShareData)
-		if err != nil {
-			return result, fmt.Errorf("block '%s': ParseShare: %w", k, err)
+		var shareHandle blockshare.Share
+		if len(v.ShareData) > 0 && string(v.ShareData) != "null" {
+			shareHandle, err = shr.ParseShare(v.ShareData)
+			if err != nil {
+				return result, fmt.Errorf("block '%s': ParseShare: %w", k, err)
+			}
 		}
 
 		var addrOpt []AddressOption
