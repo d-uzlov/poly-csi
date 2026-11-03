@@ -161,9 +161,9 @@ func (s *wrapper) UpdateClient(ctx context.Context) (*ssh.Client, error) {
 		Timeout: s.config.DialTimeout,
 		KeepAliveConfig: net.KeepAliveConfig{
 			Enable:   true,
-			Idle:     15 * time.Second,
-			Interval: 15 * time.Second,
-			Count:    2,
+			Idle:     s.config.KeepaliveInterval,
+			Interval: s.config.KeepaliveInterval,
+			Count:    s.config.KeepaliveCount,
 		},
 	}
 	conn, err := dialer.DialContext(ctx, "tcp", s.config.ServerAddress)
@@ -171,15 +171,19 @@ func (s *wrapper) UpdateClient(ctx context.Context) (*ssh.Client, error) {
 		return nil, fmt.Errorf("DialContext: %w", err)
 	}
 	// https://github.com/golang/go/issues/19338#issuecomment-539057790
-	if s.config.DialTimeout > 0 {
-		conn.SetDeadline(time.Now().Add(s.sshClientConfig.Timeout))
+	err = conn.SetDeadline(time.Now().Add(s.config.DialTimeout))
+	if err != nil {
+		return nil, fmt.Errorf("conn.SetDeadline before NewClientConn: %w", err)
 	}
 	// NewClientConn uses address only for passing to sshClientConfig.HostKeyCallback
 	c, chans, reqs, err := ssh.NewClientConn(conn, s.config.ServerAddress, &s.sshClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("NewClientConn: %w", err)
 	}
-	conn.SetDeadline(time.Time{})
+	err = conn.SetDeadline(time.Time{})
+	if err != nil {
+		return nil, fmt.Errorf("conn.SetDeadline(0) after NewClientConn: %w", err)
+	}
 	s.client = ssh.NewClient(c, chans, reqs)
 	s.logger.Debug("SshWrapper.UpdateClient: success")
 	return s.client, nil

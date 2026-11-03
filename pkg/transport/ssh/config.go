@@ -6,10 +6,12 @@ import (
 )
 
 type Config struct {
-	verified              bool
+	verified              bool          `yaml:"verified"`
 	ServerAddress         string        `yaml:"serverAddress"`
 	Username              string        `yaml:"username"`
 	DialTimeout           time.Duration `yaml:"dialTimeout"`
+	KeepaliveInterval     time.Duration `yaml:"keepaliveInterval"`
+	KeepaliveCount        int           `yaml:"keepaliveCount"`
 	DefaultCommandTimeout time.Duration `yaml:"defaultCommandTimeout"`
 	Auth                  []Auth        `yaml:"auth"`
 }
@@ -34,6 +36,14 @@ func (sc *Config) Validate() (errorList []string, warningList []string) {
 	if sc.DialTimeout == 0 {
 		warningList = append(warningList, "dialTimeout: empty, set to 1s as default")
 		sc.DialTimeout = time.Second
+	}
+	if sc.KeepaliveInterval == 0 {
+		warningList = append(warningList, "keepaliveInterval: empty, set to 5s as default")
+		sc.KeepaliveInterval = 5 * time.Second
+	}
+	if sc.KeepaliveCount == 0 {
+		warningList = append(warningList, "KeepaliveCount: empty, set to 2 as default")
+		sc.KeepaliveCount = 2
 	}
 	if sc.DefaultCommandTimeout == 0 {
 		warningList = append(warningList, "defaultCommandTimeout: empty, set to 1s as default")
