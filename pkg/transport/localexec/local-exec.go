@@ -25,7 +25,7 @@ type Config struct {
 type localExecWrapper struct {
 	isRoot   bool
 	config   Config
-	commands *transport.ExecReplacement
+	commands transport.ExecReplacement
 }
 
 func New(config Config) transport.Transport {
@@ -55,7 +55,7 @@ func (s *localExecWrapper) SudoCmds() transport.Commands {
 	return executils.New(s, true)
 }
 
-func (s *localExecWrapper) SetCommands(commands *transport.ExecReplacement) {
+func (s *localExecWrapper) SetCommands(commands transport.ExecReplacement) {
 	s.commands = commands
 }
 

@@ -14,7 +14,7 @@ type commandReplacementConfig struct {
 type commandParams struct {
 }
 
-func NewExecReplacement(cfg map[string][]string) *ExecReplacement {
+func NewExecReplacement(cfg map[string][]string) ExecReplacement {
 	result := ExecReplacement{
 		commands: map[string]commandReplacementConfig{},
 	}
@@ -28,7 +28,7 @@ func NewExecReplacement(cfg map[string][]string) *ExecReplacement {
 		}
 		result.commands[cmdName] = crc
 	}
-	return &result
+	return result
 }
 
 func (c *ExecReplacement) Lookup(name string, preferSudo bool) []string {

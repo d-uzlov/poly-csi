@@ -30,7 +30,7 @@ func TransportFromType(transportType string, byteConfig yaml.Node) (Inflate, con
 			return localexec.New(cfg), nil
 		}, nil, nil
 	case TransportTypeSsh:
-		var cfg ssh_wrapper.SshConfig
+		var cfg ssh_wrapper.Config
 		err := byteConfig.Decode(&cfg)
 		if err != nil {
 			return nil, nil, fmt.Errorf("parse %s config: %w", transportType, err)

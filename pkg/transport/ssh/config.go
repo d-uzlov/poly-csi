@@ -5,21 +5,23 @@ import (
 	"time"
 )
 
-type SshConfig struct {
+type Config struct {
 	verified              bool
 	ServerAddress         string        `yaml:"serverAddress"`
 	Username              string        `yaml:"username"`
 	DialTimeout           time.Duration `yaml:"dialTimeout"`
 	DefaultCommandTimeout time.Duration `yaml:"defaultCommandTimeout"`
-	Auth                  []struct {
-		Name          string `yaml:"name"`
-		Type          string `yaml:"type"`
-		ValueFromEnv  string `yaml:"valueFromEnv"`
-		ValueFromFile string `yaml:"valueFromFile"`
-	} `yaml:"auth"`
+	Auth                  []Auth        `yaml:"auth"`
 }
 
-func (sc *SshConfig) Validate() (errorList []string, warningList []string) {
+type Auth struct {
+	Name          string `yaml:"name"`
+	Type          string `yaml:"type"`
+	ValueFromEnv  string `yaml:"valueFromEnv"`
+	ValueFromFile string `yaml:"valueFromFile"`
+}
+
+func (sc *Config) Validate() (errorList []string, warningList []string) {
 	if sc.ServerAddress == "" {
 		errorList = append(errorList, "serverAddress: field is empty")
 	}

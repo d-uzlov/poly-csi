@@ -11,7 +11,7 @@ type Transport interface {
 	Cleanup()
 	// SetCommands sets command overrides
 	// It's not thread-safe.
-	SetCommands(commands *ExecReplacement)
+	SetCommands(commands ExecReplacement)
 	// RunCommand runs specified command to completion
 	// Safe to run in parallel.
 	RunCommand(ctx context.Context, cmd []string, opts ...ExecOption) (RunResult, error)

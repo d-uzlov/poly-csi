@@ -19,26 +19,24 @@ import (
 
 const defaultTimeout = time.Second
 
-type sshWrapper struct {
-	ctx             context.Context
+type wrapper struct {
 	watcherCtx      context.Context
 	watcherCancel   func()
-	config          SshConfig
-	sshClientConfig *ssh.ClientConfig
+	config          Config
+	sshClientConfig ssh.ClientConfig
 	clientMutex     sync.Mutex
 	client          *ssh.Client
 	sshLogId        string
 	logger          *slog.Logger
-	commands        *transport.ExecReplacement
+	commands        transport.ExecReplacement
 }
 
-func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
+func New(ctx context.Context, config Config) (transport.Transport, error) {
 	if !config.verified {
 		return nil, fmt.Errorf("config is not validated")
 	}
 
-	result := &sshWrapper{
-		ctx:      ctx,
+	result := &wrapper{
 		config:   config,
 		sshLogId: fmt.Sprintf("%s@%s", config.Username, config.ServerAddress),
 		commands: transport.NewExecReplacement(map[string][]string{}),
@@ -82,7 +80,7 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		return nil, fmt.Errorf("no auth methods found")
 	}
 
-	result.sshClientConfig = &ssh.ClientConfig{
+	result.sshClientConfig = ssh.ClientConfig{
 		User:    config.Username,
 		Auth:    authMethods,
 		Timeout: config.DialTimeout,
@@ -90,7 +88,6 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	// TODO this will mean that if app context is cancelled, cleanup is not possible
 	result.watcherCtx, result.watcherCancel = context.WithCancel(ctx)
 	result.watcherCtx = slogctx.With(result.watcherCtx, "thread", "SshWrapper:client-watcher")
 
@@ -99,34 +96,36 @@ func New(ctx context.Context, config SshConfig) (transport.Transport, error) {
 	return result, nil
 }
 
-func (s *sshWrapper) watchClient(ctx context.Context) {
+func (s *wrapper) watchClient(ctx context.Context) {
 	for ctx.Err() == nil {
-		client := s.GetClient()
-		if client != nil {
-			err := client.Conn.Wait()
-			s.logger.Info("client connection closed", "error", err.Error())
+		s.restartClient(ctx)
+		// TODO add backoff? or remove repeated attempts from logs?
+		select {
+		case <-ctx.Done():
+		case <-time.Tick(time.Second):
 		}
-		if ctx.Err() != nil {
-			break
-		}
-		// at this point client is either nil or already closed
-		err := s.UpdateClient(client)
-		if err != nil {
-			s.logger.Error("SshWrapper.watchClient: UpdateClient failed", "error", err.Error())
-			// TODO add backoff? or remove repeated attempts from logs?
-			time.Sleep(time.Second)
-			continue
-		}
-		s.logger.Info("SshWrapper.watchClient: UpdateClient created new client")
 	}
 	s.logger.Debug("context cancelled, stopping ssh watcher")
 }
 
-func (s *sshWrapper) SetCommands(commands *transport.ExecReplacement) {
+func (s *wrapper) restartClient(ctx context.Context) {
+	clientCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	client, err := s.UpdateClient(clientCtx)
+	if err == nil {
+		s.logger.Info("SshWrapper.watchClient: UpdateClient created new client")
+		err := client.Conn.Wait()
+		s.logger.Info("client connection closed", "error", err.Error())
+	} else {
+		s.logger.Error("SshWrapper.watchClient: UpdateClient failed", "error", err.Error())
+	}
+}
+
+func (s *wrapper) SetCommands(commands transport.ExecReplacement) {
 	s.commands = commands
 }
 
-func (s *sshWrapper) Cleanup() {
+func (s *wrapper) Cleanup() {
 	s.clientMutex.Lock()
 	defer s.clientMutex.Unlock()
 
@@ -140,23 +139,18 @@ func (s *sshWrapper) Cleanup() {
 	}
 }
 
-func (s *sshWrapper) GetClient() *ssh.Client {
+func (s *wrapper) GetClient() *ssh.Client {
 	s.clientMutex.Lock()
 	defer s.clientMutex.Unlock()
 
 	return s.client
 }
 
-func (s *sshWrapper) UpdateClient(client *ssh.Client) error {
+func (s *wrapper) UpdateClient(ctx context.Context) (*ssh.Client, error) {
 	s.logger.Debug("SshWrapper.UpdateClient")
 
 	s.clientMutex.Lock()
 	defer s.clientMutex.Unlock()
-
-	if client != nil && client != s.client {
-		// someone has already updated client, no need to do anything
-		return nil
-	}
 
 	if s.client != nil {
 		s.client.Close()
@@ -172,22 +166,23 @@ func (s *sshWrapper) UpdateClient(client *ssh.Client) error {
 			Count:    2,
 		},
 	}
-	conn, err := dialer.DialContext(s.ctx, "tcp", s.config.ServerAddress)
+	conn, err := dialer.DialContext(ctx, "tcp", s.config.ServerAddress)
 	if err != nil {
-		return fmt.Errorf("DialContext: %w", err)
+		return nil, fmt.Errorf("DialContext: %w", err)
 	}
 	// https://github.com/golang/go/issues/19338#issuecomment-539057790
 	if s.config.DialTimeout > 0 {
 		conn.SetDeadline(time.Now().Add(s.sshClientConfig.Timeout))
 	}
-	c, chans, reqs, err := ssh.NewClientConn(conn, s.config.ServerAddress, s.sshClientConfig)
+	// NewClientConn uses address only for passing to sshClientConfig.HostKeyCallback
+	c, chans, reqs, err := ssh.NewClientConn(conn, s.config.ServerAddress, &s.sshClientConfig)
 	if err != nil {
-		return fmt.Errorf("NewClientConn: %w", err)
+		return nil, fmt.Errorf("NewClientConn: %w", err)
 	}
 	conn.SetDeadline(time.Time{})
 	s.client = ssh.NewClient(c, chans, reqs)
 	s.logger.Debug("SshWrapper.UpdateClient: success")
-	return nil
+	return s.client, nil
 }
 
 func checkIoError(err error) bool {

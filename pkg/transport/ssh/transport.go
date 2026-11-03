@@ -16,15 +16,15 @@ import (
 	"al.essio.dev/pkg/shellescape"
 )
 
-func (s *sshWrapper) Cmds() transport.Commands {
+func (s *wrapper) Cmds() transport.Commands {
 	return executils.New(s, false)
 }
 
-func (s *sshWrapper) SudoCmds() transport.Commands {
+func (s *wrapper) SudoCmds() transport.Commands {
 	return executils.New(s, true)
 }
 
-func (s *sshWrapper) RunCommand(ctx context.Context, cmd []string, opts ...transport.ExecOption) (transport.RunResult, error) {
+func (s *wrapper) RunCommand(ctx context.Context, cmd []string, opts ...transport.ExecOption) (transport.RunResult, error) {
 	if ctx.Err() != nil {
 		return transport.RunResult{}, ctx.Err()
 	}

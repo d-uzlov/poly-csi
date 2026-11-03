@@ -198,7 +198,7 @@ func (c *parsedServer) InitTransport(ctx context.Context, logPrefix string) erro
 	c.trInstance = instance
 	c.trConfig = cfg
 
-	c.trInstance.SetCommands(&c.ExecReplacements)
+	c.trInstance.SetCommands(c.ExecReplacements)
 
 	return nil
 }
@@ -257,7 +257,7 @@ func ParseDispatcherConfig(ctx context.Context, raw []byte) (*DispatcherConf, er
 			// TODO remove valid?
 			valid:            true,
 			Conf:             v,
-			ExecReplacements: *transport.NewExecReplacement(v.Commands),
+			ExecReplacements: transport.NewExecReplacement(v.Commands),
 		}
 
 		sl = append(sl, &srv)
